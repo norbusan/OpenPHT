@@ -1,0 +1,15 @@
+---
+ xbmc/peripherals/devices/PeripheralCecAdapter.cpp |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- plex-home-theater-public.git.orig/xbmc/peripherals/devices/PeripheralCecAdapter.cpp
++++ plex-home-theater-public.git/xbmc/peripherals/devices/PeripheralCecAdapter.cpp
+@@ -1379,7 +1379,7 @@
+   m_configuration.bShutdownOnStandby = iStandbyAction == 13005 ? 1 : 0;
+ 
+   // double tap prevention timeout in ms
+-  m_configuration.iDoubleTapTimeoutMs = GetSettingInt("double_tap_timeout_ms");
++  m_configuration.iDoubleTapTimeout50Ms = 50 / GetSettingInt("double_tap_timeout_ms");
+ }
+ 
+ void CPeripheralCecAdapter::ReadLogicalAddresses(const CStdString &strString, cec_logical_addresses &addresses)

@@ -1,0 +1,26 @@
+---
+ plex/Third-Party/aes/aes_via_ace.h |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+--- plex-home-theater-public.git.orig/plex/Third-Party/aes/aes_via_ace.h
++++ plex-home-theater-public.git/plex/Third-Party/aes/aes_via_ace.h
+@@ -351,7 +351,7 @@
+ INLINE int is_via_cpu(void)
+ {   int val;
+     asm("pushl %ebx\n\t");
+-    asm("xorl %eax,%eax\n\t");
++/*    asm("xorl %eax,%eax\n\t");
+     asm("cpuid\n\t");
+     asm("xorl %eax,%eax\n\t");
+     asm("subl $0x746e6543,%ebx\n\t");
+@@ -364,7 +364,9 @@
+     asm("popl %ebx\n\t");
+     val = (val ? 0 : 1);
+     via_flags = (val | NEH_CPU_READ);
+-    return val;
++    return val;*/
++    via_flags = (0 | NEH_CPU_READ);
++    return 0;
+ }
+ 
+ INLINE int read_via_flags(void)

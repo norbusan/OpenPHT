@@ -1,0 +1,6 @@
+
+* compilation with libcec
+  with the version in unstable cmake does not detect it
+  with the version in deb-multimedia (and probably in experimental) there
+  is a compilation error
+

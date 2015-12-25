@@ -1,0 +1,21 @@
+Patch from sobkas https://gist.github.com/sobkas/a79089bad0b3b5b504c4
+to make PHT work with both old and new libcec
+---
+ xbmc/peripherals/devices/PeripheralCecAdapter.cpp |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+--- plex-home-theater-public.git.orig/xbmc/peripherals/devices/PeripheralCecAdapter.cpp
++++ plex-home-theater-public.git/xbmc/peripherals/devices/PeripheralCecAdapter.cpp
+@@ -1379,7 +1379,11 @@
+   m_configuration.bShutdownOnStandby = iStandbyAction == 13005 ? 1 : 0;
+ 
+   // double tap prevention timeout in ms
+-  m_configuration.iDoubleTapTimeoutMs = GetSettingInt("double_tap_timeout_ms");
++  #if defined(CEC_DOUBLE_TAP_TIMEOUT_MS_OLD)
++     m_configuration.iDoubleTapTimeout50Ms = GetSettingInt("double_tap_timeout_ms") / 50;
++  #else
++     m_configuration.iDoubleTapTimeoutMs = GetSettingInt("double_tap_timeout_ms");
++  #endif
+ }
+ 
+ void CPeripheralCecAdapter::ReadLogicalAddresses(const CStdString &strString, cec_logical_addresses &addresses)

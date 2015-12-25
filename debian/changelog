@@ -1,0 +1,279 @@
+openpht (1.5.0.502-1~1) UNRELEASED; urgency=medium
+
+  * switch to openpht sources
+
+ -- Norbert Preining <preining@debian.org>  Fri, 25 Dec 2015 10:09:07 +0900
+
+plexhometheater (1.4.1-3) unstable; urgency=medium
+
+  * add alternative dependency on libcec3.0 for DebMultimedia
+
+ -- Norbert Preining <preining@debian.org>  Thu, 27 Aug 2015 15:38:17 +0900
+
+plexhometheater (1.4.1-2) unstable; urgency=medium
+
+  * update libcec patch from sobkas to deal with both libs
+  * fix compilation on libcec3
+  * adapt dependencies for current Debian/sid
+
+ -- Norbert Preining <preining@debian.org>  Tue, 25 Aug 2015 09:58:53 +0900
+
+plexhometheater (1.4.1-1) unstable; urgency=medium
+
+  * new release
+
+ -- Norbert Preining <preining@debian.org>  Thu, 14 May 2015 14:20:24 +0900
+
+plexhometheater (1.4.0.83-1) unstable; urgency=medium
+
+  * new release
+
+ -- Norbert Preining <preining@debian.org>  Fri, 01 May 2015 16:53:45 +0900
+
+plexhometheater (1.3.7.82-1) unstable; urgency=medium
+
+  * new release, built from bzr sources
+  * disable ffmpeg patch, included upstream
+
+ -- Norbert Preining <preining@debian.org>  Mon, 20 Apr 2015 12:14:53 +0900
+
+plexhometheater (1.3.6.441-0.1) unstable; urgency=medium
+
+  * new releases
+  * fix patches, remove libcec patch
+
+ -- Norbert Preining <preining@debian.org>  Thu, 05 Feb 2015 20:02:45 +0900
+
+plexhometheater (1.3.2.417-0.1) unstable; urgency=medium
+
+  * add libcec patch
+  * remove postinst, we don't need fonts
+  * adjust deps
+  * move to /usr/lib/plexhometheater
+  * rename script to plexhometheater on install
+  * rebuild on Debian/sid
+
+ -- Norbert Preining <preining@debian.org>  Thu, 04 Dec 2014 09:34:28 +0900
+
+plexhometheater (1.3.2.417-201412021047-ubuntu65~ubuntu14.10.1) utopic; urgency=low
+
+  * Auto build.
+
+ -- Christian Svedin <christian.svedin@gmail.com>  Tue, 02 Dec 2014 10:47:52 +0000
+
+plexhometheater (1.3.2.417) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 02 Dec 2014 10:37:00 +0100
+
+plexhometheater (1.3.1.409) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 27 Nov 2014 12:55:00 +0100
+
+plexhometheater (1.3.0.404) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 21 Nov 2014 10:00:00 +0100
+
+plexhometheater (1.2.3.378) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 28 Aug 2014 10:31:00 +0100
+
+plexhometheater (1.2.2.331) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Mon, 25 Aug 2014 21:53:00 +0200
+
+plexhometheater (1.2.1.314) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Sun, 03 Aug 2014 15:16:00 +0200
+
+plexhometheater (1.2.0.313) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Thu, 31 Jul 2014 19:59:00 +0200
+
+plexhometheater (1.1.6.303) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Sat, 12 Jul 2014 10:51:00 +0200
+
+plexhometheater (1.1.5.300) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 01 Jul 2014 14:32:00 +0200
+
+plexhometheater (1.1.4.297) trusty; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 19 Jun 2014 07:53:00 +0200
+
+plexhometheater (1.1.3.296) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 13 Jun 2014 06:17:00 +0200
+
+plexhometheater (1.1.1.283) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 24 May 2014 09:39:00 +0100
+
+plexhometheater (1.1.0.271) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 20 May 2014 11:19:00 +0100
+
+plexhometheater (1.0.13.222) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Fri, 24 Mar 2014 23:01:00 +0100
+
+plexhometheater (1.0.12.220) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Fri, 21 Mar 2014 16:08:00 +0100
+
+plexhometheater (1.0.11.213) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Mon, 17 Mar 2014 08:08:00 +0100
+
+plexhometheater (1.0.10.199) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 26 Feb 2014 22:19:00 +0100
+
+plexhometheater (1.0.10.197) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Tue, 25 Feb 2014 11:43:00 +0100
+
+plexhometheater (1.0.9.180) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Fri, 17 Jan 2014 15:58:00 +0100
+
+plexhometheater (1.0.8.175) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Fri, 10 Jan 2014 15:40:00 +0100
+
+plexhometheater (1.0.7.168) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Wed, 13 Dec 2013 11:28:00 +0100
+
+plexhometheater (1.0.6.162) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Wed, 11 Dec 2013 12:28:00 +0100
+
+plexhometheater (1.0.5.155) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Wed, 04 Dec 2013 10:57:00 +0100
+
+plexhometheater (1.0.4.144) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Sun, 24 Nov 2013 13:01:00 +0100
+
+plexhometheater (1.0.2.141) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Thu, 21 Nov 2013 14:34:00 +0100
+
+plexhometheater (1.0.1.126) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Thu, 13 Nov 2013 19:28:00 +0100
+
+plexhometheater (1.0.0.123) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Thu, 13 Nov 2013 15:25:00 +0100
+
+plexhometheater (0.9.10.2.44) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Thu, 05 Sep 2013 18:22:00 +0100
+
+plexhometheater (0.9.10.1.20) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Fri, 09 Aug 2013 18:22:00 +0100
+
+plexhometheater (0.9.10.0) precise; urgency=low
+
+  * Latest upstream release
+
+ -- Christian Svedin (gurka) <christian.svedin@gmail.com>  Wen, 26 Jun 2013 13:00:18 +0100
+
+plexhometheater (0.9.9.7) precise; urgency=low
+
+  * Latest upstream release
+
+ -- plex <plex@plex-ubuntu-1204-i386>  Thu, 21 Mar 2013 16:20:18 +0100
+
+plexhometheater (0.9.9.6) precise; urgency=low
+
+  * Latest upstream release
+
+ -- plex <plex@plex-ubuntu-1204-i386>  Thu, 14 Mar 2013 20:08:18 +0100
+
+plexhometheater (0.9.9.4) lucid; urgency=low
+
+  * Updated to latest release
+
+ -- Plex inc <linux@plexapp.com>  Thu, 31 Jan 2013 13:11:54 +0000
+
+plexhometheater (0.9.9.3) precise; urgency=low
+
+  * Updated to latest git
+
+ -- plex <plex@plex-ubuntu-1204-i386>  Tue, 22 Jan 2013 14:38:15 +0100
+
+plexhometheater (0.9.9.2) precise; urgency=low
+
+  * Upstream 0.9.9.2
+
+ -- Plex inc <linux@plexapp.com>  Thu, 17 Jan 2013 15:01:00 +0100
+
+plexhometheater (0.9.9) precise; urgency=low
+
+  * Initial release.
+
+ -- Plex inc <linux@plexapp.com>  Tue, 08 Jan 2013 13:27:29 +0100
+

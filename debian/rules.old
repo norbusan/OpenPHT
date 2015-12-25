@@ -1,0 +1,101 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+export DH_OPTIONS
+
+export 
+PACKAGE := plexhometheater
+pht := $(CURDIR)/debian/$(PACKAGE)
+libpht := /usr/lib/PlexHomeTheater
+
+
+
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+#LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
+unexport LDFLAGS
+
+CFLAGS += -g -Wall
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+
+build-stamp: configure-stamp
+	cd WORK && ninja
+	touch $@
+
+
+configure: configure-stamp
+
+configure-stamp:
+	dh_testdir
+	mkdir -p WORK
+	cd WORK && \
+		CXXFLAGS="$(CXXFLAGS)" CFLAGS="$(CFLAGS)" \
+		cmake -GNinja -DENABLE_UBUNTU_FFMPEG_HACK=on -DCOMPRESS_TEXTURES=on -DCMAKE_BUILD_TYPE=Debug -DENABLE_DVD_DRIVE=off -DENABLE_AUTOUPDATE=off -DCMAKE_INSTALL_PREFIX=$(libpht)  $(CURDIR)
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -rf WORK
+	dh_clean install-stamp build-stamp configure-stamp config.log
+
+install: install-stamp
+
+install-stamp: DH_OPTIONS=
+install-stamp: build-stamp
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	cd WORK && cmake -DCMAKE_INSTALL_PREFIX=$(pht)/$(libpht) -P cmake_install.cmake
+	mkdir -p $(pht)/usr/bin
+	cp debian/plexhometheater.sh $(pht)/usr/bin/plexhometheater
+	chmod 0644 $(pht)/usr/bin/plexhometheater
+	mkdir -p $(pht)/usr/share/applications
+	cp debian/plexhometheater.desktop $(pht)/usr/share/applications
+	mkdir -p $(pht)/usr/share/pixmaps
+	cp plex/Resources/plexhometheater.png $(pht)/usr/share/pixmaps
+	cp debian/plex-steamtile_460x215.png $(pht)/usr/share/pixmaps
+	# done
+	touch install-stamp
+
+binary-indep: install
+
+export LD_LIBRARY_PATH := debian/$(PACKAGE)/$(libpht)/bin/system/players/dvdplayer:$(LD_LIBRARY_PATH)
+
+binary-arch: DH_OPTIONS=-a
+binary-arch: install
+	dh_testdir
+	dh_testroot
+	dh_installdocs
+	dh_installchangelogs
+ifeq "$(findstring nostrip,$(DEB_BUILD_OPTIONS))" ""
+	dh_strip
+endif
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	#dh_shlibdeps -X avformat -X avfilter -X postproc -X swresample -X avcodec -X swscale 
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+
+orig-tar:
+	vers=`dpkg-parsechangelog -S Version | awk -F- '{print$$1}'` ;	\
+	if [ -r ../$(PACKAGE)_$$vers.orig.tar.gz ] ; then		\
+	  echo "orig.tar.gz already present for $$vers" ; exit 1 ;	\
+	else								\
+	  git archive 	\
+	    --output ../$(PACKAGE)_$$vers.orig.tar.gz pht-frodo		\
+	    --prefix $(PACKAGE)-$$vers/ ;				\
+	fi
+
+.PHONY: build clean binary-indep binary-arch binary install

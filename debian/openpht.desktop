@@ -1,0 +1,13 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=OpenPHT
+Name[en_US]=OpenPHT
+GenericName=OpenPHT
+X-GNOME-FullName=OpenPHT
+Comment=Watch your media on the big screen
+Exec=openpht
+Icon=openpht
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=AudioVideo

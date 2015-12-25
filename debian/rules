@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+DEB_AUTO_UPDATE_DEBIAN_CONTROL := yes
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/cmake.mk
+
+DEB_CMAKE_NORMAL_ARGS += -DENABLE_AUTOUPDATE=off -DCMAKE_BUILD_TYPE=Debug -DENABLE_DVD_DRIVE=off -DCOMPRESS_TEXTURES=on -DENABLE_UBUNTU_FFMPEG_HACK=on -DCMAKE_INSTALL_PREFIX=/usr/lib/openpht
+
+export LD_LIBRARY_PATH := debian/openpht/usr/lib/openpht/bin/system/players/dvdplayer:$(LD_LIBRARY_PATH) dh_shlibdeps
+unexport LDFLAGS
+
+# fix installation of plex
+install/openpht::
+	mkdir -p debian/openpht/usr/bin
+	cp debian/openpht.sh debian/openpht/usr/bin/openpht
+	chmod 0755 debian/openpht/usr/bin/openpht
+

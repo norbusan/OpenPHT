@@ -1,0 +1,4 @@
+#!/usr/bin/dh-exec
+debian/openpht.desktop /usr/share/applications
+plex/Resources/plexhometheater.png /usr/share/pixmaps
+debian/plex-steamtile_460x215.png /usr/share/pixmaps
