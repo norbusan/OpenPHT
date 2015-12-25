@@ -1,3 +1,9 @@
+openpht (1.5.0.502-1~bpo8+1) stable; urgency=medium
+
+  * bpo for jessie
+
+ -- Norbert Preining <preining@debian.org>  Fri, 25 Dec 2015 12:42:43 +0900
+
 openpht (1.5.0.502-1) unstable; urgency=medium
 
   * switch to openpht sources
