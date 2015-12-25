@@ -79,6 +79,8 @@ Build-Depends: cmake (>= 2.8.8), debhelper (>= 9),
 Package: openpht
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, libshairport2, libcec3 | libcec3.0, libplist3
+Replaces: plexhometheater
+Conflicts: plexhometheater
 Description: The most awesome Media Center you'll ever need.
   Forked from the Plex Home Theater to continue supporting open source
   Plex players.
