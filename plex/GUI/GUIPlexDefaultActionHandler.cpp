@@ -92,6 +92,14 @@ CGUIPlexDefaultActionHandler::CGUIPlexDefaultActionHandler()
   action->WindowSettings[WINDOW_VIDEO_NAV].contextMenuVisisble = true;
   m_ActionSettings.push_back(*action);
 
+  action = new ACTION_SETTING(ACTION_PLEX_GOTO_SHOW);
+  action->WindowSettings[WINDOW_HOME].contextMenuVisisble = true;
+  m_ActionSettings.push_back(*action);
+
+  action = new ACTION_SETTING(ACTION_PLEX_GOTO_SEASON);
+  action->WindowSettings[WINDOW_HOME].contextMenuVisisble = true;
+  m_ActionSettings.push_back(*action);
+
   action = new ACTION_SETTING(ACTION_DELETE_ITEM);
   action->WindowSettings[WINDOW_HOME].contextMenuVisisble = true;
   action->WindowSettings[WINDOW_PLEX_PLAY_QUEUE].contextMenuVisisble = true;
@@ -322,6 +330,37 @@ bool CGUIPlexDefaultActionHandler::OnAction(int windowID, CAction action, CFileI
         break;
       }
         
+      case ACTION_PLEX_GOTO_SHOW:
+      {
+        if (dirType == PLEX_DIR_TYPE_EPISODE && item->HasProperty("grandparentKey"))
+        {
+          std::vector<CStdString> args;
+          args.push_back(item->GetProperty("grandparentKey").asString() + "/children");
+          args.push_back("return");
+          CApplicationMessenger::Get().ActivateWindow(WINDOW_VIDEO_NAV, args, false);
+        }
+        else if (dirType == PLEX_DIR_TYPE_SEASON && item->HasProperty("parentKey"))
+        {
+          std::vector<CStdString> args;
+          args.push_back(item->GetProperty("parentKey").asString() + "/children");
+          args.push_back("return");
+          CApplicationMessenger::Get().ActivateWindow(WINDOW_VIDEO_NAV, args, false);
+        }
+        break;
+      }
+
+      case ACTION_PLEX_GOTO_SEASON:
+      {
+        if (dirType == PLEX_DIR_TYPE_EPISODE && item->HasProperty("parentKey"))
+        {
+          std::vector<CStdString> args;
+          args.push_back(item->GetProperty("parentKey").asString() + "/children");
+          args.push_back("return");
+          CApplicationMessenger::Get().ActivateWindow(WINDOW_VIDEO_NAV, args, false);
+        }
+        break;
+      }
+
       case ACTION_PLEX_PL_ADDTO:
       {
         if (IsItemPlaylistCompatible(item))
@@ -510,6 +549,24 @@ void CGUIPlexDefaultActionHandler::GetContextButtonsForAction(int actionID, CFil
 
         default:
           break;
+      }
+      break;
+
+    case ACTION_PLEX_GOTO_SHOW:
+      if (dirType == PLEX_DIR_TYPE_EPISODE && item->HasProperty("grandparentKey"))
+      {
+        buttons.Add(actionID, 52635);
+      }
+      else if (dirType == PLEX_DIR_TYPE_SEASON && item->HasProperty("parentKey"))
+      {
+        buttons.Add(actionID, 52635);
+      }
+      break;
+
+    case ACTION_PLEX_GOTO_SEASON:
+      if (dirType == PLEX_DIR_TYPE_EPISODE && item->HasProperty("parentKey"))
+      {
+        buttons.Add(actionID, 52636);
       }
       break;
 

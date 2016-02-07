@@ -80,7 +80,7 @@ typedef struct RTMPPacket {
     uint32_t       ts_delta;   ///< timestamp increment to the previous one in milliseconds (latter only for media packets)
     uint32_t       extra;      ///< probably an additional channel ID used during streaming data
     uint8_t        *data;      ///< packet payload
-    int            data_size;  ///< packet payload size
+    int            size;       ///< packet payload size
 } RTMPPacket;
 
 /**
@@ -217,6 +217,13 @@ void ff_amf_write_field_name(uint8_t **dst, const char *str);
  * @param dst pointer to the input buffer (will be modified)
  */
 void ff_amf_write_object_end(uint8_t **dst);
+
+/**
+ * Match AMF string with a NULL-terminated string.
+ *
+ * @return 0 if the strings do not match.
+ */
+int ff_amf_match_string(const uint8_t *data, int size, const char *str);
 
 /** @} */ // AMF funcs
 

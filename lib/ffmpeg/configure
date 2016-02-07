@@ -54,6 +54,8 @@ if test "$E1" != 0 || test "$E2" = 0; then
     exit 1
 fi
 
+test -d /usr/xpg4/bin && PATH=/usr/xpg4/bin:$PATH
+
 show_help(){
 cat <<EOF
 Usage: configure [options]
@@ -689,6 +691,13 @@ check_ld(){
     check_cmd $ld $LDFLAGS $flags -o $TMPE $TMPO $libs $extralibs
 }
 
+print_include(){
+    hdr=$1
+    test "${hdr%.h}" = "${hdr}" &&
+        echo "#include $hdr"    ||
+        echo "#include <$hdr>"
+}
+
 check_cppflags(){
     log check_cppflags "$@"
     set -- $($filter_cppflags "$@")
@@ -766,7 +775,7 @@ check_func_headers(){
     shift 2
     {
         for hdr in $headers; do
-            echo "#include <$hdr>"
+            print_include $hdr
         done
         for func in $funcs; do
             echo "long check_$func(void) { return (long) $func; }"
@@ -1169,6 +1178,7 @@ HAVE_LIST="
     dlfcn_h
     dlopen
     dos_paths
+    dxva_h
     ebp_available
     ebx_available
     exp2
@@ -2561,7 +2571,7 @@ check_host_cflags -std=c99
 check_host_cflags -Wall
 
 case "$arch" in
-    alpha|ia64|mips|parisc|sparc)
+    alpha|ia64|mips|parisc|ppc|sparc)
         spic=$shared
     ;;
     x86)
@@ -2903,17 +2913,14 @@ elif enabled ppc; then
         check_cc <<EOF || disable altivec
 $inc_altivec_h
 int main(void) {
-    vector signed int v1, v2, v3;
-    v1 = vec_add(v2,v3);
+    vector signed int v1 = (vector signed int) { 0 };
+    vector signed int v2 = (vector signed int) { 1 };
+    v1 = vec_add(v1, v2);
     return 0;
 }
 EOF
 
-        # check if our compiler supports braces for vector declarations
-        check_cc <<EOF || die "You need a compiler that supports {} in AltiVec vector declarations."
-$inc_altivec_h
-int main (void) { (vector int) {1}; return 0; }
-EOF
+        enabled altivec || warn "Altivec disabled, possibly missing --cpu flag"
     fi
 
 elif enabled sparc; then
@@ -2985,6 +2992,7 @@ if enabled asm; then
 fi
 
 check_ldflags -Wl,--as-needed
+check_ldflags -Wl,-z,noexecstack
 
 if check_func dlopen; then
     ldl=
@@ -3051,6 +3059,7 @@ check_func_headers windows.h MapViewOfFile
 check_func_headers windows.h VirtualAlloc
 
 check_header dlfcn.h
+check_header dxva.h
 check_header dxva2api.h -D_WIN32_WINNT=0x0600
 check_header libcrystalhd/libcrystalhd_if.h
 check_header malloc.h
@@ -3141,7 +3150,7 @@ enabled libdirac   && require_pkg_config dirac                          \
     "libdirac_decoder/dirac_parser.h libdirac_encoder/dirac_encoder.h"  \
     "dirac_decoder_init dirac_encoder_init"
 enabled libfaac    && require2 libfaac "stdint.h faac.h" faacEncGetVersion -lfaac
-enabled libfreetype && require_pkg_config freetype2 "ft2build.h freetype/freetype.h" FT_Init_FreeType
+enabled libfreetype && require_pkg_config freetype2 "ft2build.h FT_FREETYPE_H" FT_Init_FreeType
 enabled libgsm     && require  libgsm gsm/gsm.h gsm_create -lgsm
 enabled libmodplug && require  libmodplug libmodplug/modplug.h ModPlug_Load -lmodplug
 enabled libmp3lame && require  "libmp3lame >= 3.98.3" lame/lame.h lame_set_VBR_quality -lmp3lame
@@ -3207,7 +3216,14 @@ makeinfo --version > /dev/null 2>&1 && enable makeinfo  || disable makeinfo
 check_header linux/fb.h
 check_header linux/videodev.h
 check_header linux/videodev2.h
-check_struct linux/videodev2.h "struct v4l2_frmivalenum" discrete
+check_cc <<EOF && enable_safe struct_v4l2_frmivalenum_discrete
+#include <linux/videodev2.h>
+int main(void) {
+struct v4l2_frmsizeenum vfse;
+vfse.discrete.width = 0;
+return 0;
+}
+EOF
 
 check_header sys/videoio.h
 
@@ -3360,11 +3376,15 @@ elif enabled gcc; then
     check_cflags -fno-tree-vectorize
     check_cflags -Werror=implicit-function-declaration
     check_cflags -Werror=missing-prototypes
+    check_cflags -Werror=return-type
 elif enabled llvm_gcc; then
     check_cflags -mllvm -stack-alignment=16
 elif enabled clang; then
     check_cflags -mllvm -stack-alignment=16
     check_cflags -Qunused-arguments
+    check_cflags -Werror=return-type
+    check_cflags -Werror=implicit-function-declaration
+    check_cflags -Werror=missing-prototypes
 elif enabled armcc; then
     # 2523: use of inline assembler is deprecated
     add_cflags -W${armcc_opt},--diag_suppress=2523

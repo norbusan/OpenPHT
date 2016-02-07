@@ -1239,7 +1239,7 @@ static void m4sl_cb(MpegTSFilter *filter, const uint8_t *section, int section_le
             AVStream *st;
             if (ts->pids[pid]->es_id != mp4_descr[i].es_id)
                 continue;
-            if (!(ts->pids[pid] && ts->pids[pid]->type == MPEGTS_PES)) {
+            if (ts->pids[pid]->type != MPEGTS_PES) {
                 av_log(s, AV_LOG_ERROR, "pid %x is not PES\n", pid);
                 continue;
             }
@@ -1587,12 +1587,18 @@ static void pat_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
         if (sid == 0x0000) {
             /* NIT info */
         } else {
+            MpegTSFilter *fil = ts->pids[pmt_pid];
             program = av_new_program(ts->stream, sid);
             program->program_num = sid;
             program->pmt_pid = pmt_pid;
-            if (ts->pids[pmt_pid])
-                mpegts_close_filter(ts, ts->pids[pmt_pid]);
-            mpegts_open_section_filter(ts, pmt_pid, pmt_cb, ts, 1);
+            if (fil)
+                if (   fil->type != MPEGTS_SECTION
+                    || fil->pid != pmt_pid
+                    || fil->u.section_filter.section_cb != pmt_cb)
+                    mpegts_close_filter(ts, ts->pids[pmt_pid]);
+
+            if (!ts->pids[pmt_pid])
+                mpegts_open_section_filter(ts, pmt_pid, pmt_cb, ts, 1);
             add_pat_entry(ts, sid);
             add_pid_to_pmt(ts, sid, 0); //add pat pid to program
             add_pid_to_pmt(ts, sid, pmt_pid);
@@ -1642,7 +1648,7 @@ static void sdt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
                 break;
             desc_len = get8(&p, desc_list_end);
             desc_end = p + desc_len;
-            if (desc_end > desc_list_end)
+            if (desc_len < 0 || desc_end > desc_list_end)
                 break;
 
             av_dlog(ts->stream, "tag: 0x%02x len=%d\n",

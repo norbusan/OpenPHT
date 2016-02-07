@@ -43,7 +43,7 @@
 #undef NDEBUG
 #include <assert.h>
 
-extern const uint8_t mvtab[33][2];
+extern const uint8_t ff_mvtab[33][2];
 
 static VLC svq1_block_type;
 static VLC svq1_motion_component;
@@ -644,13 +644,29 @@ static int svq1_decode_frame(AVCodecContext *avctx,
     return -1;
 
   /* swap some header bytes (why?) */
-  if (s->f_code != 0x20) {
-    uint32_t *src = (uint32_t *) (buf + 4);
+    if (s->f_code != 0x20) {
+        uint32_t *src;
 
-    for (i=0; i < 4; i++) {
-      src[i] = ((src[i] << 16) | (src[i] >> 16)) ^ src[7 - i];
+        if (buf_size < 9 * 4) {
+            av_log(avctx, AV_LOG_ERROR, "Input packet too small\n");
+            return AVERROR_INVALIDDATA;
+        }
+
+        av_fast_padded_malloc(&s->pkt_swapped, &s->pkt_swapped_allocated,
+                       buf_size);
+        if (!s->pkt_swapped)
+            return AVERROR(ENOMEM);
+
+        memcpy(s->pkt_swapped, buf, buf_size);
+        buf = s->pkt_swapped;
+        init_get_bits(&s->gb, buf, buf_size * 8);
+        skip_bits(&s->gb, 22);
+
+        src = (uint32_t *)(s->pkt_swapped + 4);
+
+        for (i = 0; i < 4; i++)
+            src[i] = ((src[i] << 16) | (src[i] >> 16)) ^ src[7 - i];
     }
-  }
 
   result = svq1_decode_frame_header (&s->gb, s);
 
@@ -769,8 +785,8 @@ static av_cold int svq1_decode_init(AVCodecContext *avctx)
         &ff_svq1_block_type_vlc[0][0], 2, 1, 6);
 
     INIT_VLC_STATIC(&svq1_motion_component, 7, 33,
-        &mvtab[0][1], 2, 1,
-        &mvtab[0][0], 2, 1, 176);
+        &ff_mvtab[0][1], 2, 1,
+        &ff_mvtab[0][0], 2, 1, 176);
 
     for (i = 0; i < 6; i++) {
         static const uint8_t sizes[2][6] = {{14, 10, 14, 18, 16, 18}, {10, 10, 14, 14, 14, 16}};
@@ -803,6 +819,9 @@ static av_cold int svq1_decode_init(AVCodecContext *avctx)
 static av_cold int svq1_decode_end(AVCodecContext *avctx)
 {
     MpegEncContext *s = avctx->priv_data;
+
+    av_freep(&s->pkt_swapped);
+    s->pkt_swapped_allocated = 0;
 
     MPV_common_end(s);
     return 0;

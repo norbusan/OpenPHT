@@ -166,8 +166,8 @@ static inline int decode_residual_inter(AVSContext *h) {
 
     /* get coded block pattern */
     int cbp= get_ue_golomb(&h->s.gb);
-    if(cbp > 63U){
-        av_log(h->s.avctx, AV_LOG_ERROR, "illegal inter cbp\n");
+    if(cbp > 63 || cbp < 0){
+        av_log(h->s.avctx, AV_LOG_ERROR, "illegal inter cbp %d\n", cbp);
         return -1;
     }
     h->cbp = cbp_tab[cbp][1];
@@ -226,7 +226,7 @@ static int decode_mb_i(AVSContext *h, int cbp_code) {
     /* get coded block pattern */
     if(h->pic_type == AV_PICTURE_TYPE_I)
         cbp_code = get_ue_golomb(gb);
-    if(cbp_code > 63U){
+    if(cbp_code > 63 || cbp_code < 0 ){
         av_log(h->s.avctx, AV_LOG_ERROR, "illegal intra cbp\n");
         return -1;
     }
@@ -468,6 +468,11 @@ static int decode_pic(AVSContext *h) {
     int skip_count = -1;
     enum cavs_mb mb_type;
 
+    if (!h->top_qp) {
+        av_log(h, AV_LOG_ERROR, "No sequence header decoded yet\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     if (!s->context_initialized) {
         s->avctx->idct_algo = FF_IDCT_CAVS;
         if (MPV_common_init(s) < 0)
@@ -609,12 +614,21 @@ static int decode_pic(AVSContext *h) {
 static int decode_seq_header(AVSContext *h) {
     MpegEncContext *s = &h->s;
     int frame_rate_code;
+    int width, height;
 
     h->profile =         get_bits(&s->gb,8);
     h->level =           get_bits(&s->gb,8);
     skip_bits1(&s->gb); //progressive sequence
-    s->width =           get_bits(&s->gb,14);
-    s->height =          get_bits(&s->gb,14);
+
+    width  = get_bits(&s->gb, 14);
+    height = get_bits(&s->gb, 14);
+    if ((s->width || s->height) && (s->width != width || s->height != height)) {
+        av_log_missing_feature(s, "Width/height changing in CAVS is", 0);
+        return AVERROR_PATCHWELCOME;
+    }
+    s->width  = width;
+    s->height = height;
+
     skip_bits(&s->gb,2); //chroma format
     skip_bits(&s->gb,3); //sample_precision
     h->aspect_ratio =    get_bits(&s->gb,4);

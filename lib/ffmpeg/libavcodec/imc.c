@@ -36,6 +36,7 @@
 #include <stdio.h>
 
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "dsputil.h"
 #include "fft.h"
@@ -365,6 +366,10 @@ static int bit_allocation (IMCContext* q, int stream_format_code, int freebits, 
         iacc += q->bandWidthT[i];
         summa += q->bandWidthT[i] * q->flcoeffs4[i];
     }
+
+    if (!iacc)
+        return AVERROR_INVALIDDATA;
+
     q->bandWidthT[BANDS-1] = 0;
     summa = (summa * 0.5 - freebits) / iacc;
 
@@ -676,7 +681,7 @@ static int imc_decode_frame(AVCodecContext * avctx, void *data,
 
     /* get output buffer */
     q->frame.nb_samples = COEFFS;
-    if ((ret = avctx->get_buffer(avctx, &q->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &q->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }

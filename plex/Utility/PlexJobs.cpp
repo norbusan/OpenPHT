@@ -228,6 +228,8 @@ bool CPlexTextureCacheJob::CacheTexture(CBaseTexture **texture)
   unsigned int width, height;
   CStdString image = DecodeImageURL(m_url, width, height, additional_info);
 
+  m_details.updateable = additional_info != "music" && UpdateableURL(image);
+
   // generate the hash
   m_details.hash = GetImageHash(image);
   if (m_details.hash.empty())
@@ -295,6 +297,10 @@ bool CPlexTextureCacheJob::CacheTexture(CBaseTexture **texture)
     m_outputFile.Flush();
     m_inputFile.Close();
     m_outputFile.Close();
+	
+    if (texture)
+      *texture = CTextureCacheJob::LoadImage(CTextureCache::GetCachedPath(m_details.file), width, height, additional_info);
+	
     return true;
   }
   else

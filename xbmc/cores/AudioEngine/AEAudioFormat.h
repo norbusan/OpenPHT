@@ -43,7 +43,8 @@ enum AEDataFormat
 
   AE_FMT_S24BE4,
   AE_FMT_S24LE4,
-  AE_FMT_S24NE4, /* S24 in 4 bytes */
+  AE_FMT_S24NE4,    // 24 bits in lower 3 bytes
+  AE_FMT_S24NE4MSB, // S32 with bits_per_sample < 32
 
   AE_FMT_S24BE3,
   AE_FMT_S24LE3,
@@ -70,7 +71,7 @@ enum AEDataFormat
 /**
  * The audio format structure that fully defines a stream's audio information
  */
-typedef struct {
+typedef struct AEAudioFormat{
   /**
    * The stream's data format (eg, AE_FMT_S16LE)
    */
@@ -105,5 +106,27 @@ typedef struct {
    * The size of one frame in bytes
    */
   unsigned int m_frameSize;
+ 
+  AEAudioFormat()
+  {
+    m_dataFormat = AE_FMT_INVALID;
+    m_sampleRate = 0;
+    m_encodedRate = 0;
+    m_frames = 0;
+    m_frameSamples = 0;
+    m_frameSize = 0;
+  }
+
+  bool operator==(const AEAudioFormat& fmt) const
+  {
+    return  m_dataFormat    ==  fmt.m_dataFormat    &&
+            m_sampleRate    ==  fmt.m_sampleRate    &&
+            m_encodedRate   ==  fmt.m_encodedRate   &&
+            m_channelLayout ==  fmt.m_channelLayout &&
+            m_frames        ==  fmt.m_frames        &&
+            m_frameSamples  ==  fmt.m_frameSamples  &&
+            m_frameSize     ==  fmt.m_frameSize;
+  }
+ 
 } AEAudioFormat;
 

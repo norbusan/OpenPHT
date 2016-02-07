@@ -44,17 +44,6 @@
 		<posy>47</posy>
 		<posx>34</posx>
 	</include>
-	<include name="SearchScreenPosterDimmer">
-		<posx>37</posx>
-		<posy>50</posy>
-		<width>116</width>
-		<height>176</height>
-		<aspectratio scalediffuse="false" align="center">scale</aspectratio>
-		<texture diffuse="posterMaskSmall.png" background="true">posterMaskSmall.png</texture>
-		<colordiffuse>FF000000</colordiffuse>
-		<animation effect="fade" start="0" end="50" time="400" condition="true">Visible</animation>
-		<animation effect="fade" start="50" end="0" time="300" condition="true">Hidden</animation>
-	</include>
 	<!-- Poster Items -->
 	<include name="SearchScreenPoster">
 		<control type="image">
@@ -184,17 +173,6 @@
 			<info>ListItem.Overlay</info>
 			<animation effect="fade" start="100" end="50" time="300" condition="ControlGroup(7001).HasFocus">Conditional</animation>
 		</control>
-	</include>
-	<include name="SearchScreenPosterDimmer">
-		<posx>37</posx>
-		<posy>50</posy>
-		<width>116</width>
-		<height>176</height>
-		<aspectratio scalediffuse="false" align="center">scale</aspectratio>
-		<texture diffuse="posterMaskSmall.png" background="true">posterMaskSmall.png</texture>
-		<colordiffuse>FF000000</colordiffuse>
-		<animation effect="fade" start="0" end="50" time="400" condition="true">Visible</animation>
-		<animation effect="fade" start="50" end="0" time="300" condition="true">Hidden</animation>
 	</include>
 	<!-- Square Items -->
 	<include name="SearchScreenSquare">

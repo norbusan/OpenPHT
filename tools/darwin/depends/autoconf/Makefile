@@ -2,7 +2,7 @@ include ../Makefile.buildtools
 
 # lib name, version
 APPNAME=autoconf
-VERSION=2.63
+VERSION=2.69
 SOURCE=$(APPNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 

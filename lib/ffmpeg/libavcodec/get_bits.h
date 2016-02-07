@@ -342,25 +342,33 @@ static inline int check_marker(GetBitContext *s, const char *msg)
 }
 
 /**
- * Inititalize GetBitContext.
- * @param buffer bitstream buffer, must be FF_INPUT_BUFFER_PADDING_SIZE bytes larger than the actual read bits
- * because some optimized bitstream readers read 32 or 64 bit at once and could read over the end
+ * Initialize GetBitContext.
+ * @param buffer bitstream buffer, must be FF_INPUT_BUFFER_PADDING_SIZE bytes
+ *        larger than the actual read bits because some optimized bitstream
+ *        readers read 32 or 64 bit at once and could read over the end
  * @param bit_size the size of the buffer in bits
+ * @return 0 on success, AVERROR_INVALIDDATA if the buffer_size would overflow.
  */
-static inline void init_get_bits(GetBitContext *s, const uint8_t *buffer,
-                                 int bit_size)
+static inline int init_get_bits(GetBitContext *s, const uint8_t *buffer,
+                                int bit_size)
 {
-    int buffer_size = (bit_size+7)>>3;
-    if (buffer_size < 0 || bit_size < 0) {
+    int buffer_size;
+    int ret = 0;
+
+    if (bit_size > INT_MAX - 7 || bit_size < 0 || !buffer) {
         buffer_size = bit_size = 0;
         buffer = NULL;
+        ret = AVERROR_INVALIDDATA;
     }
+
+    buffer_size = (bit_size + 7) >> 3;
 
     s->buffer       = buffer;
     s->size_in_bits = bit_size;
     s->size_in_bits_plus8 = bit_size + 8;
     s->buffer_end   = buffer + buffer_size;
     s->index        = 0;
+    return ret;
 }
 
 static inline void align_get_bits(GetBitContext *s)
@@ -373,19 +381,19 @@ static inline void align_get_bits(GetBitContext *s)
                  bits, bits_wrap, bits_size,            \
                  codes, codes_wrap, codes_size,         \
                  flags)                                 \
-        init_vlc_sparse(vlc, nb_bits, nb_codes,         \
-                        bits, bits_wrap, bits_size,     \
-                        codes, codes_wrap, codes_size,  \
-                        NULL, 0, 0, flags)
+        ff_init_vlc_sparse(vlc, nb_bits, nb_codes,         \
+                           bits, bits_wrap, bits_size,     \
+                           codes, codes_wrap, codes_size,  \
+                           NULL, 0, 0, flags)
 
-int init_vlc_sparse(VLC *vlc, int nb_bits, int nb_codes,
+int ff_init_vlc_sparse(VLC *vlc, int nb_bits, int nb_codes,
              const void *bits, int bits_wrap, int bits_size,
              const void *codes, int codes_wrap, int codes_size,
              const void *symbols, int symbols_wrap, int symbols_size,
              int flags);
 #define INIT_VLC_LE         2
 #define INIT_VLC_USE_NEW_STATIC 4
-void free_vlc(VLC *vlc);
+void ff_free_vlc(VLC *vlc);
 
 #define INIT_VLC_STATIC(vlc, bits, a,b,c,d,e,f,g, static_size) do {     \
         static VLC_TYPE table[static_size][2];                          \

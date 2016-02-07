@@ -603,12 +603,12 @@ bool CPeripherals::OnAction(const CAction &action)
       for (unsigned int iPeripheralPtr = 0; iPeripheralPtr < peripherals.size(); iPeripheralPtr++)
       {
         CPeripheralCecAdapter *cecDevice = (CPeripheralCecAdapter *) peripherals.at(iPeripheralPtr);
-        if (cecDevice && cecDevice->HasConnectedAudioSystem())
+        if (cecDevice && cecDevice->HasAudioControl())
         {
           if (action.GetID() == ACTION_VOLUME_UP)
-            cecDevice->ScheduleVolumeUp();
+            cecDevice->VolumeUp();
           else
-            cecDevice->ScheduleVolumeDown();
+            cecDevice->VolumeDown();
           return true;
         }
       }
@@ -642,9 +642,9 @@ bool CPeripherals::ToggleMute(void)
     for (unsigned int iPeripheralPtr = 0; iPeripheralPtr < peripherals.size(); iPeripheralPtr++)
     {
       CPeripheralCecAdapter *cecDevice = (CPeripheralCecAdapter *) peripherals.at(iPeripheralPtr);
-      if (cecDevice && cecDevice->HasConnectedAudioSystem())
+      if (cecDevice && cecDevice->HasAudioControl())
       {
-        cecDevice->ScheduleMute();
+        cecDevice->ToggleMute();
         return true;
       }
     }

@@ -69,7 +69,7 @@ struct CZeroconfAvahi::ServiceInfo
   AvahiEntryGroup* mp_group;
 };
 
-CZeroconfAvahi::CZeroconfAvahi(): mp_client(0), mp_poll (0), m_shutdown(false),m_thread_id(0)
+CZeroconfAvahi::CZeroconfAvahi(): mp_client(0), mp_poll (0)
 {
     if (! (mp_poll = avahi_threaded_poll_new()))
     {
@@ -94,37 +94,14 @@ CZeroconfAvahi::CZeroconfAvahi(): mp_client(0), mp_poll (0), m_shutdown(false),m
 CZeroconfAvahi::~CZeroconfAvahi()
 {
   CLog::Log(LOGDEBUG, "CZeroconfAvahi::~CZeroconfAvahi() Going down! cleaning up...");
-
-  if (mp_poll)
-  {
-    //normally we would stop the avahi thread here and do our work, but
-    //it looks like this does not work -> www.avahi.org/ticket/251
-    //so instead of calling
-    //avahi_threaded_poll_stop(mp_poll);
-    //we set m_shutdown=true, post an event and wait for it to stop itself
-    struct timeval tv = { 0, 0 }; //TODO: does tv survive the thread?
-    AvahiTimeout* lp_timeout;
-    {
-      ScopedEventLoopBlock l_block(mp_poll);
-      const AvahiPoll* cp_apoll = avahi_threaded_poll_get(mp_poll);
-      m_shutdown = true;
-      lp_timeout = cp_apoll->timeout_new(cp_apoll,
-                                         &tv,
-                                         shutdownCallback,
-                                         this);
-    }
-
-    //now wait for the thread to stop
-    assert(m_thread_id);
-    pthread_join(m_thread_id, NULL);
-    avahi_threaded_poll_get(mp_poll)->timeout_free(lp_timeout);
-  }
-
+  avahi_threaded_poll_stop ( mp_poll );
   //free the client (frees all browsers, groups, ...)
   if (mp_client)
     avahi_client_free(mp_client);
+  mp_client = 0;
   if (mp_poll)
     avahi_threaded_poll_free(mp_poll);
+  mp_poll = 0;
 }
 
 bool CZeroconfAvahi::doPublishService(const std::string& fcr_identifier,
@@ -216,15 +193,6 @@ void CZeroconfAvahi::doStop()
 void CZeroconfAvahi::clientCallback(AvahiClient* fp_client, AvahiClientState f_state, void* fp_data)
 {
   CZeroconfAvahi* p_instance = static_cast<CZeroconfAvahi*>(fp_data);
-
-  //store our thread ID and check for shutdown -> check details in destructor
-  p_instance->m_thread_id = pthread_self();
-
-  if (p_instance->m_shutdown)
-  {
-    avahi_threaded_poll_quit(p_instance->mp_poll);
-    return;
-  }
   switch(f_state)
   {
   case AVAHI_CLIENT_S_RUNNING:
@@ -265,14 +233,6 @@ void CZeroconfAvahi::clientCallback(AvahiClient* fp_client, AvahiClientState f_s
 void CZeroconfAvahi::groupCallback(AvahiEntryGroup *fp_group, AvahiEntryGroupState f_state, void * fp_data)
 {
   CZeroconfAvahi* p_instance = static_cast<CZeroconfAvahi*>(fp_data);
-  //store our thread ID and check for shutdown -> check details in destructor
-  p_instance->m_thread_id = pthread_self();
-  if (p_instance->m_shutdown)
-  {
-    avahi_threaded_poll_quit(p_instance->mp_poll);
-    return;
-  }
-
   switch (f_state)
   {
   case AVAHI_ENTRY_GROUP_ESTABLISHED :
@@ -330,16 +290,6 @@ void CZeroconfAvahi::groupCallback(AvahiEntryGroup *fp_group, AvahiEntryGroupSta
   case AVAHI_ENTRY_GROUP_REGISTERING:
   default:
     break;
-  }
-}
-
-void CZeroconfAvahi::shutdownCallback(AvahiTimeout *fp_e, void *fp_data)
-{
-  CZeroconfAvahi* p_instance = static_cast<CZeroconfAvahi*>(fp_data);
-  //should only be called on shutdown
-  if (p_instance->m_shutdown)
-  {
-    avahi_threaded_poll_quit(p_instance->mp_poll);
   }
 }
 

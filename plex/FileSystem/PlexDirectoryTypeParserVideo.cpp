@@ -69,6 +69,22 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
   else
     videoTag.m_fRating = item.GetProperty("rating").asDouble();
   
+  if (item.HasProperty("rating") && item.GetProperty("rating").asDouble() >= 0.0)
+    item.SetProperty("ratingPercent", (int)(item.GetProperty("rating").asDouble() * 10.0));
+  if (item.HasProperty("audienceRating") && item.GetProperty("audienceRating").asDouble() >= 0.0)
+    item.SetProperty("audienceRatingPercent", (int)(item.GetProperty("audienceRating").asDouble() * 10.0));
+
+  if (item.HasProperty("ratingImage") && boost::starts_with(item.GetProperty("ratingImage").asString(), "rottentomatoes://image.rating."))
+    item.SetProperty("ratingImage", "rottentomatoes-" + item.GetProperty("ratingImage").asString().substr(30) + ".png");
+  else
+    item.ClearProperty("ratingImage");
+  if (item.HasProperty("audienceRatingImage") && boost::starts_with(item.GetProperty("audienceRatingImage").asString(), "rottentomatoes://image.rating."))
+    item.SetProperty("audienceRatingImage", "rottentomatoes-" + item.GetProperty("audienceRatingImage").asString().substr(30) + ".png");
+  else
+    item.ClearProperty("audienceRatingImage");
+  if (!item.HasProperty("audienceRatingImage") && item.HasProperty("ratingImage"))
+    item.SetProperty("audienceRatingImage", "rottentomatoes-plus.png");
+
   if (item.HasProperty("summary") && !item.GetProperty("summary").empty())
     videoTag.m_strPlot = videoTag.m_strPlotOutline = item.GetProperty("summary").asString();
   else if (item.HasProperty("parentSummary"))

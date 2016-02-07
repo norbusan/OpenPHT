@@ -78,12 +78,12 @@ public:
   CAEChannelInfo& operator=(const CAEChannelInfo& rhs);
   CAEChannelInfo& operator=(const enum AEChannel* rhs);
   CAEChannelInfo& operator=(const enum AEStdChLayout rhs);
-  bool operator==(const CAEChannelInfo& rhs);
+  bool operator==(const CAEChannelInfo& rhs) const;
   bool operator!=(const CAEChannelInfo& rhs);
   CAEChannelInfo& operator+=(const enum AEChannel& rhs);
   CAEChannelInfo& operator-=(const enum AEChannel& rhs);
   const enum AEChannel operator[](unsigned int i) const;
-  operator std::string();
+  operator std::string() const;
 
   /* remove any channels that dont exist in the provided info */
   void ResolveChannels(const CAEChannelInfo& rhs);
@@ -91,7 +91,7 @@ public:
   inline unsigned int Count() const { return m_channelCount; }
   static const char* GetChName(const enum AEChannel ch);
   bool HasChannel(const enum AEChannel ch) const;
-  bool ContainsChannels(CAEChannelInfo& rhs) const;
+  bool ContainsChannels(const CAEChannelInfo& rhs) const;
 private:
   unsigned int   m_channelCount;
   enum AEChannel m_channels[AE_CH_MAX];

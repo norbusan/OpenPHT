@@ -41,6 +41,9 @@ using namespace PVR;
 #ifndef __PLEX__
 CDVDDemux* CDVDFactoryDemuxer::CreateDemuxer(CDVDInputStream* pInputStream)
 {
+  if (!pInputStream)
+    return NULL;
+
   // Try to open the AirTunes demuxer
   if (pInputStream->IsStreamType(DVDSTREAM_TYPE_FILE) && pInputStream->GetContent().compare("audio/x-xbmc-pcm") == 0 )
   {
@@ -128,6 +131,9 @@ CDVDDemux* CDVDFactoryDemuxer::CreateDemuxer(CDVDInputStream* pInputStream)
 #else
 CDVDDemux* CDVDFactoryDemuxer::CreateDemuxer(CDVDInputStream *pInputStream, CStdString &error)
 {
+  if (!pInputStream)
+    return NULL;
+
   // Try to open the AirTunes demuxer
   if (pInputStream->IsStreamType(DVDSTREAM_TYPE_FILE) && pInputStream->GetContent().compare("audio/x-xbmc-pcm") == 0 )
   {

@@ -6,7 +6,7 @@ export CXXFLAGS=-I$(TOOLCHAIN)/include
 
 # lib name, version
 LIBNAME=libpng
-VERSION=1.2.38
+VERSION=1.6.21
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 

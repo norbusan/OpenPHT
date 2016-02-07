@@ -48,6 +48,8 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
     int timeout = 50;
     char hostname[1024],proto[1024],path[1024];
     char portstr[10];
+    size_t len;
+    char *c;
 
     av_url_split(proto, sizeof(proto), NULL, 0, hostname, sizeof(hostname),
         &port, path, sizeof(path), uri);
@@ -60,6 +62,17 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
             listen_socket = 1;
         if (av_find_info_tag(buf, sizeof(buf), "timeout", p)) {
             timeout = strtol(buf, NULL, 10);
+        }
+    }
+    len = strlen(hostname);
+    if (len > 12 && !strcmp(hostname + len - 12, ".plex.direct")) {
+        for (c = hostname; *c; c++) {
+            if (*c == '-') {
+                *c = '.';
+            } else if (*c == '.') {
+                *c = '\0';
+                break;
+            }
         }
     }
     memset(&hints, 0, sizeof(hints));

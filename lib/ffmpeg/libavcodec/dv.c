@@ -312,7 +312,7 @@ static av_cold int dvvideo_init(AVCodecContext *avctx)
             dv_rl_vlc[i].level = level;
             dv_rl_vlc[i].run   = run;
         }
-        free_vlc(&dv_vlc);
+        ff_free_vlc(&dv_vlc);
 
         dv_vlc_map_tableinit();
     }
@@ -371,11 +371,6 @@ typedef struct BlockInfo {
 /* bit budget for AC only in 5 MBs */
 static const int vs_total_ac_bits = (100 * 4 + 68*2) * 5;
 static const int mb_area_start[5] = { 1, 6, 21, 43, 64 };
-
-static inline int put_bits_left(PutBitContext* s)
-{
-    return (s->buf_end - s->buf) * 8 - put_bits_count(s);
-}
 
 /* decode AC coefficients */
 static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, DCTELEM *block)

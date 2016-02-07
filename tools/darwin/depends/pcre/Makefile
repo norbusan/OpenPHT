@@ -2,13 +2,16 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=pcre
-VERSION=7.9
+VERSION=8.38
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 
 # configuration settings
 CONFIGURE=./configure --prefix=$(PREFIX) \
-  --disable-stack-for-recursion
+	--disable-stack-for-recursion \
+	--enable-pcre8 --disable-pcre16 --disable-pcre32 \
+	--enable-jit --enable-utf --enable-unicode-properties \
+	--enable-newline-is-anycrlf
 
 LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
 

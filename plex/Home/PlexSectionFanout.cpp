@@ -114,7 +114,7 @@ void CPlexSectionFanout::Refresh(bool force)
       trueUrl.SetOption("X-Plex-Container-Size", "20");
 #endif
 
-      if (m_sectionType != SECTION_TYPE_ALBUM)
+      if (m_sectionType != SECTION_TYPE_ALBUM && !g_guiSettings.GetBool("myplex.recentlywatched"))
         trueUrl.SetOption("unwatched", "1");
 
 #if 0

@@ -179,16 +179,16 @@ CAEChannelInfo& CAEChannelInfo::operator=(const enum AEStdChLayout rhs)
     {AE_CH_FL, AE_CH_FR, AE_CH_BL , AE_CH_BR , AE_CH_NULL},
     {AE_CH_FL, AE_CH_FR, AE_CH_BL , AE_CH_BR , AE_CH_LFE, AE_CH_NULL},
     {AE_CH_FL, AE_CH_FR, AE_CH_FC , AE_CH_BL , AE_CH_BR , AE_CH_NULL},
-    {AE_CH_FL, AE_CH_FR, AE_CH_FC , AE_CH_BL , AE_CH_BR , AE_CH_LFE, AE_CH_NULL},
+    {AE_CH_FL, AE_CH_FR, AE_CH_FC , AE_CH_LFE,  AE_CH_BL , AE_CH_BR , AE_CH_NULL},
     {AE_CH_FL, AE_CH_FR, AE_CH_FC , AE_CH_BL , AE_CH_BR , AE_CH_SL , AE_CH_SR, AE_CH_NULL},
-    {AE_CH_FL, AE_CH_FR, AE_CH_FC , AE_CH_BL , AE_CH_BR , AE_CH_SL , AE_CH_SR, AE_CH_LFE, AE_CH_NULL}
+    {AE_CH_FL, AE_CH_FR, AE_CH_FC , AE_CH_LFE, AE_CH_BL , AE_CH_BR , AE_CH_SL , AE_CH_SR, AE_CH_NULL}
   };
 
   *this = layouts[rhs];
   return *this;
 }
 
-bool CAEChannelInfo::operator==(const CAEChannelInfo& rhs)
+bool CAEChannelInfo::operator==(const CAEChannelInfo& rhs) const
 {
   /* if the channel count doesnt match, no need to check further */
   if (m_channelCount != rhs.m_channelCount)
@@ -240,7 +240,7 @@ const enum AEChannel CAEChannelInfo::operator[](unsigned int i) const
   return m_channels[i];
 }
 
-CAEChannelInfo::operator std::string()
+CAEChannelInfo::operator std::string() const
 {
   if (m_channelCount == 0)
     return "NULL";
@@ -258,7 +258,7 @@ CAEChannelInfo::operator std::string()
 
 const char* CAEChannelInfo::GetChName(const enum AEChannel ch)
 {
-  ASSERT(ch >= 0 || ch < AE_CH_MAX);
+  ASSERT(ch >= 0 && ch < AE_CH_MAX);
 
   static const char* channels[AE_CH_MAX] =
   {
@@ -289,7 +289,7 @@ bool CAEChannelInfo::HasChannel(const enum AEChannel ch) const
   return false;
 }
 
-bool CAEChannelInfo::ContainsChannels(CAEChannelInfo& rhs) const
+bool CAEChannelInfo::ContainsChannels(const CAEChannelInfo& rhs) const
 {
   for (unsigned int i = 0; i < rhs.m_channelCount; ++i)
   {

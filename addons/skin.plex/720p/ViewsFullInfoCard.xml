@@ -478,9 +478,9 @@
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(movie)">$INFO[Container(11000).ListItem.DurationStr]$INFO[Container(11000).ListItem.Year, &#xB7; ]</value>
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(album)">$INFO[Container(11000).ListItem.Label]</value>
 		<!-- queue -->
-		<value condition="ControlGroup(7003).HasFocus]">$INFO[Container(11003).ListItem.DurationStr]</value>
+		<value condition="ControlGroup(7003).HasFocus">$INFO[Container(11003).ListItem.DurationStr]</value>
 		<!-- recommended -->
-		<value condition="ControlGroup(7005).HasFocus]">$INFO[Container(11004).ListItem.DurationStr]</value>
+		<value condition="ControlGroup(7005).HasFocus">$INFO[Container(11004).ListItem.DurationStr]</value>
 	</variable>
 	<variable name="HomeListItemFullInfoThirdTitle">
 		<!-- on deck -->
@@ -492,9 +492,9 @@
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(movie)">[UPPERCASE]$INFO[Container(11000).ListItem.Genre][/UPPERCASE]</value>
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(album) + !IsEmpty(Container(11000).ListItem.Album)">$INFO[Container(11000).ListItem.Album]</value>
 		<!-- queue -->
-		<value condition="ControlGroup(7003).HasFocus]">$INFO[Container(11003).ListItem.Property(sourceTitle)]</value>
+		<value condition="ControlGroup(7003).HasFocus">$INFO[Container(11003).ListItem.Property(sourceTitle)]</value>
 		<!-- recommended -->
-		<value condition="ControlGroup(7005).HasFocus]">$INFO[Container(11004).ListItem.Property(Recommender)]$INFO[Container(11004).ListItem.Property(sourceTitle), [COLOR=orange]&#xB7;[/COLOR] ]</value>
+		<value condition="ControlGroup(7005).HasFocus">$INFO[Container(11004).ListItem.Property(Recommender)]$INFO[Container(11004).ListItem.Property(sourceTitle), [COLOR=orange]&#xB7;[/COLOR] ]</value>
 		<!--><value>No second title available (debug).</value>-->
 		<!--><value>No third title available (debug).</value>-->
 	</variable>
@@ -508,9 +508,9 @@
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(episode) + !Skin.HasSetting(HidePlotForUnwatched)">$INFO[Container(11000).ListItem.Plot]</value>
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(episode) + Skin.HasSetting(HidePlotForUnwatched)">$LOCALIZE[32105]</value>
 		<!-- queue -->
-		<value condition="ControlGroup(7003).HasFocus]">$INFO[Container(11003).ListItem.Plot]</value>
+		<value condition="ControlGroup(7003).HasFocus">$INFO[Container(11003).ListItem.Plot]</value>
 		<!-- recommended -->
-		<value condition="ControlGroup(7005).HasFocus]">$INFO[Container(11004).ListItem.Plot]</value>
+		<value condition="ControlGroup(7005).HasFocus">$INFO[Container(11004).ListItem.Plot]</value>
 		<!--><value>No plot available (debug).</value>-->
 	</variable>
 	<include name="HomeListItemFullInfoFlags">

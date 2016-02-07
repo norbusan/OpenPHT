@@ -46,6 +46,11 @@ static av_cold int xan_decode_init(AVCodecContext *avctx)
 
     avctx->pix_fmt = PIX_FMT_YUV420P;
 
+    if (avctx->width & 1) {
+        av_log(avctx, AV_LOG_ERROR, "Invalid frame width: %d.\n", avctx->width);
+        return AVERROR(EINVAL);
+    }
+
     s->buffer_size = avctx->width * avctx->height;
     s->y_buffer = av_malloc(s->buffer_size);
     if (!s->y_buffer)
@@ -298,7 +303,7 @@ static int xan_decode_frame_type0(AVCodecContext *avctx)
         if (chroma_off > corr_off)
             corr_end = chroma_off;
         bytestream2_seek(&s->gb, 8 + corr_off, SEEK_SET);
-        dec_size = xan_unpack(s, s->scratch_buffer, s->buffer_size);
+        dec_size = xan_unpack(s, s->scratch_buffer, s->buffer_size / 2);
         if (dec_size < 0)
             dec_size = 0;
         else

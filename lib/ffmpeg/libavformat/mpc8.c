@@ -55,7 +55,7 @@ typedef struct {
 
 static inline int64_t bs_get_v(uint8_t **bs)
 {
-    int64_t v = 0;
+    uint64_t v = 0;
     int br = 0;
     int c;
 
@@ -89,7 +89,7 @@ static int mpc8_probe(AVProbeData *p)
         size = bs_get_v(&bs);
         if (size < 2)
             return 0;
-        if (bs + size - 2 >= bs_end)
+        if (size >= bs_end - bs + 2)
             return AVPROBE_SCORE_MAX / 4 - 1; //seems to be valid MPC but no header yet
         if (header_found) {
             if (size < 11 || size > 28)
@@ -106,7 +106,7 @@ static int mpc8_probe(AVProbeData *p)
 
 static inline int64_t gb_get_v(GetBitContext *gb)
 {
-    int64_t v = 0;
+    uint64_t v = 0;
     int bits = 0;
     while(get_bits1(gb) && bits < 64-7){
         v <<= 7;
@@ -137,10 +137,19 @@ static void mpc8_parse_seektable(AVFormatContext *s, int64_t off)
     int i, t, seekd;
     GetBitContext gb;
 
+    if (s->nb_streams == 0) {
+        av_log(s, AV_LOG_ERROR, "No stream added before parsing seek table\n");
+        return;
+    }
+
     avio_seek(s->pb, off, SEEK_SET);
     mpc8_get_chunk_header(s->pb, &tag, &size);
     if(tag != TAG_SEEKTABLE){
         av_log(s, AV_LOG_ERROR, "No seek table at given position\n");
+        return;
+    }
+    if (size < 0 || size >= INT_MAX / 2) {
+        av_log(s, AV_LOG_ERROR, "Bad seek table size\n");
         return;
     }
     if(!(buf = av_malloc(size + FF_INPUT_BUFFER_PADDING_SIZE)))
@@ -205,6 +214,10 @@ static int mpc8_read_header(AVFormatContext *s, AVFormatParameters *ap)
     while(!url_feof(pb)){
         pos = avio_tell(pb);
         mpc8_get_chunk_header(pb, &tag, &size);
+        if (size < 0) {
+            av_log(s, AV_LOG_ERROR, "Invalid chunk length\n");
+            return AVERROR_INVALIDDATA;
+        }
         if(tag == TAG_STREAMHDR)
             break;
         mpc8_handle_chunk(s, tag, pos, size);

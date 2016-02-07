@@ -24,6 +24,7 @@
 #include "YUV2RGBShader.h"
 #include "settings/AdvancedSettings.h"
 #include "guilib/TransformMatrix.h"
+#include "windowing/WindowingFactory.h"
 #include "utils/log.h"
 #if defined(HAS_GL) || defined(HAS_GLES)
 #include "utils/GLUtils.h"
@@ -106,8 +107,20 @@ void CalculateYUVMatrix(TransformMatrix &matrix
       coef.m[row][col] = conv[col][row];
   coef.identity = false;
 
+
+  if(g_Windowing.UseLimitedColor())
+  {
+    matrix *= TransformMatrix::CreateTranslation(+ 16.0f / 255
+                                               , + 16.0f / 255
+                                               , + 16.0f / 255);
+    matrix *= TransformMatrix::CreateScaler((235 - 16) / 255.0f
+                                          , (235 - 16) / 255.0f
+                                          , (235 - 16) / 255.0f);
+  }
+
   matrix *= coef;
   matrix *= TransformMatrix::CreateTranslation(0.0, -0.5, -0.5);
+
   if (!(flags & CONF_FLAGS_YUV_FULLRANGE))
   {
     matrix *= TransformMatrix::CreateScaler(255.0f / (235 - 16)
@@ -199,7 +212,7 @@ BaseYUV2RGBGLSLShader::BaseYUV2RGBGLSLShader(bool rect, unsigned flags, ERenderF
     m_defines += "#define XBMC_NV12\n";
   else if (m_format == RENDER_FMT_YUYV422)
     m_defines += "#define XBMC_YUY2\n";
-  else if (m_format == RENDER_FMT_UYVY422)
+  else if (m_format == RENDER_FMT_UYVY422 || m_format == RENDER_FMT_CVBREF)
     m_defines += "#define XBMC_UYVY\n";
   else
     CLog::Log(LOGERROR, "GL: BaseYUV2RGBGLSLShader - unsupported format %d", m_format);
@@ -213,6 +226,12 @@ BaseYUV2RGBGLSLShader::BaseYUV2RGBGLSLShader(bool rect, unsigned flags, ERenderF
   m_hProj   = -1;
   m_hModel  = -1;
   m_hAlpha  = -1;
+  if (m_format == RENDER_FMT_YUV420P)
+    m_defines += "#define XBMC_YV12\n";
+  else if (m_format == RENDER_FMT_NV12)
+    m_defines += "#define XBMC_NV12\n";
+  else
+    CLog::Log(LOGERROR, "GL: BaseYUV2RGBGLSLShader - unsupported format %d", m_format);
 
   VertexShader()->LoadSource("yuv2rgb_vertex_gles.glsl", m_defines);
 #endif
@@ -354,7 +373,7 @@ YUV2RGBProgressiveShaderARB::YUV2RGBProgressiveShaderARB(bool rect, unsigned fla
     else
       shaderfile = "yuv2rgb_basic_2d_YUY2.arb";
   }
-  else if (m_format == RENDER_FMT_UYVY422)
+  else if (m_format == RENDER_FMT_UYVY422 || m_format == RENDER_FMT_CVBREF)
   {
     if(rect)
       shaderfile = "yuv2rgb_basic_rect_UYVY.arb";

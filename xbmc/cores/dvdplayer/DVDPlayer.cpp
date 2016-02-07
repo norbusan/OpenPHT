@@ -496,26 +496,12 @@ bool CDVDPlayer::OpenFile(const CFileItem& file, const CPlayerOptions &options)
 #endif
 
     Create();
-    if(!m_ready.WaitMSec(100))
-    {
-      CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
-      if(dialog)
-      {
-        dialog->Show();
-        while(!m_ready.WaitMSec(1))
-        {
-          /* PLEX */
-          if (dialog->IsCanceled())
-          {
-            m_bStop = true;
-            Abort();
-          }
-          /* END PLEX */
 
-          g_windowManager.ProcessRenderLoop(false);
-        }
-        dialog->Close();
-      }
+    // wait for the ready event
+    if (!CGUIDialogBusy::WaitOnEvent(m_ready, g_advancedSettings.m_videoBusyDialogDelay_ms))
+    {
+      m_bStop = true;
+      Abort();
     }
 
     // Playback might have been stopped due to some error
@@ -2254,9 +2240,9 @@ void CDVDPlayer::HandleMessages()
         if(!msg.GetTrickPlay())
         {
           g_infoManager.SetDisplayAfterSeek(100000);
-          if(msg.GetFlush())
-            SetCaching(CACHESTATE_FLUSH);
         }
+        if(msg.GetFlush())
+          SetCaching(CACHESTATE_FLUSH);
 
         double start = DVD_NOPTS_VALUE;
 
@@ -2817,7 +2803,7 @@ void CDVDPlayer::GetAudioInfo(CStdString& strAudioInfo)
   { CSingleLock lock(m_StateSection);
     strAudioInfo.Format("D(%s)", m_State.demux_audio.c_str());
   }
-  strAudioInfo.AppendFormat(" P(%s)", m_dvdPlayerAudio.GetPlayerInfo().c_str());
+  strAudioInfo.AppendFormat("\nP(%s)", m_dvdPlayerAudio.GetPlayerInfo().c_str());
 }
 
 void CDVDPlayer::GetVideoInfo(CStdString& strVideoInfo)
@@ -2825,7 +2811,7 @@ void CDVDPlayer::GetVideoInfo(CStdString& strVideoInfo)
   { CSingleLock lock(m_StateSection);
     strVideoInfo.Format("D(%s)", m_State.demux_video.c_str());
   }
-  strVideoInfo.AppendFormat(" P(%s)", m_dvdPlayerVideo.GetPlayerInfo().c_str());
+  strVideoInfo.AppendFormat("\nP(%s)", m_dvdPlayerVideo.GetPlayerInfo().c_str());
 }
 
 void CDVDPlayer::GetGeneralInfo(CStdString& strGeneralInfo)
@@ -2848,7 +2834,7 @@ void CDVDPlayer::GetGeneralInfo(CStdString& strGeneralInfo)
     CSingleLock lock(m_StateSection);
     if(m_State.cache_bytes >= 0)
     {
-      strBuf.AppendFormat(" cache:%s %2.0f%%"
+      strBuf.AppendFormat(" forward:%s %2.0f%%"
                          , StringUtils::SizeToString(m_State.cache_bytes).c_str()
                          , m_State.cache_level * 100);
       if(m_playSpeed == 0 || m_caching == CACHESTATE_FULL)

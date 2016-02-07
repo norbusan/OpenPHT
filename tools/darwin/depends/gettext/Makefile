@@ -2,7 +2,7 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=gettext
-VERSION=0.17
+VERSION=0.19.7
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 
@@ -14,7 +14,7 @@ CONFIGURE=./configure --prefix=$(PREFIX) \
     --with-included-glib \
     --with-included-libcroco \
     --with-included-libxml \
-    --without-git --without-cvs
+    --without-git --without-cvs --disable-curses
 
 LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
 
@@ -27,13 +27,6 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
-	cd $(SOURCE); patch -p0 <../01-gettext-tools-Makefile.in.patch
-	if [ "$(DARWIN)" = "osx" ] && [ "$(SDK)" != "10.4" ] && [ "$(SDK)" != "10.5" ] && [ "$(SDK)" != "10.6" ];then \
-	  cd $(SOURCE); patch -p1 <../02-gettext-tools-stpncpy.patch; \
-	fi
-	if [ "$(DARWIN)" = "ios" ] && [ "$(SDK)" != "4.2" ]; then \
-	  cd $(SOURCE); patch -p1 <../02-gettext-tools-stpncpy.patch; \
-	fi
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)

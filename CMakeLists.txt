@@ -28,7 +28,7 @@ endif()
 
 set(PLEX_VERSION_MAJOR 1)
 set(PLEX_VERSION_MINOR 5)
-set(PLEX_VERSION_PATCH 0)
+set(PLEX_VERSION_PATCH 1)
 if(DEFINED ENV{BUILD_NUMBER})
   set(PLEX_VERSION_BUILD "$ENV{BUILD_NUMBER}")
   set(PLEX_VERSION_BUILD_NR "$ENV{BUILD_NUMBER}")
@@ -99,7 +99,9 @@ if(NOT TARGET_RPI)
 endif()
 
 # add our visualizations
-add_subdirectory(xbmc/visualizations)
+if(NOT TARGET_RPI)
+  add_subdirectory(xbmc/visualizations)
+endif()
 
 # global includes
 include_directories(

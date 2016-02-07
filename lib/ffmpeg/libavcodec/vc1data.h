@@ -41,7 +41,7 @@ extern const int ff_vc1_ttfrm_to_tt[4];
 extern const uint8_t ff_vc1_mv_pmode_table[2][5];
 extern const uint8_t ff_vc1_mv_pmode_table2[2][4];
 
-extern const int ff_vc1_fps_nr[5], ff_vc1_fps_dr[2];
+extern const int ff_vc1_fps_nr[7], ff_vc1_fps_dr[2];
 extern const uint8_t ff_vc1_pquant_table[3][32];
 
 /* MBMODE table for interlaced frame P-picture */
@@ -200,4 +200,9 @@ extern const int32_t ff_vc1_dqscale[63];
 extern const uint16_t vc1_field_mvpred_scales[2][7][4];
 /* B Interlaced field picture backward MV predictor scaling values for first field (Table 115) */
 extern const uint16_t vc1_b_field_mvpred_scales[7][4];
+
+#define AC_MODES 8
+
+extern const int ff_vc1_ac_sizes[AC_MODES];
+
 #endif /* AVCODEC_VC1DATA_H */

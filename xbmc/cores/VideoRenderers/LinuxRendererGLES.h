@@ -137,6 +137,7 @@ public:
   virtual unsigned int PreInit();
   virtual void         UnInit();
   virtual void         Reset(); /* resets renderer after seek for example */
+  virtual void         Flush();
   virtual void         ReorderDrawPoints();
 
   virtual void RenderUpdate(bool clear, DWORD flags = 0, DWORD alpha = 255);
@@ -173,6 +174,7 @@ protected:
   int  NextYV12Texture();
   virtual bool ValidateRenderTarget();
   virtual void LoadShaders(int field=FIELD_FULL);
+  virtual void ReleaseShaders();
   void SetTextureFilter(GLenum method);
   void UpdateVideoFilter();
 
@@ -184,6 +186,10 @@ protected:
   void UploadYV12Texture(int index);
   void DeleteYV12Texture(int index);
   bool CreateYV12Texture(int index);
+
+  void UploadNV12Texture(int index);
+  void DeleteNV12Texture(int index);
+  bool CreateNV12Texture(int index);
 
   void UploadCVRefTexture(int index);
   void DeleteCVRefTexture(int index);
@@ -235,6 +241,10 @@ protected:
     unsigned texwidth;
     unsigned texheight;
 
+    //pixels per texel
+    unsigned pixpertex_x;
+    unsigned pixpertex_y;
+
     unsigned flipindex;
   };
 
@@ -267,9 +277,10 @@ protected:
 
   void LoadPlane( YUVPLANE& plane, int type, unsigned flipindex
                 , unsigned width,  unsigned height
-                , int stride, void* data );
+                , unsigned int stride, int bpp, void* data );
 
-  Shaders::BaseYUV2RGBShader     *m_pYUVShader;
+  Shaders::BaseYUV2RGBShader     *m_pYUVProgShader;
+  Shaders::BaseYUV2RGBShader     *m_pYUVBobShader;
   Shaders::BaseVideoFilterShader *m_pVideoFilterShader;
   ESCALINGMETHOD m_scalingMethod;
   ESCALINGMETHOD m_scalingMethodGui;

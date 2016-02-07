@@ -37,6 +37,7 @@
 #include <stdio.h>
 
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "dsputil.h"
 #include "bytestream.h"
@@ -184,8 +185,11 @@ static int decode_bytes(const uint8_t* inbuffer, uint8_t* out, int bytes){
     uint32_t* obuf = (uint32_t*) out;
 
     off = (intptr_t)inbuffer & 3;
-    buf = (const uint32_t*) (inbuffer - off);
-    c = av_be2ne32((0x537F6103 >> (off*8)) | (0x537F6103 << (32-(off*8))));
+    buf = (const uint32_t *)(inbuffer - off);
+    if (off)
+        c = av_be2ne32((0x537F6103U >> (off * 8)) | (0x537F6103U << (32 - (off * 8))));
+    else
+        c = av_be2ne32(0x537F6103U);
     bytes += 3 + off;
     for (i = 0; i < bytes/4; i++)
         obuf[i] = c ^ buf[i];
@@ -687,7 +691,8 @@ static int decodeChannelSoundUnit (ATRAC3Context *q, GetBitContext *gb, channel_
     if (result) return result;
 
     pSnd->numComponents = decodeTonalComponents (gb, pSnd->components, pSnd->bandsCoded);
-    if (pSnd->numComponents == -1) return -1;
+    if (pSnd->numComponents < 0)
+        return pSnd->numComponents;
 
     numSubbands = decodeSpectrum (gb, pSnd->spectrum);
 
@@ -769,7 +774,7 @@ static int decodeFrame(ATRAC3Context *q, const uint8_t* databuf,
 
 
         /* set the bitstream reader at the start of the second Sound Unit*/
-        init_get_bits(&q->gb,ptr1,q->bits_per_frame);
+        init_get_bits(&q->gb, ptr1, (q->bytes_per_frame - i) * 8);
 
         /* Fill the Weighting coeffs delay buffer */
         memmove(q->weighting_delay,&(q->weighting_delay[2]),4*sizeof(int));
@@ -848,7 +853,7 @@ static int atrac3_decode_frame(AVCodecContext *avctx, void *data,
 
     /* get output buffer */
     q->frame.nb_samples = SAMPLES_PER_FRAME;
-    if ((result = avctx->get_buffer(avctx, &q->frame)) < 0) {
+    if ((result = ff_get_buffer(avctx, &q->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return result;
     }
@@ -972,6 +977,8 @@ static av_cold int atrac3_decode_init(AVCodecContext *avctx)
     if (q->codingMode == STEREO) {
         av_log(avctx,AV_LOG_DEBUG,"Normal stereo detected.\n");
     } else if (q->codingMode == JOINT_STEREO) {
+        if (avctx->channels != 2)
+            return AVERROR_INVALIDDATA;
         av_log(avctx,AV_LOG_DEBUG,"Joint stereo detected.\n");
     } else {
         av_log(avctx,AV_LOG_ERROR,"Unknown channel coding mode %x!\n",q->codingMode);

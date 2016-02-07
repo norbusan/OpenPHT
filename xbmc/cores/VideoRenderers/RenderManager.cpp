@@ -366,6 +366,7 @@ bool CXBMCRenderManager::Flush()
 
     CRetakeLock<CExclusiveLock> lock(m_sharedSection);
     m_pRenderer->Flush();
+    m_overlays.Flush();
     m_flushEvent.Set();
   }
   else
@@ -381,6 +382,9 @@ bool CXBMCRenderManager::Flush()
     else
       return true;
   }
+
+  m_presentsource = 0;
+
   return true;
 }
 

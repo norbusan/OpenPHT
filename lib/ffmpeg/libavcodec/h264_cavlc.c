@@ -708,7 +708,7 @@ int ff_h264_decode_mb_cavlc(H264Context *h){
                 down the code */
     if(h->slice_type_nos != AV_PICTURE_TYPE_I){
         if(s->mb_skip_run==-1)
-            s->mb_skip_run= get_ue_golomb(&s->gb);
+            s->mb_skip_run= get_ue_golomb_long(&s->gb);
 
         if (s->mb_skip_run--) {
             if(FRAME_MBAFF && (s->mb_y&1) == 0){
@@ -770,6 +770,10 @@ decode_intra_mb:
 
         // We assume these blocks are very rare so we do not optimize it.
         align_get_bits(&s->gb);
+        if (get_bits_left(&s->gb) < mb_size) {
+            av_log(s->avctx, AV_LOG_ERROR, "Not enough data for an intra PCM block.\n");
+            return AVERROR_INVALIDDATA;
+        }
 
         // The pixels are stored in the same order as levels in h->mb array.
         for(x=0; x < mb_size; x++){

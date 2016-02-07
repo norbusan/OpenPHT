@@ -9,7 +9,9 @@ ARCHIVE=$(SOURCE).tar.gz
 export LIBTOOL=builds/unix/libtool
 export PATH:=$(TOOLCHAIN)/bin:$(PATH)
 CONFIGURE=./configure --prefix=$(TOOLCHAIN) \
---program-transform-name=s/tar/gtar/ --disable-dependency-tracking
+  --program-transform-name=s/tar/gtar/   \
+  --disable-dependency-tracking ac_cv_func_fdopendir=no \
+  gl_cv_func_getcwd_abort_bug=no
 
 APP=$(SOURCE)/src/tar
 APPBIN=$(TOOLCHAIN)/bin/tar

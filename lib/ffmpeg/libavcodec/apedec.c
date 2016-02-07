@@ -22,6 +22,7 @@
 
 #define BITSTREAM_READER_LE
 #include "avcodec.h"
+#include "internal.h"
 #include "dsputil.h"
 #include "get_bits.h"
 #include "bytestream.h"
@@ -404,9 +405,12 @@ static inline int ape_decode_value(APEContext *ctx, APERice *rice)
 
         if (tmpk <= 16)
             x = range_decode_bits(ctx, tmpk);
-        else {
+        else if (tmpk <= 32) {
             x = range_decode_bits(ctx, 16);
             x |= (range_decode_bits(ctx, tmpk - 16) << 16);
+        } else {
+            av_log(ctx->avctx, AV_LOG_ERROR, "Too many bits: %d\n", tmpk);
+            return AVERROR_INVALIDDATA;
         }
         x += overflow << tmpk;
     } else {
@@ -819,7 +823,6 @@ static int ape_decode_frame(AVCodecContext *avctx, void *data,
     int16_t *samples;
     int i, ret;
     int blockstodecode;
-    int bytes_used = 0;
 
     /* this should never be negative, but bad things will happen if it is, so
        check it just to make sure. */
@@ -874,7 +877,6 @@ static int ape_decode_frame(AVCodecContext *avctx, void *data,
             return AVERROR_INVALIDDATA;
         }
 
-        bytes_used = buf_size;
     }
 
     if (!s->data) {
@@ -886,7 +888,7 @@ static int ape_decode_frame(AVCodecContext *avctx, void *data,
 
     /* get output buffer */
     s->frame.nb_samples = blockstodecode;
-    if ((ret = avctx->get_buffer(avctx, &s->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &s->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }
@@ -917,7 +919,7 @@ static int ape_decode_frame(AVCodecContext *avctx, void *data,
     *got_frame_ptr   = 1;
     *(AVFrame *)data = s->frame;
 
-    return bytes_used;
+    return (s->samples == 0) ? buf_size : 0;
 }
 
 static void ape_flush(AVCodecContext *avctx)

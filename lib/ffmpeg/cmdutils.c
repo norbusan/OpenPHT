@@ -56,7 +56,7 @@
 struct SwsContext *sws_opts;
 AVDictionary *format_opts, *codec_opts;
 
-const int this_year = 2012;
+const int this_year = 2015;
 
 static FILE *report_file;
 
@@ -423,7 +423,10 @@ int opt_default(const char *opt, const char *arg)
     const AVOption *oc, *of, *os;
     char opt_stripped[128];
     const char *p;
-    const AVClass *cc = avcodec_get_class(), *fc = avformat_get_class(), *sc;
+    const AVClass *cc = avcodec_get_class(), *fc = avformat_get_class();
+#if CONFIG_SWSCALE
+    const AVClass *sc = sws_get_class();
+#endif
 
     if (!(p = strchr(opt, ':')))
         p = opt + strlen(opt);
@@ -438,7 +441,6 @@ int opt_default(const char *opt, const char *arg)
                           AV_OPT_SEARCH_CHILDREN | AV_OPT_SEARCH_FAKE_OBJ)))
         av_dict_set(&format_opts, opt, arg, FLAGS(of));
 #if CONFIG_SWSCALE
-    sc = sws_get_class();
     if ((os = av_opt_find(&sc, opt, NULL, 0,
                           AV_OPT_SEARCH_CHILDREN | AV_OPT_SEARCH_FAKE_OBJ))) {
         // XXX we only support sws_flags, not arbitrary sws options

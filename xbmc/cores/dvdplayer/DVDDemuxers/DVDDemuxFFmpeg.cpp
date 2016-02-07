@@ -52,6 +52,9 @@
 /* PLEX */
 #include "guilib/LocalizeStrings.h"
 #include "FileSystem/PlexFile.h"
+#include <boost/foreach.hpp>
+
+typedef std::pair<std::string, std::string> stringPair;
 /* END PLEX */
 
 void CDemuxStreamAudioFFmpeg::GetStreamInfo(std::string& strInfo)
@@ -274,7 +277,7 @@ bool CDVDDemuxFFmpeg::Open(CDVDInputStream* pInput)
       iformat = m_dllAvFormat.av_find_input_format("mpeg");
     else if( content.compare("video/x-dvd-mpeg") == 0 )
       iformat = m_dllAvFormat.av_find_input_format("mpeg");
-    else if( content.compare("video/x-mpegts") == 0 )
+    else if( content.compare("video/mp2t") == 0 )
       iformat = m_dllAvFormat.av_find_input_format("mpegts");
     else if( content.compare("multipart/x-mixed-replace") == 0 )
       iformat = m_dllAvFormat.av_find_input_format("mjpeg");
@@ -647,12 +650,22 @@ AVDictionary *CDVDDemuxFFmpeg::GetFFMpegOptionsFromURL(const CURL &url)
 
   AVDictionary *options = NULL;
 
-  if (protocol.Equals("http") || protocol.Equals("https"))
+  if (protocol.Equals("http") || protocol.Equals("https") || protocol.Equals("plexserver"))
   {
     std::map<CStdString, CStdString> protocolOptions;
     url.GetProtocolOptions(protocolOptions);
     std::string headers;
     bool hasUserAgent = false;
+
+    /* PLEX */
+    if (protocol.Equals("plexserver"))
+    {
+      std::vector<stringPair> hdrs = XFILE::CPlexFile::GetHeaderList();
+      BOOST_FOREACH(stringPair sp, hdrs)
+        headers.append(sp.first).append(": ").append(sp.second).append("\r\n");
+    }
+    /* END PLEX */
+
     for(std::map<CStdString, CStdString>::const_iterator it = protocolOptions.begin(); it != protocolOptions.end(); ++it)
     {
       const CStdString &name = it->first;
@@ -1041,7 +1054,9 @@ void CDVDDemuxFFmpeg::AddStream(int iId)
         st->iSampleRate = pStream->codec->sample_rate;
         st->iBlockAlign = pStream->codec->block_align;
         st->iBitRate = pStream->codec->bit_rate;
-        st->iBitsPerSample = pStream->codec->bits_per_coded_sample;
+        st->iBitsPerSample = pStream->codec->bits_per_raw_sample;
+        if (st->iBitsPerSample == 0)
+          st->iBitsPerSample = pStream->codec->bits_per_coded_sample;
 	
         if(m_dllAvUtil.av_dict_get(pStream->metadata, "title", NULL, 0))
           st->m_description = m_dllAvUtil.av_dict_get(pStream->metadata, "title", NULL, 0)->value;

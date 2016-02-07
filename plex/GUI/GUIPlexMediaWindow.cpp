@@ -405,28 +405,14 @@ void CGUIPlexMediaWindow::OnFilterButton(int filterButtonId)
       m_filterValuesEvent.Reset();
       m_waitingForFilter = currentFilter->getFilterKey();
 
-      bool canceled = false;
       m_sectionFilter->loadFilterValues(currentFilter);
-      CGUIDialogBusy *busy = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
-      if (busy)
+      if (!CGUIDialogBusy::WaitOnEvent(m_filterValuesEvent))
       {
-        busy->Show();
-        while(!m_filterValuesEvent.WaitMSec(10))
-        {
-          g_windowManager.ProcessRenderLoop(false);
-          if (busy->IsCanceled())
-          {
-            CSingleLock lk(m_filterValuesSection);
-            m_filterValuesEvent.Set();
-            m_waitingForFilter.clear();
-			canceled = true;
-            break;
-          }
-        }
-        busy->Close();
+        CSingleLock lk(m_filterValuesSection);
+        m_filterValuesEvent.Set();
+        m_waitingForFilter.clear();
       }
-
-      if (!canceled)
+      else
       {
         CGUIDialogFilterSort* dialog = (CGUIDialogFilterSort*)g_windowManager.GetWindow(WINDOW_DIALOG_FILTER_SORT);
         if (dialog)
@@ -1019,8 +1005,8 @@ void CGUIPlexMediaWindow::CheckPlexFilters(CFileItemList &list)
     list.SetContent("folders");
 
   /* check if we have gone deeper down or not */
-  CURL newPath(list.GetPath());
-  if (m_startDirectory != newPath.GetUrlWithoutOptions())
+  //CURL newPath(list.GetPath());
+  //if (m_startDirectory != newPath.GetUrlWithoutOptions())
   {
     if (list.Size())
       m_directoryType = list.GetPlexDirectoryType();

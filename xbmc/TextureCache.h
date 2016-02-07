@@ -73,7 +73,7 @@ public:
    \return cached url of this image
    \sa GetCachedImage
    */ 
-  virtual CStdString CheckCachedImage(const CStdString &image, bool returnDDS, bool &needsRecaching);
+  CStdString CheckCachedImage(const CStdString &image, bool returnDDS, bool &needsRecaching);
 
   /*! \brief Cache image (if required) using a background job
 
@@ -84,7 +84,7 @@ public:
    \param image url of the image to cache
    \sa CacheImage
    */
-  virtual void BackgroundCacheImage(const CStdString &image);
+  void BackgroundCacheImage(const CStdString &image);
 
   /*! \brief Cache an image to image cache, optionally return the texture
 
@@ -112,13 +112,13 @@ public:
    \return true if the image is cached, false otherwise
    \sa ClearCachedImage
    */
-  virtual bool HasCachedImage(const CStdString &image);
+  bool HasCachedImage(const CStdString &image);
 
   /*! \brief clear the cached version of the given image
    \param image url of the image
    \sa GetCachedImage
    */
-  virtual void ClearCachedImage(const CStdString &image, bool deleteSource = false);
+  void ClearCachedImage(const CStdString &image, bool deleteSource = false);
 
   /*! \brief retrieve a cache file (relative to the cache path) to associate with the given image, excluding extension
    Use GetCachedPath(GetCacheFile(url)+extension) for the full path to the file.
@@ -191,7 +191,7 @@ private:
    \return cached url of this image, empty if none exists
    \sa ClearCachedImage, CTextureDetails
    */
-  virtual CStdString GetCachedImage(const CStdString &image, CTextureDetails &details, bool trackUsage = false);
+  CStdString GetCachedImage(const CStdString &image, CTextureDetails &details, bool trackUsage = false);
 
   /*! \brief Get an image from the database
    Thread-safe wrapper of CTextureDatabase::GetCachedTexture
@@ -232,7 +232,7 @@ private:
    \param success whether the job was successful.
    \param job the caching job.
    */
-  virtual void OnCachingComplete(bool success, CTextureCacheJob *job);
+  void OnCachingComplete(bool success, CTextureCacheJob *job);
 
   CCriticalSection m_databaseSection;
   CTextureDatabase m_database;

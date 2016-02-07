@@ -195,7 +195,8 @@ bool CTextureCacheJob::UpdateableURL(const CStdString &url) const
 {
   // we don't constantly check online images
   if (url.compare(0, 7, "http://") == 0 ||
-      url.compare(0, 8, "https://") == 0)
+      url.compare(0, 8, "https://") == 0 ||
+      url.compare(0, 13, "plexserver://") == 0)
     return false;
   return true;
 }
@@ -221,6 +222,10 @@ CStdString CTextureCacheJob::GetImageHash(const CStdString &url)
       hash.Format("d%"PRId64"s%"PRId64, time, st.st_size);
       return hash;
     }
+
+    // the image exists but we couldn't determine the mtime/ctime and/or size
+    // so set an obviously bad hash
+    return "BADHASH";
   }
   CLog::Log(LOGDEBUG, "%s - unable to stat url %s", __FUNCTION__, url.c_str());
   return "";

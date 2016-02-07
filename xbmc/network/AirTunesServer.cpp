@@ -156,6 +156,8 @@ void CAirTunesServer::AudioOutputFunctions::audio_set_coverart(void *cls, void *
   CAirTunesServer::SetCoverArtFromBuffer((char *)buffer, buflen);
 }
 
+char *session="XBMC-AirTunes";
+
 void* CAirTunesServer::AudioOutputFunctions::audio_init(void *cls, int bits, int channels, int samplerate)
 {
   XFILE::CPipeFile *pipe=(XFILE::CPipeFile *)cls;
@@ -185,7 +187,7 @@ void* CAirTunesServer::AudioOutputFunctions::audio_init(void *cls, int bits, int
 
   CApplicationMessenger::Get().PlayFile(item);
 
-  return "XBMC-AirTunes";//session
+  return session;//session
 }
 
 void  CAirTunesServer::AudioOutputFunctions::audio_set_volume(void *cls, void *session, float volume)
@@ -242,7 +244,7 @@ void  CAirTunesServer::AudioOutputFunctions::audio_destroy(void *cls, void *sess
   }
 }
 
-void shairplay_log(int level, const char *msg)
+void shairplay_log(void *cls, int level, const char *msg)
 {
   int xbmcLevel = LOGINFO;
 
@@ -629,7 +631,7 @@ bool CAirTunesServer::Initialize(const CStdString &password)
         m_pLibShairplay->raop_set_log_level(m_pRaop, RAOP_LOG_DEBUG);
       }
 
-      m_pLibShairplay->raop_set_log_callback(m_pRaop, shairplay_log);
+      m_pLibShairplay->raop_set_log_callback(m_pRaop, shairplay_log, NULL);
 
       CNetworkInterface *net = g_application.getNetwork().GetFirstConnectedInterface();
 

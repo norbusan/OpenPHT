@@ -156,7 +156,7 @@ public:
     unsigned int space = GetReadSize();
 
     //want to read more than we have written?
-    if( space <= 0 )
+    if( space == 0 )
     {
 #ifdef AE_RING_BUFFER_DEBUG
       CLog::Log(LOGDEBUG, "AERingBuffer: Can't read from empty buffer.");
@@ -179,7 +179,8 @@ public:
 #ifdef AE_RING_BUFFER_DEBUG
       CLog::Log(LOGDEBUG, "AERingBuffer: Reading from: %u size: %u space before: %u\n", m_iWritePos, size, space);
 #endif
-      memcpy(dest, &(m_Buffer[m_iReadPos]), size);
+      if (dest)
+        memcpy(dest, &(m_Buffer[m_iReadPos]), size);
       m_iReadPos+=size;
     }
     //need to wrap
@@ -190,8 +191,11 @@ public:
 #ifdef AE_RING_BUFFER_DEBUG
       CLog::Log(LOGDEBUG, "AERingBuffer: Reading from (split) first: %u second: %u size: %u space before: %u\n", first, second, size, space);
 #endif
-      memcpy(dest, &(m_Buffer[m_iReadPos]), first);
-      memcpy(&dest[first], &(m_Buffer[0]), second);
+      if (dest)
+      {
+        memcpy(dest, &(m_Buffer[m_iReadPos]), first);
+        memcpy(&dest[first], &(m_Buffer[0]), second);
+      }
       m_iReadPos = second;
     }
     //we can increase the read count now

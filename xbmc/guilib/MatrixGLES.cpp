@@ -1,27 +1,27 @@
 /*
-*      Copyright (C) 2005-2012 Team XBMC
-*      http://www.xbmc.org
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with XBMC; see the file COPYING.  If not, see
-*  <http://www.gnu.org/licenses/>.
-*
-*/
+ *      Copyright (C) 2005-2013 Team XBMC
+ *      http://xbmc.org
+ *
+ *  This Program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ *  This Program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with XBMC; see the file COPYING.  If not, see
+ *  <http://www.gnu.org/licenses/>.
+ *
+ */
 
 
 #include "system.h"
 
-#if HAS_GLES == 2
+#if defined(HAS_GL) || HAS_GLES == 2
 #include "system_gl.h"
 
 #include <cmath>
@@ -31,88 +31,26 @@
 #include "utils/CPUInfo.h"
 #endif
 
-CMatrixGLES g_matrices;
 
-#define MODE_WITHIN_RANGE(m)       ((m >= 0) && (m < (int)MM_MATRIXSIZE))
-
-CMatrixGLES::CMatrixGLES()
-{
-  for (unsigned int i=0; i < MM_MATRIXSIZE; i++)
-  {
-    m_matrices[i].push_back(MatrixWrapper());
-    MatrixMode((EMATRIXMODE)i);
-    LoadIdentity();
-  }
-  m_matrixMode = (EMATRIXMODE)-1;
-  m_pMatrix    = NULL;
-#if defined(__ARM_NEON__)
-  m_has_neon = (g_cpuInfo.GetCPUFeatures() & CPU_FEATURE_NEON) == CPU_FEATURE_NEON;
+#ifdef HAS_GL
+CMatrixGLStack glMatrixModview(GL_MODELVIEW);
+CMatrixGLStack glMatrixProject(GL_PROJECTION);
+CMatrixGLStack glMatrixTexture(GL_TEXTURE);
+#else
+CMatrixGLStack glMatrixModview(0);
+CMatrixGLStack glMatrixProject(0);
+CMatrixGLStack glMatrixTexture(0);
 #endif
-}
 
-CMatrixGLES::~CMatrixGLES()
+void CMatrixGL::LoadIdentity()
 {
+  m_pMatrix[0] = 1.0f;  m_pMatrix[4] = 0.0f;  m_pMatrix[8]  = 0.0f;  m_pMatrix[12] = 0.0f;
+  m_pMatrix[1] = 0.0f;  m_pMatrix[5] = 1.0f;  m_pMatrix[9]  = 0.0f;  m_pMatrix[13] = 0.0f;
+  m_pMatrix[2] = 0.0f;  m_pMatrix[6] = 0.0f;  m_pMatrix[10] = 1.0f;  m_pMatrix[14] = 0.0f;
+  m_pMatrix[3] = 0.0f;  m_pMatrix[7] = 0.0f;  m_pMatrix[11] = 0.0f;  m_pMatrix[15] = 1.0f;
 }
 
-GLfloat* CMatrixGLES::GetMatrix(EMATRIXMODE mode)
-{
-  if (MODE_WITHIN_RANGE(mode))
-  {
-    if (!m_matrices[mode].empty())
-    {
-      return m_matrices[mode].back();
-    }
-  }
-  return NULL;
-}
-
-void CMatrixGLES::MatrixMode(EMATRIXMODE mode)
-{
-  if (MODE_WITHIN_RANGE(mode))
-  {
-    m_matrixMode = mode;
-    m_pMatrix    = m_matrices[mode].back();
-  }
-  else
-  {
-    m_matrixMode = (EMATRIXMODE)-1;
-    m_pMatrix    = NULL;
-  }
-}
-
-void CMatrixGLES::PushMatrix()
-{
-  if (m_pMatrix && MODE_WITHIN_RANGE(m_matrixMode))
-  {
-    m_matrices[m_matrixMode].push_back(MatrixWrapper(m_pMatrix));
-    m_pMatrix =  m_matrices[m_matrixMode].back();
-  }
-}
-
-void CMatrixGLES::PopMatrix()
-{
-  if (MODE_WITHIN_RANGE(m_matrixMode))
-  {
-    if (m_matrices[m_matrixMode].size() > 1)
-    { 
-      m_matrices[m_matrixMode].pop_back();
-    }
-    m_pMatrix = m_matrices[m_matrixMode].back();
-  }
-}
-
-void CMatrixGLES::LoadIdentity()
-{
-  if (m_pMatrix)
-  {
-    m_pMatrix[0] = 1.0f;  m_pMatrix[4] = 0.0f;  m_pMatrix[8]  = 0.0f;  m_pMatrix[12] = 0.0f;
-    m_pMatrix[1] = 0.0f;  m_pMatrix[5] = 1.0f;  m_pMatrix[9]  = 0.0f;  m_pMatrix[13] = 0.0f;
-    m_pMatrix[2] = 0.0f;  m_pMatrix[6] = 0.0f;  m_pMatrix[10] = 1.0f;  m_pMatrix[14] = 0.0f;
-    m_pMatrix[3] = 0.0f;  m_pMatrix[7] = 0.0f;  m_pMatrix[11] = 0.0f;  m_pMatrix[15] = 1.0f;
-  }
-}
-
-void CMatrixGLES::Ortho(GLfloat l, GLfloat r, GLfloat b, GLfloat t, GLfloat n, GLfloat f)
+void CMatrixGL::Ortho(GLfloat l, GLfloat r, GLfloat b, GLfloat t, GLfloat n, GLfloat f)
 {
   GLfloat u =  2.0f / (r - l);
   GLfloat v =  2.0f / (t - b);
@@ -127,7 +65,7 @@ void CMatrixGLES::Ortho(GLfloat l, GLfloat r, GLfloat b, GLfloat t, GLfloat n, G
   MultMatrixf(matrix);
 }
 
-void CMatrixGLES::Ortho2D(GLfloat l, GLfloat r, GLfloat b, GLfloat t)
+void CMatrixGL::Ortho2D(GLfloat l, GLfloat r, GLfloat b, GLfloat t)
 {
   GLfloat u =  2.0f / (r - l);
   GLfloat v =  2.0f / (t - b);
@@ -140,7 +78,7 @@ void CMatrixGLES::Ortho2D(GLfloat l, GLfloat r, GLfloat b, GLfloat t)
   MultMatrixf(matrix);
 }
 
-void CMatrixGLES::Frustum(GLfloat l, GLfloat r, GLfloat b, GLfloat t, GLfloat n, GLfloat f)
+void CMatrixGL::Frustum(GLfloat l, GLfloat r, GLfloat b, GLfloat t, GLfloat n, GLfloat f)
 {
   GLfloat u = (2.0f * n) / (r - l);
   GLfloat v = (2.0f * n) / (t - b);
@@ -155,7 +93,7 @@ void CMatrixGLES::Frustum(GLfloat l, GLfloat r, GLfloat b, GLfloat t, GLfloat n,
   MultMatrixf(matrix);
 }
 
-void CMatrixGLES::Translatef(GLfloat x, GLfloat y, GLfloat z)
+void CMatrixGL::Translatef(GLfloat x, GLfloat y, GLfloat z)
 {
   GLfloat matrix[16] = {1.0f, 0.0f, 0.0f, 0.0f,
                         0.0f, 1.0f, 0.0f, 0.0f,
@@ -164,7 +102,7 @@ void CMatrixGLES::Translatef(GLfloat x, GLfloat y, GLfloat z)
   MultMatrixf(matrix);
 }
 
-void CMatrixGLES::Scalef(GLfloat x, GLfloat y, GLfloat z)
+void CMatrixGL::Scalef(GLfloat x, GLfloat y, GLfloat z)
 {
   GLfloat matrix[16] = {   x, 0.0f, 0.0f, 0.0f,
                         0.0f,    y, 0.0f, 0.0f,
@@ -173,7 +111,7 @@ void CMatrixGLES::Scalef(GLfloat x, GLfloat y, GLfloat z)
   MultMatrixf(matrix);
 }
 
-void CMatrixGLES::Rotatef(GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
+void CMatrixGL::Rotatef(GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
 {
   GLfloat modulous = sqrt((x*x)+(y*y)+(z*z));
   if (modulous != 0.0)
@@ -242,12 +180,10 @@ inline void Matrix4Mul(const float* src_mat_1, const float* src_mat_2, float* ds
     );
 }
 #endif
-void CMatrixGLES::MultMatrixf(const GLfloat *matrix)
+void CMatrixGL::MultMatrixf(const GLfloat *matrix)
 {
-  if (m_pMatrix)
-  {
 #if defined(__ARM_NEON__)
-    if (m_has_neon)
+    if ((g_cpuInfo.GetCPUFeatures() & CPU_FEATURE_NEON) == CPU_FEATURE_NEON)
     {
       GLfloat m[16];
       Matrix4Mul(m_pMatrix, matrix, m);
@@ -274,11 +210,10 @@ void CMatrixGLES::MultMatrixf(const GLfloat *matrix)
     m_pMatrix[1] = b;  m_pMatrix[5] = f;  m_pMatrix[9]  = j;  m_pMatrix[13] = n;
     m_pMatrix[2] = c;  m_pMatrix[6] = g;  m_pMatrix[10] = k;  m_pMatrix[14] = o;
     m_pMatrix[3] = d;  m_pMatrix[7] = h;  m_pMatrix[11] = l;  m_pMatrix[15] = p;
-  }
 }
 
 // gluLookAt implementation taken from Mesa3D
-void CMatrixGLES::LookAt(GLfloat eyex, GLfloat eyey, GLfloat eyez, GLfloat centerx, GLfloat centery, GLfloat centerz, GLfloat upx, GLfloat upy, GLfloat upz)
+void CMatrixGL::LookAt(GLfloat eyex, GLfloat eyey, GLfloat eyez, GLfloat centerx, GLfloat centery, GLfloat centerz, GLfloat upx, GLfloat upy, GLfloat upz)
 {
   GLfloat forward[3], side[3], up[3];
   GLfloat m[4][4];
@@ -350,7 +285,7 @@ static void __gluMultMatrixVecf(const GLfloat matrix[16], const GLfloat in[4], G
 }
 
 // gluProject implementation taken from Mesa3D
-bool CMatrixGLES::Project(GLfloat objx, GLfloat objy, GLfloat objz, const GLfloat modelMatrix[16], const GLfloat projMatrix[16], const GLint viewport[4], GLfloat* winx, GLfloat* winy, GLfloat* winz)
+bool CMatrixGL::Project(GLfloat objx, GLfloat objy, GLfloat objz, const GLfloat modelMatrix[16], const GLfloat projMatrix[16], const GLint viewport[4], GLfloat* winx, GLfloat* winy, GLfloat* winz)
 {
   GLfloat in[4];
   GLfloat out[4];
@@ -381,17 +316,20 @@ bool CMatrixGLES::Project(GLfloat objx, GLfloat objy, GLfloat objz, const GLfloa
   return true;
 }
 
-void CMatrixGLES::PrintMatrix(void)
+void CMatrixGL::PrintMatrix(void)
 {
-  for (unsigned int i=0; i < MM_MATRIXSIZE; i++)
-  {
-    GLfloat *m = GetMatrix((EMATRIXMODE)i);
-    CLog::Log(LOGDEBUG, "MatrixGLES - Matrix:%d", i);
-    CLog::Log(LOGDEBUG, "%f %f %f %f", m[0], m[4], m[8],  m[12]);
-    CLog::Log(LOGDEBUG, "%f %f %f %f", m[1], m[5], m[9],  m[13]);
-    CLog::Log(LOGDEBUG, "%f %f %f %f", m[2], m[6], m[10], m[14]);
-    CLog::Log(LOGDEBUG, "%f %f %f %f", m[3], m[7], m[11], m[15]);
-  }
+  CLog::Log(LOGDEBUG, "%f %f %f %f", m_pMatrix[0], m_pMatrix[4], m_pMatrix[8],  m_pMatrix[12]);
+  CLog::Log(LOGDEBUG, "%f %f %f %f", m_pMatrix[1], m_pMatrix[5], m_pMatrix[9],  m_pMatrix[13]);
+  CLog::Log(LOGDEBUG, "%f %f %f %f", m_pMatrix[2], m_pMatrix[6], m_pMatrix[10], m_pMatrix[14]);
+  CLog::Log(LOGDEBUG, "%f %f %f %f", m_pMatrix[3], m_pMatrix[7], m_pMatrix[11], m_pMatrix[15]);
+}
+
+void CMatrixGLStack::Load()
+{
+#ifdef HAS_GL
+  glMatrixMode(m_type);
+  glLoadMatrixf(m_current);
+#endif
 }
 
 #endif

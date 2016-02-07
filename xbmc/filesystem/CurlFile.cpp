@@ -171,12 +171,20 @@ size_t CCurlFile::CReadState::WriteCallback(char *buffer, size_t size, size_t ni
     if (maxWriteable)
     {
       if (!m_buffer.WriteData(m_overflowBuffer, maxWriteable))
-        CLog::Log(LOGERROR, "Unable to write to buffer - what's up?");
-      if (m_overflowSize > maxWriteable)
-      { // still have some more - copy it down
+      {
+        CLog::Log(LOGERROR, "CCurlFile::WriteCallback - Unable to write to buffer - what's up?");
+        return 0;
+      }
+
+      if (maxWriteable < m_overflowSize)
+      {
+        // still have some more - copy it down
         memmove(m_overflowBuffer, m_overflowBuffer + maxWriteable, m_overflowSize - maxWriteable);
       }
       m_overflowSize -= maxWriteable;
+
+      // Shrink memory:
+      m_overflowBuffer = (char*)realloc_simple(m_overflowBuffer, m_overflowSize);
     }
   }
   // ok, now copy the data into our ring buffer
@@ -185,7 +193,8 @@ size_t CCurlFile::CReadState::WriteCallback(char *buffer, size_t size, size_t ni
   {
     if (!m_buffer.WriteData(buffer, maxWriteable))
     {
-      CLog::Log(LOGERROR, "%s - Unable to write to buffer with %i bytes - what's up?", __FUNCTION__, maxWriteable);
+      CLog::Log(LOGERROR, "CCurlFile::WriteCallback - Unable to write to buffer with %i bytes - what's up?", maxWriteable);
+      return 0;
     }
     else
     {
@@ -197,10 +206,11 @@ size_t CCurlFile::CReadState::WriteCallback(char *buffer, size_t size, size_t ni
   {
 //    CLog::Log(LOGDEBUG, "CCurlFile::WriteCallback(%p) not enough free space for %i bytes", (void*)this,  amount);
 
+    // TODO: Limit max. amount of the overflowbuffer
     m_overflowBuffer = (char*)realloc_simple(m_overflowBuffer, amount + m_overflowSize);
     if(m_overflowBuffer == NULL)
     {
-      CLog::Log(LOGWARNING, "%s - Failed to grow overflow buffer from %i bytes to %i bytes", __FUNCTION__, m_overflowSize, amount + m_overflowSize);
+      CLog::Log(LOGWARNING, "CCurlFile::WriteCallback - Failed to grow overflow buffer from %i bytes to %i bytes", m_overflowSize, amount + m_overflowSize);
       return 0;
     }
     memcpy(m_overflowBuffer + m_overflowSize, buffer, amount);
@@ -613,8 +623,6 @@ void CCurlFile::SetCommonOptions(CReadState* state)
 
   if (m_useOldHttpVersion)
     g_curlInterface.easy_setopt(h, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
-  else
-    SetRequestHeader("Connection", "keep-alive");
 
   if (g_advancedSettings.m_curlDisableIPV6)
     g_curlInterface.easy_setopt(h, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
@@ -1409,9 +1417,10 @@ bool CCurlFile::CReadState::FillBuffer(unsigned int want)
       m_buffer.WriteData(m_overflowBuffer, amount);
 
       if (amount < m_overflowSize)
-        memcpy(m_overflowBuffer, m_overflowBuffer+amount,m_overflowSize-amount);
+        memmove(m_overflowBuffer, m_overflowBuffer + amount, m_overflowSize - amount);
 
       m_overflowSize -= amount;
+      // Shrink memory:
       m_overflowBuffer = (char*)realloc_simple(m_overflowBuffer, m_overflowSize);
       continue;
     }
@@ -1519,7 +1528,7 @@ bool CCurlFile::CReadState::FillBuffer(unsigned int want)
         g_curlInterface.multi_fdset(m_multiHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
 
         long timeout = 0;
-        if (CURLM_OK != g_curlInterface.multi_timeout(m_multiHandle, &timeout) || timeout == -1)
+        if (CURLM_OK != g_curlInterface.multi_timeout(m_multiHandle, &timeout) || timeout == -1 || timeout < 200)
           timeout = 200;
 
         struct timeval t = { timeout / 1000, (timeout % 1000) * 1000 };

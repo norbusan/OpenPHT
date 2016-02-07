@@ -84,7 +84,7 @@ public:
     }
 
     palette_colors = src.palette_colors;
-    linesize       = sub_w;
+    linesize       = sub_w * bpp;
     x              = sub_x;
     y              = sub_y;
     width          = sub_w;
@@ -92,14 +92,14 @@ public:
     source_width   = src.source_width;
     source_height  = src.source_height;
 
-    data = (BYTE*)malloc(height*linesize);
+    data = (BYTE*)malloc(sub_h * linesize);
 
     BYTE* s = src.data_at(sub_x, sub_y);
     BYTE* t = data;
 
     for(int row = 0;row < sub_h; ++row)
     {
-      memcpy(t, s, width*bpp);
+      memcpy(t, s, linesize);
       s += src.linesize;
       t += linesize;
     }

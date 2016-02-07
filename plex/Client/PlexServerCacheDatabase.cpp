@@ -180,6 +180,7 @@ bool CPlexServerCacheDatabase::getCachedServers(std::vector<CPlexServerPtr>& ser
       server->SetSupportsAudioTranscoding(m_pDS->fv("supportsAudioTranscoding").get_asBool());
       server->SetSupportsVideoTranscoding(m_pDS->fv("supportsVideoTranscoding").get_asBool());
       server->SetSupportsDeletion(m_pDS->fv("supportsDeletion").get_asBool());
+      server->SetAllowChannelAccess(!server->IsShared());
 
       CStdString resolutions = m_pDS->fv("transcoderResolutions").get_asString();
       if (!resolutions.empty())

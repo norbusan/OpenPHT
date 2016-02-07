@@ -4,7 +4,7 @@ ROOT=$(pwd)
 DEPENDDIR=$ROOT/tools/darwin/depends
 DEPEND_HASH=$(git rev-list -1 HEAD -- $DEPENDDIR | cut -c1-8)
 FFMPEG_HASH=$(git rev-list -1 HEAD -- $ROOT/lib/ffmpeg | cut -c1-8)
-NIGHTLIES_ROOT="https://nightlies.plex.tv"
+NIGHTLIES_ROOT="http://sources.openpht.tv/plex-dependencies"
 
 target_os=$1
 osx_sdk=$2
@@ -54,17 +54,17 @@ function fail
 if [ ! -d plex/Dependencies/$outputdir-xbmc-$DEPEND_HASH -o ! -d plex/Dependencies/$outputdir-ffmpeg-$FFMPEG_HASH ]; then
   if [ ! -e plex/Dependencies/built-depends/$outputdir-xbmc-$DEPEND_HASH.tar.xz ]; then
     echo "-- Missing plex/Dependencies/built-depends/$outputdir-xbmc-$DEPEND_HASH.tar.xz"
-    curl --head --fail -s $NIGHTLIES_ROOT/plex-dependencies/plex-home-theater-dependencies/latest/$outputdir-xbmc-$DEPEND_HASH.tar.xz > /dev/null || fail xbmc $DEPEND_HASH
-    echo "-- Fetching $NIGHTLIES_ROOT/plex-dependencies/plex-home-theater-dependencies/latest/$outputdir-xbmc-$DEPEND_HASH.tar.xz"
-    curl -s --fail $NIGHTLIES_ROOT/plex-dependencies/plex-home-theater-dependencies/latest/$outputdir-xbmc-$DEPEND_HASH.tar.xz -o $TMPDIR$outputdir-xbmc-$DEPEND_HASH.tar.xz || fail xbmc $DEPEND_HASH
+    curl --head --fail -s $NIGHTLIES_ROOT/$outputdir-xbmc-$DEPEND_HASH.tar.xz > /dev/null || fail xbmc $DEPEND_HASH
+    echo "-- Fetching $NIGHTLIES_ROOT/$outputdir-xbmc-$DEPEND_HASH.tar.xz"
+    curl -s --fail $NIGHTLIES_ROOT/$outputdir-xbmc-$DEPEND_HASH.tar.xz -o $TMPDIR$outputdir-xbmc-$DEPEND_HASH.tar.xz || fail xbmc $DEPEND_HASH
   else
     cp -v plex/Dependencies/built-depends/$outputdir-xbmc-$DEPEND_HASH.tar.xz $TMPDIR
   fi
 
   if [ ! -e plex/Dependencies/built-depends/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz ]; then
-    curl --head --fail -s $NIGHTLIES_ROOT/plex-dependencies/plex-home-theater-dependencies/latest/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz > /dev/null || fail ffmpeg $FFMPEG_HASH
-    echo "-- Fetching $NIGHTLIES_ROOT/plex-dependencies/plex-home-theater-dependencies/latest/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz"
-    curl -s --fail $NIGHTLIES_ROOT/plex-dependencies/plex-home-theater-dependencies/latest/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz -o $TMPDIR$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz || fail ffmpeg $FFMPEG_HASH
+    curl --head --fail -s $NIGHTLIES_ROOT/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz > /dev/null || fail ffmpeg $FFMPEG_HASH
+    echo "-- Fetching $NIGHTLIES_ROOT/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz"
+    curl -s --fail $NIGHTLIES_ROOT/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz -o $TMPDIR$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz || fail ffmpeg $FFMPEG_HASH
   else
     cp -v plex/Dependencies/built-depends/$outputdir-ffmpeg-$FFMPEG_HASH.tar.xz $TMPDIR
   fi

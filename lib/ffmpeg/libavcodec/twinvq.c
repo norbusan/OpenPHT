@@ -20,6 +20,7 @@
  */
 
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "dsputil.h"
 #include "fft.h"
@@ -840,7 +841,7 @@ static int twin_decode_frame(AVCodecContext * avctx, void *data,
     /* get output buffer */
     if (tctx->discarded_packets >= 2) {
         tctx->frame.nb_samples = mtab->size;
-        if ((ret = avctx->get_buffer(avctx, &tctx->frame)) < 0) {
+        if ((ret = ff_get_buffer(avctx, &tctx->frame)) < 0) {
             av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
             return ret;
         }
@@ -996,18 +997,20 @@ static void linear_perm(int16_t *out, int16_t *in, int n_blocks, int size)
         out[i] = block_size * (in[i] % n_blocks) + in[i] / n_blocks;
 }
 
-static av_cold void construct_perm_table(TwinContext *tctx,enum FrameType ftype)
+static av_cold void construct_perm_table(TwinContext *tctx, int ftype)
 {
     int block_size;
     const ModeTab *mtab = tctx->mtab;
-    int size = tctx->avctx->channels*mtab->fmode[ftype].sub;
+    int size;
     int16_t *tmp_perm = (int16_t *) tctx->tmp_buf;
 
     if (ftype == FT_PPC) {
         size  = tctx->avctx->channels;
         block_size = mtab->ppc_shape_len;
-    } else
+    } else {
+        size       = tctx->avctx->channels * mtab->fmode[ftype].sub;
         block_size = mtab->size / mtab->fmode[ftype].sub;
+    }
 
     permutate_in_line(tmp_perm, tctx->n_div[ftype], size,
                       block_size, tctx->length[ftype],
@@ -1137,6 +1140,10 @@ static av_cold int twin_decode_init(AVCodecContext *avctx)
         return -1;
     }
     ibps = avctx->bit_rate / (1000 * avctx->channels);
+    if (ibps < 8 || ibps > 48) {
+        av_log(avctx, AV_LOG_ERROR, "Bad bitrate per channel value %d\n", ibps);
+        return AVERROR_INVALIDDATA;
+    }
 
     switch ((isampf << 8) +  ibps) {
     case (8 <<8) +  8: tctx->mtab = &mode_08_08; break;

@@ -57,8 +57,8 @@
 					</control>
 					<control type="label" id="10082">
 						<posy>15</posy>
-						<posx>0</posx>
-						<width>460</width>
+						<posx>-60</posx>
+						<width>580</width>
 						<height>150</height>
 						<align>center</align>
 						<font>Bold-124</font>

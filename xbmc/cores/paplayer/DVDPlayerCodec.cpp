@@ -26,6 +26,7 @@
 #include "cores/dvdplayer/DVDDemuxers/DVDDemuxUtils.h"
 #include "cores/dvdplayer/DVDStreamInfo.h"
 #include "cores/dvdplayer/DVDCodecs/DVDFactoryCodec.h"
+#include "cores/dvdplayer/DVDClock.h"
 #include "utils/log.h"
 #include "settings/GUISettings.h"
 #include "URL.h"
@@ -166,7 +167,7 @@ bool DVDPlayerCodec::Init(const CStdString &strFile, unsigned int filecache)
     m_EncodedSampleRate = m_pAudioCodec->GetEncodedSampleRate();
     m_Channels = m_pAudioCodec->GetChannels();
     m_ChannelInfo = m_pAudioCodec->GetChannelMap();
-
+    m_BitsPerCodedSample = static_cast<CDemuxStreamAudio*>(pStream)->iBitsPerSample;
   }
   if (nErrors >= 10)
   {
@@ -184,6 +185,10 @@ bool DVDPlayerCodec::Init(const CStdString &strFile, unsigned int filecache)
 
   m_TotalTime = m_pDemuxer->GetStreamLength();
   m_Bitrate = m_pAudioCodec->GetBitRate();
+  if (!m_Bitrate && m_TotalTime)
+  {
+    m_Bitrate = (int)(((m_pInputStream->GetLength()*1000) / m_TotalTime) * 8);
+  }
   m_pDemuxer->GetStreamCodecName(m_nAudioStream,m_CodecName);
 
   return true;
@@ -220,15 +225,25 @@ void DVDPlayerCodec::DeInit()
 
 int64_t DVDPlayerCodec::Seek(int64_t iSeekTime)
 {
+  // default to announce backwards seek if !m_pPacket to not make FFmpeg
+  // skip mpeg audio frames at playback start
+  bool seekback = true;
+
   if (m_pPacket)
+  {
+    seekback = (DVD_MSEC_TO_TIME(iSeekTime) > m_pPacket->pts);
     CDVDDemuxUtils::FreeDemuxPacket(m_pPacket);
+  }
   m_pPacket = NULL;
 
-  m_pDemuxer->SeekTime((int)iSeekTime, false);
+  bool ret = m_pDemuxer->SeekTime((int)iSeekTime, seekback);
   m_pAudioCodec->Reset();
 
   m_decoded = NULL;;
   m_nDecodedLen = 0;
+
+  if (!ret)
+    return DVD_NOPTS_VALUE;
 
   return iSeekTime;
 }

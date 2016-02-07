@@ -30,6 +30,7 @@
 #include <gsm/gsm.h>
 
 #include "avcodec.h"
+#include "internal.h"
 #include "gsm.h"
 
 static av_cold int libgsm_encode_init(AVCodecContext *avctx) {
@@ -188,7 +189,7 @@ static int libgsm_decode_frame(AVCodecContext *avctx, void *data,
 
     /* get output buffer */
     s->frame.nb_samples = avctx->frame_size;
-    if ((ret = avctx->get_buffer(avctx, &s->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &s->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }

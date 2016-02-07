@@ -55,6 +55,11 @@ static av_cold int mp_decode_init(AVCodecContext *avctx)
     int w4 = (avctx->width  + 3) & ~3;
     int h4 = (avctx->height + 3) & ~3;
 
+    if(avctx->extradata_size < 2){
+        av_log(avctx, AV_LOG_ERROR, "extradata too small\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     motionpixels_tableinit();
     mp->avctx = avctx;
     dsputil_init(&mp->dsp, avctx);
@@ -191,10 +196,13 @@ static void mp_decode_line(MotionPixelsContext *mp, GetBitContext *gb, int y)
             p = mp_get_yuv_from_rgb(mp, x - 1, y);
         } else {
             p.y += mp_gradient(mp, 0, mp_get_vlc(mp, gb));
+            p.y = av_clip(p.y, 0, 31);
             if ((x & 3) == 0) {
                 if ((y & 3) == 0) {
                     p.v += mp_gradient(mp, 1, mp_get_vlc(mp, gb));
+                    p.v = av_clip(p.v, -32, 31);
                     p.u += mp_gradient(mp, 2, mp_get_vlc(mp, gb));
+                    p.u = av_clip(p.u, -32, 31);
                     mp->hpt[((y / 4) * mp->avctx->width + x) / 4] = p;
                 } else {
                     p.v = mp->hpt[((y / 4) * mp->avctx->width + x) / 4].v;
@@ -218,9 +226,12 @@ static void mp_decode_frame_helper(MotionPixelsContext *mp, GetBitContext *gb)
             p = mp_get_yuv_from_rgb(mp, 0, y);
         } else {
             p.y += mp_gradient(mp, 0, mp_get_vlc(mp, gb));
+            p.y = av_clip(p.y, 0, 31);
             if ((y & 3) == 0) {
                 p.v += mp_gradient(mp, 1, mp_get_vlc(mp, gb));
+                p.v = av_clip(p.v, -32, 31);
                 p.u += mp_gradient(mp, 2, mp_get_vlc(mp, gb));
+                p.u = av_clip(p.u, -32, 31);
             }
             mp->vpt[y] = p;
             mp_set_rgb_from_yuv(mp, 0, y, &p);
@@ -287,7 +298,7 @@ static int mp_decode_frame(AVCodecContext *avctx,
     if (init_vlc(&mp->vlc, mp->max_codes_bits, mp->codes_count, &mp->codes[0].size, sizeof(HuffCode), 1, &mp->codes[0].code, sizeof(HuffCode), 4, 0))
         goto end;
     mp_decode_frame_helper(mp, &gb);
-    free_vlc(&mp->vlc);
+    ff_free_vlc(&mp->vlc);
 
 end:
     *data_size = sizeof(AVFrame);

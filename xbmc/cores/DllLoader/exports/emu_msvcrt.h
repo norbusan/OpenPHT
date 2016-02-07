@@ -46,9 +46,9 @@ typedef fpos_t   fpos64_t; // no 64-bit on android
 
 typedef void ( *PFV)(void);
 
-#define __IS_STDIN_STREAM(stream)   (stream == stdin  || stream->_file == stdin->_file || stream->_file == 0)
-#define __IS_STDOUT_STREAM(stream)  (stream == stdout || stream->_file == stdout->_file || stream->_file == 1)
-#define __IS_STDERR_STREAM(stream)  (stream == stderr || stream->_file == stderr->_file || stream->_file == 2)
+#define __IS_STDIN_STREAM(stream)  (stream == stdin || fileno(stream) == fileno(stdin) || fileno(stream) == 0)
+#define __IS_STDOUT_STREAM(stream) (stream == stdout || fileno(stream) == fileno(stdout) || fileno(stream) == 1)
+#define __IS_STDERR_STREAM(stream) (stream == stderr || fileno(stream) == fileno(stderr) || fileno(stream) == 2)
 #define IS_STDIN_STREAM(stream)     (stream != NULL && __IS_STDIN_STREAM(stream))
 #define IS_STDOUT_STREAM(stream)    (stream != NULL && __IS_STDOUT_STREAM(stream))
 #define IS_STDERR_STREAM(stream)    (stream != NULL && __IS_STDERR_STREAM(stream))
@@ -116,7 +116,8 @@ extern "C"
   int dll_feof (FILE * stream);
   int dll_fread (void * buffer, size_t size, size_t count, FILE * stream);
   int dll_getc (FILE * stream);
-  FILE * dll_fopen (const char * filename, const char * mode);
+  FILE * dll_fopen(const char * filename, const char * mode);
+  int dll_fopen_s(FILE** pFile, const char * filename, const char * mode);
   int dll_fputc (int character, FILE * stream);
   int dll_putcchar (int character);
   int dll_fputs (const char * szLine , FILE* stream);

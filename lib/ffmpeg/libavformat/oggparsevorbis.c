@@ -188,6 +188,16 @@ fixup_vorbis_headers(AVFormatContext * as, struct oggvorbis_private *priv,
     return offset;
 }
 
+static void vorbis_cleanup(AVFormatContext *s, int idx)
+{
+    struct ogg *ogg = s->priv_data;
+    struct ogg_stream *os = ogg->streams + idx;
+    struct oggvorbis_private *priv = os->private;
+    int i;
+    if (os->private)
+        for (i = 0; i < 3; i++)
+            av_freep(&priv->packet[i]);
+}
 
 static int
 vorbis_header (AVFormatContext * s, int idx)
@@ -198,14 +208,14 @@ vorbis_header (AVFormatContext * s, int idx)
     struct oggvorbis_private *priv;
     int pkt_type = os->buf[os->pstart];
 
-    if (!(pkt_type & 1))
-        return 0;
-
     if (!os->private) {
         os->private = av_mallocz(sizeof(struct oggvorbis_private));
         if (!os->private)
             return 0;
     }
+
+    if (!(pkt_type & 1))
+        return 0;
 
     if (os->psize < 1 || pkt_type > 5)
         return -1;
@@ -278,5 +288,7 @@ vorbis_header (AVFormatContext * s, int idx)
 const struct ogg_codec ff_vorbis_codec = {
     .magic = "\001vorbis",
     .magicsize = 7,
-    .header = vorbis_header
+    .header = vorbis_header,
+    .cleanup= vorbis_cleanup,
+    .nb_header = 3,
 };

@@ -505,7 +505,7 @@ static int alloc_buffer(AVCodecContext *s, InputStream *ist, FrameBuffer **pbuf)
         const int v_shift = i==0 ? 0 : v_chroma_shift;
         if (s->flags & CODEC_FLAG_EMU_EDGE)
             buf->data[i] = buf->base[i];
-        else
+        else if (buf->base[i])
             buf->data[i] = buf->base[i] +
                            FFALIGN((buf->linesize[i]*edge >> v_shift) +
                                    (pixel_size*edge >> h_shift), 32);
@@ -4057,8 +4057,6 @@ static OutputStream *new_video_stream(OptionsContext *o, AVFormatContext *oc)
             if (p) p++;
         }
         video_enc->rc_override_count = i;
-        if (!video_enc->rc_initial_buffer_occupancy)
-            video_enc->rc_initial_buffer_occupancy = video_enc->rc_buffer_size * 3 / 4;
         video_enc->intra_dc_precision = intra_dc_precision - 8;
 
         if (do_psnr)
@@ -4068,9 +4066,11 @@ static OutputStream *new_video_stream(OptionsContext *o, AVFormatContext *oc)
         if (do_pass) {
             if (do_pass & 1) {
                 video_enc->flags |= CODEC_FLAG_PASS1;
+                av_dict_set(&ost->opts, "flags", "+pass1", AV_DICT_APPEND);
             }
             if (do_pass & 2) {
                 video_enc->flags |= CODEC_FLAG_PASS2;
+                av_dict_set(&ost->opts, "flags", "+pass2", AV_DICT_APPEND);
             }
         }
 
@@ -4696,7 +4696,8 @@ static int opt_target(OptionsContext *o, const char *opt, const char *arg)
             for (j = 0; j < nb_input_files; j++) {
                 for (i = 0; i < input_files[j].nb_streams; i++) {
                     AVCodecContext *c = input_files[j].ctx->streams[i]->codec;
-                    if (c->codec_type != AVMEDIA_TYPE_VIDEO)
+                    if (c->codec_type != AVMEDIA_TYPE_VIDEO ||
+                        !c->time_base.num)
                         continue;
                     fr = c->time_base.den * 1000 / c->time_base.num;
                     if (fr == 25000) {

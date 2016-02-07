@@ -72,6 +72,7 @@ CMyPlexManager::EMyPlexError CMyPlexScanner::DoScan()
       if (serverItem->HasProperty("sourceTitle"))
         server->SetOwner(serverItem->GetProperty("sourceTitle").asString());
       server->SetHome(home);
+      server->SetAllowChannelAccess(!server->IsShared());
 
       BOOST_FOREACH(const CFileItemPtr& connection, serverItem->m_connections)
       {

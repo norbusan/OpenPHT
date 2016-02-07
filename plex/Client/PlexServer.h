@@ -36,7 +36,7 @@ class CPlexServer : public boost::enable_shared_from_this<CPlexServer>
 {
 public:
   CPlexServer(const CStdString& uuid, const CStdString& name, bool owned, bool synced = false)
-    : m_owned(owned), m_uuid(uuid), m_name(name), m_synced(synced), m_lastRefreshed(0), m_home(false) {}
+    : m_owned(owned), m_uuid(uuid), m_name(name), m_synced(synced), m_lastRefreshed(0), m_home(false), m_allowChannelAccess(false) {}
 
   CPlexServer() {}
 
@@ -94,6 +94,7 @@ public:
   void SetSynced(bool synced) { m_synced = synced; }
   void SetVersion(const CStdString& version) { m_version = version; }
   void SetServerClass(const CStdString& classStr) { m_serverClass = classStr; }
+  void SetAllowChannelAccess(bool allowChannelAccess) { m_allowChannelAccess = allowChannelAccess; }
   void SetSupportsVideoTranscoding(bool support) { m_supportsVideoTranscoding = support; }
   void SetSupportsAudioTranscoding(bool support) { m_supportsAudioTranscoding = support; }
   void SetSupportsDeletion(bool support) { m_supportsDeletion = support; }
@@ -106,6 +107,7 @@ public:
   std::vector<std::string> GetTranscoderBitrates() const { return m_transcoderBitrates; }
   std::vector<std::string> GetTranscoderResolutions() const { return m_transcoderResolutions; }
   
+  bool AllowChannelAccess() const { return m_allowChannelAccess; }
   bool SupportsVideoTranscoding() const { return m_supportsVideoTranscoding; }
   bool SupportsAudioTranscoding() const { return m_supportsAudioTranscoding; }
   bool SupportsDeletion() const { return m_supportsDeletion; }
@@ -115,7 +117,7 @@ public:
     
   void SetActiveConnection(CPlexConnectionPtr connection) { m_activeConnection = connection; }
 
-  uint64_t GetLastRefreshed() const { return m_lastRefreshed; }
+  uint64_t GetLastRefreshed() const { return m_lastRefreshed > 0 ? XbmcThreads::SystemClockMillis() - m_lastRefreshed : m_lastRefreshed; }
   void DidRefresh() { m_lastRefreshed = XbmcThreads::SystemClockMillis(); }
 
   bool IsSecondary() const
@@ -133,6 +135,7 @@ private:
   CStdString m_owner;
   CStdString m_serverClass;
 
+  bool m_allowChannelAccess;
   bool m_supportsDeletion;
   bool m_supportsAudioTranscoding;
   bool m_supportsVideoTranscoding;

@@ -90,6 +90,11 @@ bool CPlexServer::CollectDataFromRoot(const CStdString xmlData)
       }
     }
 
+    if (root->QueryBoolAttribute("allowChannelAccess", &boolValue) == TIXML_SUCCESS)
+      m_allowChannelAccess = boolValue;
+    else
+      m_allowChannelAccess = !IsShared();
+
     if (root->QueryBoolAttribute("allowMediaDeletion", &boolValue) == TIXML_SUCCESS)
       m_supportsDeletion = boolValue;
     else
@@ -382,6 +387,9 @@ void CPlexServer::Merge(CPlexServerPtr otherServer)
 
   BOOST_FOREACH(CPlexConnectionPtr conn, otherServer->m_connections)
   {
+    if (conn->IsReachable())
+      m_allowChannelAccess = otherServer->m_allowChannelAccess;
+
     bool found = false;
     BOOST_FOREACH(CPlexConnectionPtr mappedConn, m_connections)
     {

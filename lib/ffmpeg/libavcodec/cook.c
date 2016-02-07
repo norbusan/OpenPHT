@@ -44,6 +44,7 @@
 
 #include "libavutil/lfg.h"
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "dsputil.h"
 #include "bytestream.h"
@@ -321,11 +322,11 @@ static av_cold int cook_decode_close(AVCodecContext *avctx)
 
     /* Free the VLC tables. */
     for (i = 0; i < 13; i++)
-        free_vlc(&q->envelope_quant_index[i]);
+        ff_free_vlc(&q->envelope_quant_index[i]);
     for (i = 0; i < 7; i++)
-        free_vlc(&q->sqvh[i]);
+        ff_free_vlc(&q->sqvh[i]);
     for (i = 0; i < q->num_subpackets; i++)
-        free_vlc(&q->subpacket[i].ccpl);
+        ff_free_vlc(&q->subpacket[i].ccpl);
 
     av_log(avctx, AV_LOG_DEBUG, "Memory deallocated.\n");
 
@@ -991,7 +992,7 @@ static int cook_decode_frame(AVCodecContext *avctx, void *data,
     /* get output buffer */
     if (q->discarded_packets >= 2) {
         q->frame.nb_samples = q->samples_per_channel;
-        if ((ret = avctx->get_buffer(avctx, &q->frame)) < 0) {
+        if ((ret = ff_get_buffer(avctx, &q->frame)) < 0) {
             av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
             return ret;
         }
@@ -1234,6 +1235,11 @@ static av_cold int cook_decode_init(AVCodecContext *avctx)
         q->subpacket[s].gains1.previous = q->subpacket[s].gain_2;
         q->subpacket[s].gains2.now      = q->subpacket[s].gain_3;
         q->subpacket[s].gains2.previous = q->subpacket[s].gain_4;
+
+        if (q->num_subpackets + q->subpacket[s].num_channels > q->nb_channels) {
+            av_log(avctx, AV_LOG_ERROR, "Too many subpackets %d for channels %d\n", q->num_subpackets, q->nb_channels);
+            return AVERROR_INVALIDDATA;
+        }
 
         q->num_subpackets++;
         s++;

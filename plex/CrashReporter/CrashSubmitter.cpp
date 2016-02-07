@@ -16,7 +16,7 @@
 #include "URL.h"
 #include "utils/Base64.h"
 
-#define SUBMITTER_URL "http://crashreport.plexapp.com:8881"
+#define SUBMITTER_URL "http://services.openpht.tv/crashreport"
 
 using namespace std;
 
@@ -82,7 +82,7 @@ void CrashSubmitter::Upload()
         continue;
 
       CStdString fname = URIUtils::AddFileToFolder(uploadPath, URIUtils::GetFileName(file->GetPath()));
-      CLog::Log(LOGDEBUG, "CrashReporter::Upload moving %s to %s", file->GetPath().c_str(), fname.c_str());
+      CLog::Log(LOGNOTICE, "CrashReporter::Upload moving %s to %s", file->GetPath().c_str(), fname.c_str());
 
       XFILE::CFile::Rename(file->GetPath(), fname);
 
@@ -115,7 +115,7 @@ CStdString CrashSubmitter::GetDumpData(const CStdString &path)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CrashSubmitter::UploadFile(const CStdString& p)
 {
-  CLog::Log(LOGDEBUG,"CrashSubmitter::UploadFile Uploading crash report %s", p.c_str());
+  CLog::Log(LOGNOTICE,"CrashSubmitter::UploadFile Uploading crash report %s", p.c_str());
   XFILE::CCurlFile http;
   CURL u(SUBMITTER_URL);
 
@@ -140,7 +140,7 @@ bool CrashSubmitter::UploadFile(const CStdString& p)
   CStdString data;
   if (!http.Post(u.Get(), "dumpfileb64=" + b64data, data))
   {
-    CLog::Log(LOGDEBUG, "CrashSubmitter::UploadFile failed to upload to %s", SUBMITTER_URL);
+    CLog::Log(LOGERROR, "CrashSubmitter::UploadFile failed to upload to %s", SUBMITTER_URL);
     return false;
   }
 

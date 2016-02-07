@@ -2,12 +2,12 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=curl
-VERSION=7.21.6
+VERSION=7.46.0
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.bz2
 
 # configuration settings
-CONFIGURE=./configure --prefix=$(PREFIX)
+CONFIGURE=./configure --prefix=$(PREFIX) --without-libssh2
 CONFIGURE_IOS=$(CONFIGURE) --with-random=/dev/urandom
 
 LIBDYLIB=$(SOURCE)/.libs/(LIBNAME).dylib

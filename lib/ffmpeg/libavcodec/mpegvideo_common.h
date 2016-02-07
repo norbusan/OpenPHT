@@ -244,7 +244,8 @@ void mpeg_motion_internal(MpegEncContext *s,
 {
     uint8_t *ptr_y, *ptr_cb, *ptr_cr;
     int dxy, uvdxy, mx, my, src_x, src_y,
-        uvsrc_x, uvsrc_y, v_edge_pos, uvlinesize, linesize;
+        uvsrc_x, uvsrc_y, v_edge_pos;
+    emuedge_linesize_type uvlinesize, linesize;
 
 #if 0
 if(s->quarter_sample)
@@ -725,7 +726,8 @@ static av_always_inline void MPV_motion_internal(MpegEncContext *s,
                         0, 0, 0,
                         ref_picture, pix_op, qpix_op,
                         s->mv[dir][0][0], s->mv[dir][0][1], 16);
-        }else if(!is_mpeg12 && (CONFIG_WMV2_DECODER || CONFIG_WMV2_ENCODER) && s->mspel && s->codec_id == CODEC_ID_WMV2){
+        } else if (!is_mpeg12 && (CONFIG_WMV2_DECODER || CONFIG_WMV2_ENCODER) &&
+                   s->mspel && s->codec_id == CODEC_ID_WMV2) {
             ff_mspel_motion(s, dest_y, dest_cb, dest_cr,
                         ref_picture, pix_op,
                         s->mv[dir][0][0], s->mv[dir][0][1], 16);

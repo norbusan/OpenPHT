@@ -29,6 +29,7 @@ set(removed_files
   NFSDirectory.cpp
   NFSFile.cpp
   SFTPDirectory.cpp
+  SFTPFile.cpp
 )
 
 foreach(r ${removed_files})

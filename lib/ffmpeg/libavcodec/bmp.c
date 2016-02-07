@@ -53,6 +53,7 @@ static int bmp_decode_frame(AVCodecContext *avctx,
     uint8_t *ptr;
     int dsize;
     const uint8_t *buf0 = buf;
+    GetByteContext gb;
 
     if(buf_size < 14){
         av_log(avctx, AV_LOG_ERROR, "buf size too small (%d)\n", buf_size);
@@ -117,7 +118,7 @@ static int bmp_decode_frame(AVCodecContext *avctx,
 
     depth = bytestream_get_le16(&buf);
 
-    if(ihsize == 40 || ihsize == 64 || ihsize == 56)
+    if (ihsize >= 40)
         comp = bytestream_get_le32(&buf);
     else
         comp = BMP_RGB;
@@ -132,8 +133,7 @@ static int bmp_decode_frame(AVCodecContext *avctx,
         rgb[0] = bytestream_get_le32(&buf);
         rgb[1] = bytestream_get_le32(&buf);
         rgb[2] = bytestream_get_le32(&buf);
-        if (ihsize >= 108)
-            alpha = bytestream_get_le32(&buf);
+        alpha = bytestream_get_le32(&buf);
     }
 
     avctx->width = width;
@@ -231,9 +231,6 @@ static int bmp_decode_frame(AVCodecContext *avctx,
     if(comp == BMP_RLE4 || comp == BMP_RLE8)
         memset(p->data[0], 0, avctx->height * p->linesize[0]);
 
-    if(depth == 4 || depth == 8)
-        memset(p->data[1], 0, 1024);
-
     if(height > 0){
         ptr = p->data[0] + (avctx->height - 1) * p->linesize[0];
         linesize = -p->linesize[0];
@@ -244,6 +241,9 @@ static int bmp_decode_frame(AVCodecContext *avctx,
 
     if(avctx->pix_fmt == PIX_FMT_PAL8){
         int colors = 1 << depth;
+
+        memset(p->data[1], 0, 1024);
+
         if(ihsize >= 36){
             int t;
             buf = buf0 + 46;
@@ -269,7 +269,8 @@ static int bmp_decode_frame(AVCodecContext *avctx,
             p->data[0] += p->linesize[0] * (avctx->height - 1);
             p->linesize[0] = -p->linesize[0];
         }
-        ff_msrle_decode(avctx, (AVPicture*)p, depth, buf, dsize);
+        bytestream2_init(&gb, buf, dsize);
+        ff_msrle_decode(avctx, (AVPicture*)p, depth, &gb);
         if(height < 0){
             p->data[0] += p->linesize[0] * (avctx->height - 1);
             p->linesize[0] = -p->linesize[0];

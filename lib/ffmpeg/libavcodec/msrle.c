@@ -35,11 +35,13 @@
 #include "avcodec.h"
 #include "dsputil.h"
 #include "msrledec.h"
+#include "libavutil/imgutils.h"
 
 typedef struct MsrleContext {
     AVCodecContext *avctx;
     AVFrame frame;
 
+    GetByteContext gb;
     const unsigned char *buf;
     int size;
 
@@ -107,7 +109,7 @@ static int msrle_decode_frame(AVCodecContext *avctx,
 
     /* FIXME how to correctly detect RLE ??? */
     if (avctx->height * istride == avpkt->size) { /* assume uncompressed */
-        int linesize = (avctx->width * avctx->bits_per_coded_sample + 7) / 8;
+        int linesize = av_image_get_linesize(avctx->pix_fmt, avctx->width, 0);
         uint8_t *ptr = s->frame.data[0];
         uint8_t *buf = avpkt->data + (avctx->height-1)*istride;
         int i, j;
@@ -127,7 +129,8 @@ static int msrle_decode_frame(AVCodecContext *avctx,
             ptr += s->frame.linesize[0];
         }
     } else {
-        ff_msrle_decode(avctx, (AVPicture*)&s->frame, avctx->bits_per_coded_sample, buf, buf_size);
+        bytestream2_init(&s->gb, buf, buf_size);
+        ff_msrle_decode(avctx, (AVPicture*)&s->frame, avctx->bits_per_coded_sample, &s->gb);
     }
 
     *data_size = sizeof(AVFrame);

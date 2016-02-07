@@ -151,9 +151,9 @@ static int config_input(AVFilterLink *inlink)
     var_values[VAR_IN_H]  = var_values[VAR_IH] = inlink->h;
     var_values[VAR_OUT_W] = var_values[VAR_OW] = NAN;
     var_values[VAR_OUT_H] = var_values[VAR_OH] = NAN;
-    var_values[VAR_A]     = (float) inlink->w / inlink->h;
+    var_values[VAR_A]     = (double) inlink->w / inlink->h;
     var_values[VAR_SAR]   = inlink->sample_aspect_ratio.num ?
-        (float) inlink->sample_aspect_ratio.num / inlink->sample_aspect_ratio.den : 1;
+        (double) inlink->sample_aspect_ratio.num / inlink->sample_aspect_ratio.den : 1;
     var_values[VAR_DAR]   = var_values[VAR_A] * var_values[VAR_SAR];
     var_values[VAR_HSUB]  = 1<<pad->hsub;
     var_values[VAR_VSUB]  = 1<<pad->vsub;
@@ -299,6 +299,7 @@ static void start_frame(AVFilterLink *inlink, AVFilterBufferRef *inpicref)
 {
     PadContext *pad = inlink->dst->priv;
     AVFilterBufferRef *outpicref = avfilter_ref_buffer(inpicref, ~0);
+    AVFilterBufferRef *for_next_filter;
     int plane;
 
     for (plane = 0; plane < 4 && outpicref->data[plane]; plane++) {
@@ -335,12 +336,14 @@ static void start_frame(AVFilterLink *inlink, AVFilterBufferRef *inpicref)
     outpicref->video->w = pad->w;
     outpicref->video->h = pad->h;
 
-    avfilter_start_frame(inlink->dst->outputs[0], outpicref);
+    for_next_filter = avfilter_ref_buffer(outpicref, ~0);
+    avfilter_start_frame(inlink->dst->outputs[0], for_next_filter);
 }
 
 static void end_frame(AVFilterLink *link)
 {
     avfilter_end_frame(link->dst->outputs[0]);
+    avfilter_unref_buffer(link->dst->outputs[0]->out_buf);
     avfilter_unref_buffer(link->cur_buf);
 }
 

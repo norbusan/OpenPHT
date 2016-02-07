@@ -106,7 +106,7 @@ static const uint8_t* dv_extract_pack(uint8_t* frame, enum dv_pack_type t)
  * 3. Audio is always returned as 16bit linear samples: 12bit nonlinear samples
  *    are converted into 16bit linear ones.
  */
-static int dv_extract_audio(uint8_t* frame, uint8_t* ppcm[4],
+static int dv_extract_audio(uint8_t *frame, uint8_t **ppcm,
                             const DVprofile *sys)
 {
     int size, chan, i, j, d, of, smpls, freq, quant, half_ch;
@@ -267,9 +267,6 @@ static int dv_extract_video_info(DVDemuxContext *c, uint8_t* frame)
         avpriv_set_pts_info(c->vst, 64, c->sys->time_base.num,
                         c->sys->time_base.den);
         avctx->time_base= c->sys->time_base;
-        if (!avctx->width)
-            avcodec_set_dimensions(avctx, c->sys->width, c->sys->height);
-        avctx->pix_fmt = c->sys->pix_fmt;
 
         /* finding out SAR is a little bit messy */
         vsc_pack = dv_extract_pack(frame, dv_video_control);
@@ -377,7 +374,7 @@ int avpriv_dv_produce_packet(DVDemuxContext *c, AVPacket *pkt,
                       uint8_t* buf, int buf_size, int64_t pos)
 {
     int size, i;
-    uint8_t *ppcm[4] = {0};
+    uint8_t *ppcm[5] = { 0 };
 
     if (buf_size < DV_PROFILE_BYTES ||
         !(c->sys = avpriv_dv_frame_profile(c->sys, buf, buf_size)) ||

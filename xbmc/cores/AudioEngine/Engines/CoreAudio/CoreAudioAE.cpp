@@ -390,7 +390,7 @@ void CCoreAudioAE::Deinitialize()
 
 void CCoreAudioAE::OnSettingsChange(const std::string& setting)
 {
-  if (setting == "audiooutput.dontnormalizelevels")
+  if (setting == "audiooutput.normalizelevels")
   {
     // re-init streams remapper
     CSingleLock streamLock(m_streamLock);

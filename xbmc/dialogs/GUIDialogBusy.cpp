@@ -21,14 +21,45 @@
 #include "GUIDialogBusy.h"
 #include "guilib/GUIProgressControl.h"
 #include "guilib/GUIWindowManager.h"
+#include "threads/Event.h"
 
 #define PROGRESS_CONTROL 10
+
+bool CGUIDialogBusy::WaitOnEvent(CEvent &event, unsigned int displaytime /* = 100 */, bool allowCancel /* = true */)
+{
+  bool cancelled = false;
+  if (!event.WaitMSec(displaytime))
+  {
+    // throw up the progress
+    CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+    if (dialog)
+    {
+      dialog->Show();
+#ifdef TARGET_RASPBERRY_PI
+      while(!event.WaitMSec(100))
+#else
+      while(!event.WaitMSec(20))
+#endif
+      {
+        g_windowManager.ProcessRenderLoop(false);
+        if (allowCancel && dialog->IsCanceled())
+        {
+          cancelled = true;
+          break;
+        }
+      }
+      dialog->Close();
+    }
+  }
+  return !cancelled;
+}
 
 CGUIDialogBusy::CGUIDialogBusy(void)
   : CGUIDialog(WINDOW_DIALOG_BUSY, "DialogBusy.xml"), m_bLastVisible(false)
 {
   m_loadType = LOAD_ON_GUI_INIT;
   m_bModal = true;
+  m_bCanceled = false;
   m_progress = 0;
 }
 

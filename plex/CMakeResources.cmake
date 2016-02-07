@@ -78,7 +78,7 @@ endfunction(set_bundle_dir)
 
 if(TARGET_COMMON_DARWIN)
   set_source_files_properties(${CONFIG_PLEX_INSTALL_LIBRARIES} PROPERTIES MACOSX_PACKAGE_LOCATION Frameworks)
-  set_bundle_dir(SOURCES ${root}/media DEST Resources/XBMC/media EXCLUDE .*/Splash.png Credits.html)
+  set_bundle_dir(SOURCES ${root}/media DEST Resources/XBMC/media EXCLUDE .*/Splash.png .*/weather.zip Credits.html)
   set_bundle_dir(SOURCES ${root}/sounds DEST Resources/XBMC/sounds)
   set_bundle_dir(SOURCES ${root}/language DEST Resources/XBMC/language)
   set_bundle_dir(SOURCES ${root}/system DEST Resources/XBMC/system EXCLUDE .*/keymaps.* .*/python/.* .*/playercorefactory.xml .*/peripherals.xml)
@@ -126,6 +126,7 @@ else(TARGET_COMMON_DARWIN)
 
   install(DIRECTORY ${root}/media ${root}/sounds ${root}/language DESTINATION ${RESOURCEPATH} COMPONENT RUNTIME
           PATTERN ${PLEX_SPLASH} EXCLUDE
+          PATTERN weather.zip EXCLUDE
           PATTERN Credits.html EXCLUDE)
 
   install(DIRECTORY ${root}/system DESTINATION ${RESOURCEPATH} COMPONENT RUNTIME
@@ -141,7 +142,7 @@ else(TARGET_COMMON_DARWIN)
           REGEX library.* EXCLUDE
           REGEX metadata.* EXCLUDE
           REGEX weather.* EXCLUDE
-          PATTERN repository.xbmc.org EXCLUDE
+          REGEX repository.* EXCLUDE
           REGEX ${EXCLUDE_TEXTURES} EXCLUDE
           PATTERN .git EXCLUDE
           PATTERN xbmc.python EXCLUDE
@@ -157,12 +158,8 @@ else(TARGET_COMMON_DARWIN)
 
   if(TARGET_WIN32)
     install(FILES ${root}/system/zlib1.dll DESTINATION ${BINPATH} COMPONENT RUNTIME)
-    install(FILES ${root}/project/Win32BuildSetup/dependencies/libcdio-13.dll DESTINATION ${BINPATH} COMPONENT RUNTIME)
     install(FILES ${plexdir}/build/dependencies/vcredist/2012/vcredist_x86.exe DESTINATION ${BINPATH}/Dependencies COMPONENT VCREDIST RENAME vcredist_2012_x86.exe)
-    install(FILES ${plexdir}/build/dependencies/vcredist/2010/vcredist_x86.exe DESTINATION ${BINPATH}/Dependencies COMPONENT VCREDIST RENAME vcredist_2010_x86.exe)
     install(DIRECTORY ${plexdir}/build/dependencies/dxsetup DESTINATION ${BINPATH}/Dependencies COMPONENT QDXSETUP)
-    install(FILES ${root}/project/Win32BuildSetup/dependencies/glew32.dll DESTINATION ${BINPATH} COMPONENT RUNTIME)
-    install(FILES ${root}/project/Win32BuildSetup/dependencies/libiconv-2.dll DESTINATION ${BINPATH} COMPONENT RUNTIME)
     install(FILES ${plexdir}/Resources/Plex.ico ${plexdir}/Resources/PlexBanner.bmp DESTINATION ${RESOURCEPATH}/media COMPONENT RUNTIME)
   endif(TARGET_WIN32)
 endif(TARGET_COMMON_DARWIN)

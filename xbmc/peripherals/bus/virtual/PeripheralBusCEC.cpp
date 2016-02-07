@@ -57,7 +57,7 @@ CPeripheralBusCEC::CPeripheralBusCEC(CPeripherals *manager) :
     m_dll(new DllLibCEC),
     m_cecAdapter(NULL)
 {
-  m_iRescanTime = 1000;
+  m_iRescanTime = 5000;
   if (!m_dll->Load() || !m_dll->IsLoaded())
   {
     delete m_dll;
@@ -101,6 +101,8 @@ bool CPeripheralBusCEC::PerformDeviceScan(PeripheralScanResults &results)
       break;
     case ADAPTERTYPE_RPI:
       result.m_mappedBusType = PERIPHERAL_BUS_RPI;
+      /** the Pi's adapter cannot be removed, no need to rescan */
+      m_bNeedsPolling = false;
       break;
     default:
       break;

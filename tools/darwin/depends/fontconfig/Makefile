@@ -2,15 +2,15 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=fontconfig
-VERSION=2.8.0
+VERSION=2.11.1
 SOURCE=$(LIBNAME)-$(VERSION)
-ARCHIVE=$(SOURCE).tar.gz
+ARCHIVE=$(SOURCE).tar.bz2
 
-# configuration settings 
+# configuration settings
 export PATH:=$(TOOLCHAIN)/bin:$(PATH) 
 CONFIGURE=./configure --prefix=$(PREFIX) \
-  --disable-libxml2 --disable-docs \
-  --with-freetype-config=$(PREFIX)/bin/freetype-config
+  --with-freetype-config=$(PREFIX)/bin/freetype-config \
+  --disable-libxml2 --disable-docs
 
 LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
 
@@ -23,7 +23,7 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
-	cd $(SOURCE); patch -p1 < ../01-fontconfig-cross-compile-fix.patch
+	cd $(SOURCE); patch -p1 < ../lconv.patch 
 	cd $(SOURCE); autoreconf -vif
 	cd $(SOURCE); $(CONFIGURE)
 

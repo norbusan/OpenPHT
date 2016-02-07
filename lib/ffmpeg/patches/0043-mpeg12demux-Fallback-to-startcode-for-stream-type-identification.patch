@@ -1,0 +1,40 @@
+From c071b006436d663b977068f8d23cbc061f40491f Mon Sep 17 00:00:00 2001
+From: Michael Niedermayer <michaelni@gmx.at>
+Date: Mon, 21 Jan 2013 04:21:56 +0100
+Subject: [PATCH] mpeg12demux: Fallback to startcode for stream type
+ identification.
+
+Fixes Ticket2147
+Fixes SageTV support
+
+Based-on patch by Andrew Gallatin
+Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+---
+ libavformat/mpeg.c |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/libavformat/mpeg.c b/libavformat/mpeg.c
+index 4af2057..4eaffd8 100644
+--- a/libavformat/mpeg.c
++++ b/libavformat/mpeg.c
+@@ -416,7 +416,6 @@ static int mpegps_read_packet(AVFormatContext *s,
+     }
+ 
+     es_type = m->psm_es_type[startcode & 0xff];
+-    if(es_type > 0 && es_type != STREAM_TYPE_PRIVATE_DATA){
+         if(es_type == STREAM_TYPE_VIDEO_MPEG1){
+             codec_id = AV_CODEC_ID_MPEG2VIDEO;
+             type = AVMEDIA_TYPE_VIDEO;
+@@ -439,9 +438,6 @@ static int mpegps_read_packet(AVFormatContext *s,
+         } else if(es_type == STREAM_TYPE_AUDIO_AC3){
+             codec_id = AV_CODEC_ID_AC3;
+             type = AVMEDIA_TYPE_AUDIO;
+-        } else {
+-            goto skip;
+-        }
+     } else if (startcode >= 0x1e0 && startcode <= 0x1ef) {
+         static const unsigned char avs_seqh[4] = { 0, 0, 1, 0xb0 };
+         unsigned char buf[8];
+-- 
+1.7.10.4
+

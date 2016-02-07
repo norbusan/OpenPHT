@@ -600,6 +600,11 @@ int ff_get_wav_header(AVIOContext *pb, AVCodecContext *codec, int size)
         if (size > 0)
             avio_skip(pb, size);
     }
+    if (codec->sample_rate <= 0) {
+        av_log(NULL, AV_LOG_ERROR,
+               "Invalid sample rate: %d\n", codec->sample_rate);
+        return AVERROR_INVALIDDATA;
+    }
     if (codec->codec_id == CODEC_ID_AAC_LATM) {
         /* channels and sample_rate values are those prior to applying SBR and/or PS */
         codec->channels    = 0;
@@ -707,8 +712,13 @@ int ff_read_riff_info(AVFormatContext *s, int64_t size)
         chunk_code = avio_rl32(pb);
         chunk_size = avio_rl32(pb);
         if (chunk_size > end || end - chunk_size < cur || chunk_size == UINT_MAX) {
-            av_log(s, AV_LOG_ERROR, "too big INFO subchunk\n");
-            return AVERROR_INVALIDDATA;
+            avio_seek(pb, -9, SEEK_CUR);
+            chunk_code = avio_rl32(pb);
+            chunk_size = avio_rl32(pb);
+            if (chunk_size > end || end - chunk_size < cur || chunk_size == UINT_MAX) {
+                av_log(s, AV_LOG_ERROR, "too big INFO subchunk\n");
+                return AVERROR_INVALIDDATA;
+            }
         }
 
         chunk_size += (chunk_size & 1);

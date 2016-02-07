@@ -579,7 +579,6 @@ int av_probe_input_buffer(AVIOContext *pb, AVInputFormat **fmt,
     for(probe_size= PROBE_BUF_MIN; probe_size<=max_probe_size && !*fmt;
         probe_size = FFMIN(probe_size<<1, FFMAX(max_probe_size, probe_size+1))) {
         int score = probe_size < max_probe_size ? AVPROBE_SCORE_MAX/4 : 0;
-        int buf_offset = (probe_size == PROBE_BUF_MIN) ? 0 : probe_size>>1;
         void *buftmp;
 
         if (probe_size < offset) {
@@ -593,7 +592,7 @@ int av_probe_input_buffer(AVIOContext *pb, AVInputFormat **fmt,
             return AVERROR(ENOMEM);
         }
         buf=buftmp;
-        if ((ret = avio_read(pb, buf + buf_offset, probe_size - buf_offset)) < 0) {
+        if ((ret = avio_read(pb, buf + pd.buf_size, probe_size - pd.buf_size)) < 0) {
             /* fail if error was not end of file, otherwise, lower score */
             if (ret != AVERROR_EOF) {
                 av_free(buf);
@@ -708,7 +707,7 @@ int avformat_open_input(AVFormatContext **ps, const char *filename, AVInputForma
     }
 
     s->duration = s->start_time = AV_NOPTS_VALUE;
-    av_strlcpy(s->filename, filename, sizeof(s->filename));
+    av_strlcpy(s->filename, filename ? filename : "", sizeof(s->filename));
 
     /* allocate private data */
     if (s->iformat->priv_data_size > 0) {
@@ -925,7 +924,10 @@ static void compute_frame_duration(int *pnum, int *pden, AVStream *st,
             *pnum = st->codec->time_base.num;
             *pden = st->codec->time_base.den;
             if (pc && pc->repeat_pict) {
-                *pnum = (*pnum) * (1 + pc->repeat_pict);
+                if (*pnum > INT_MAX / (1 + pc->repeat_pict))
+                    *pden /= 1 + pc->repeat_pict;
+                else
+                    *pnum *= 1 + pc->repeat_pict;
             }
             //If this codec can be interlaced or progressive then we need a parser to compute duration of a packet
             //Thus if we have no parser in such case leave duration undefined.
@@ -1172,12 +1174,14 @@ static void compute_pkt_fields(AVFormatContext *s, AVStream *st,
             if (pkt->dts != AV_NOPTS_VALUE) {
                 // got DTS from the stream, update reference timestamp
                 st->reference_dts = pkt->dts - pc->dts_ref_dts_delta * num / den;
-                pkt->pts = pkt->dts + pc->pts_dts_delta * num / den;
             } else if (st->reference_dts != AV_NOPTS_VALUE) {
                 // compute DTS based on reference timestamp
                 pkt->dts = st->reference_dts + pc->dts_ref_dts_delta * num / den;
-                pkt->pts = pkt->dts + pc->pts_dts_delta * num / den;
             }
+
+            if (st->reference_dts != AV_NOPTS_VALUE && pkt->pts == AV_NOPTS_VALUE)
+                pkt->pts = pkt->dts + pc->pts_dts_delta * num / den;
+
             if (pc->dts_sync_point > 0)
                 st->reference_dts = pkt->dts; // new reference
         }
@@ -2053,7 +2057,7 @@ int avformat_seek_file(AVFormatContext *s, int stream_index, int64_t min_ts, int
     //Note the old has somewat different sematics
     AV_NOWARN_DEPRECATED(
     if(s->iformat->read_seek || 1)
-        return av_seek_frame(s, stream_index, ts, flags | (ts - min_ts > (uint64_t)(max_ts - ts) ? AVSEEK_FLAG_BACKWARD : 0));
+        return av_seek_frame(s, stream_index, ts, flags | ((uint64_t)ts - min_ts > (uint64_t)max_ts - ts ? AVSEEK_FLAG_BACKWARD : 0));
     )
 
     // try some generic seek like seek_frame_generic() but with new ts semantics
@@ -2162,8 +2166,13 @@ static void estimate_timings_from_bit_rate(AVFormatContext *ic)
         bit_rate = 0;
         for(i=0;i<ic->nb_streams;i++) {
             st = ic->streams[i];
-            if (st->codec->bit_rate > 0)
-            bit_rate += st->codec->bit_rate;
+            if (st->codec->bit_rate > 0) {
+                if (INT_MAX - st->codec->bit_rate < bit_rate) {
+                    bit_rate = 0;
+                    break;
+                }
+                bit_rate += st->codec->bit_rate;
+            }
         }
         ic->bit_rate = bit_rate;
     }
@@ -2520,8 +2529,8 @@ static int get_std_framerate(int i){
  * And there are "variable" fps files this needs to detect as well.
  */
 static int tb_unreliable(AVCodecContext *c){
-    if(   c->time_base.den >= 101L*c->time_base.num
-       || c->time_base.den <    5L*c->time_base.num
+    if(   c->time_base.den >= 101LL*c->time_base.num
+       || c->time_base.den <    5LL*c->time_base.num
 /*       || c->codec_tag == AV_RL32("DIVX")
        || c->codec_tag == AV_RL32("XVID")*/
        || c->codec_id == CODEC_ID_MPEG2VIDEO
@@ -2999,6 +3008,7 @@ void avformat_free_context(AVFormatContext *s)
             av_free_packet(&st->cur_pkt);
         }
         av_dict_free(&st->metadata);
+        av_freep(&st->probe_data.buf);
         av_freep(&st->index_entries);
         av_freep(&st->codec->extradata);
         av_freep(&st->codec->subtitle_header);

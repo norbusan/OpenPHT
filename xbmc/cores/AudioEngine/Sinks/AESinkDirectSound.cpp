@@ -113,15 +113,20 @@ static BOOL CALLBACK DSEnumCallback(LPGUID lpGuid, LPCTSTR lpcstrDescription, LP
 }
 
 CAESinkDirectSound::CAESinkDirectSound() :
-  m_initialized   (false),
-  m_isDirtyDS     (false),
   m_pBuffer       (NULL ),
   m_pDSound       (NULL ),
+  m_encodedFormat (AE_FMT_INVALID),
+  m_AvgBytesPerSec(0    ),
+  m_dwChunkSize   (0    ),
+  m_dwFrameSize   (0    ),
+  m_dwBufferLen   (0    ),
   m_BufferOffset  (0    ),
   m_CacheLen      (0    ),
-  m_dwChunkSize   (0    ),
-  m_dwBufferLen   (0    ),
-  m_BufferTimeouts(0    )
+  m_LastCacheCheck(0    ),
+  m_BufferTimeouts(0    ),
+  m_running       (false),
+  m_initialized   (false),
+  m_isDirtyDS     (false)
 {
   m_channelLayout.Reset();
 }
@@ -164,9 +169,13 @@ bool CAESinkDirectSound::Initialize(AEAudioFormat &format, std::string &device)
 
   if (FAILED(hr))
   {
-    CLog::Log(LOGERROR, __FUNCTION__": Failed to create the DirectSound device.");
-    CLog::Log(LOGERROR, __FUNCTION__": DSErr: %s", dserr2str(hr));
-    return false;
+    CLog::Log(LOGERROR, __FUNCTION__": Failed to create the DirectSound device %s with error %s, trying the default device.", deviceFriendlyName.c_str(), dserr2str(hr));
+    hr = DirectSoundCreate(NULL, &m_pDSound, NULL);
+    if (FAILED(hr))
+    {
+      CLog::Log(LOGERROR, __FUNCTION__": Failed to create the default DirectSound device with error %s.", dserr2str(hr));
+      return false;
+    }
   }
 
   HWND tmp_hWnd;
@@ -190,6 +199,10 @@ bool CAESinkDirectSound::Initialize(AEAudioFormat &format, std::string &device)
   }
 
   WAVEFORMATEXTENSIBLE wfxex = {0};
+
+  // clamp samplerate to a minimum
+  if (format.m_sampleRate < 44100)
+    format.m_sampleRate = 44100;
 
   //fill waveformatex
   ZeroMemory(&wfxex, sizeof(WAVEFORMATEXTENSIBLE));
@@ -218,16 +231,17 @@ bool CAESinkDirectSound::Initialize(AEAudioFormat &format, std::string &device)
 
   m_AvgBytesPerSec = wfxex.Format.nAvgBytesPerSec;
 
-  unsigned int uiFrameCount = (int)(format.m_sampleRate * 0.01); //default to 10ms chunks
+  unsigned int uiFrameCount = (int)(format.m_sampleRate * 0.015); //default to 15ms chunks
   m_dwFrameSize = wfxex.Format.nBlockAlign;
   m_dwChunkSize = m_dwFrameSize * uiFrameCount;
-  m_dwBufferLen = m_dwChunkSize * 12; //120ms total buffer
+  m_dwBufferLen = m_dwChunkSize * 12; //180ms total buffer
 
   // fill in the secondary sound buffer descriptor
   DSBUFFERDESC dsbdesc;
   memset(&dsbdesc, 0, sizeof(DSBUFFERDESC));
   dsbdesc.dwSize = sizeof(DSBUFFERDESC);
   dsbdesc.dwFlags = DSBCAPS_GETCURRENTPOSITION2 /** Better position accuracy */
+                  | DSBCAPS_TRUEPLAYPOSITION    /** Vista+ accurate position */
                   | DSBCAPS_GLOBALFOCUS;         /** Allows background playing */
 
   if (!g_sysinfo.IsVistaOrHigher())
@@ -261,6 +275,7 @@ bool CAESinkDirectSound::Initialize(AEAudioFormat &format, std::string &device)
 
   AEChannelsFromSpeakerMask(wfxex.dwChannelMask);
   format.m_channelLayout = m_channelLayout;
+  m_encodedFormat = format.m_dataFormat;
   format.m_frames = uiFrameCount;
   format.m_frameSamples = format.m_frames * format.m_channelLayout.Count();
   format.m_frameSize = (AE_IS_RAW(format.m_dataFormat) ? wfxex.Format.wBitsPerSample >> 3 : sizeof(float)) * format.m_channelLayout.Count();
@@ -373,7 +388,11 @@ unsigned int CAESinkDirectSound::AddPackets(uint8_t *data, unsigned int frames, 
   unsigned char* pBuffer = (unsigned char*)data;
 
   DWORD bufferStatus = 0;
-  m_pBuffer->GetStatus(&bufferStatus);
+  if (m_pBuffer->GetStatus(&bufferStatus) != DS_OK)
+  {
+    CLog::Log(LOGERROR, "%s: GetStatus() failed", __FUNCTION__);
+    return 0;
+  }
   if (bufferStatus & DSBSTATUS_BUFFERLOST)
   {
     CLog::Log(LOGDEBUG, __FUNCTION__ ": Buffer allocation was lost. Restoring buffer.");
@@ -382,9 +401,12 @@ unsigned int CAESinkDirectSound::AddPackets(uint8_t *data, unsigned int frames, 
 
   while (GetSpace() < total)
   {
-    if (m_isDirtyDS)
+    if(m_isDirtyDS)
       return INT_MAX;
-    Sleep(total * 1000 / m_AvgBytesPerSec);
+    else
+    {
+      Sleep(total * 1000 / m_AvgBytesPerSec);
+    }
   }
 
   while (len)
@@ -609,7 +631,12 @@ void CAESinkDirectSound::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList, bo
       WAVEFORMATEX* smpwfxex = (WAVEFORMATEX*)varName.blob.pBlobData;
       deviceInfo.m_channels = layoutsByChCount[std::max(std::min(smpwfxex->nChannels, (WORD) DS_SPEAKER_COUNT), (WORD) 2)];
       deviceInfo.m_dataFormats.push_back(AEDataFormat(AE_FMT_FLOAT));
-      deviceInfo.m_dataFormats.push_back(AEDataFormat(AE_FMT_AC3));
+      if (aeDeviceType != AE_DEVTYPE_PCM)
+      {
+        deviceInfo.m_dataFormats.push_back(AEDataFormat(AE_FMT_AC3));
+        // DTS is played with the same infrastructure as AC3
+        deviceInfo.m_dataFormats.push_back(AEDataFormat(AE_FMT_DTS));
+      }
       deviceInfo.m_sampleRates.push_back(std::min(smpwfxex->nSamplesPerSec, (DWORD) 192000));
     }
     else
@@ -667,7 +694,11 @@ failed:
 void CAESinkDirectSound::CheckPlayStatus()
 {
   DWORD status = 0;
-  m_pBuffer->GetStatus(&status);
+  if (m_pBuffer->GetStatus(&status) != DS_OK)
+  {
+    CLog::Log(LOGERROR, "%s: GetStatus() failed", __FUNCTION__);
+    return;
+  }
 
   if (!(status & DSBSTATUS_PLAYING) && m_CacheLen != 0) // If we have some data, see if we can start playback
   {
@@ -727,7 +758,8 @@ bool CAESinkDirectSound::UpdateCacheStatus()
       return false;
     }
   }
-  else m_BufferTimeouts = 0;
+  else 
+    m_BufferTimeouts = 0;
 
   // Calculate available space in the ring buffer
   if (playCursor == m_BufferOffset && m_BufferOffset ==  writeCursor) // Playback is stopped and we are all at the same place
@@ -758,8 +790,6 @@ unsigned int CAESinkDirectSound::GetSpace()
 
 void CAESinkDirectSound::AEChannelsFromSpeakerMask(DWORD speakers)
 {
-  int j = 0;
-
   m_channelLayout.Reset();
 
   for (int i = 0; i < DS_SPEAKER_COUNT; i++)
@@ -806,6 +836,12 @@ const char *CAESinkDirectSound::dserr2str(int err)
     case DSERR_UNINITIALIZED: return "DSERR_UNINITIALIZED";
     case DSERR_NOINTERFACE: return "DSERR_NOINTERFACE";
     case DSERR_ACCESSDENIED: return "DSERR_ACCESSDENIED";
+    case DSERR_BUFFERTOOSMALL: return "DSERR_BUFFERTOOSMALL";
+    case DSERR_DS8_REQUIRED: return "DSERR_DS8_REQUIRED";
+    case DSERR_SENDLOOP: return "DSERR_SENDLOOP";
+    case DSERR_BADSENDBUFFERGUID: return "DSERR_BADSENDBUFFERGUID";
+    case DSERR_OBJECTNOTFOUND: return "DSERR_OBJECTNOTFOUND";
+    case DSERR_FXUNAVAILABLE: return "DSERR_FXUNAVAILABLE";
     default: return "unknown";
   }
 }

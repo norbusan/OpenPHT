@@ -27,6 +27,7 @@
 
 #include "libavutil/mathematics.h"
 #include "avcodec.h"
+#include "internal.h"
 #define BITSTREAM_READER_LE
 #include "get_bits.h"
 #include "dsputil.h"
@@ -486,11 +487,13 @@ static av_cold int sipr_decoder_init(AVCodecContext * avctx)
     case 29: ctx->mode = MODE_6k5; break;
     case 37: ctx->mode = MODE_5k0; break;
     default:
-        av_log(avctx, AV_LOG_ERROR, "Invalid block_align: %d\n", avctx->block_align);
         if      (avctx->bit_rate > 12200) ctx->mode = MODE_16k;
         else if (avctx->bit_rate > 7500 ) ctx->mode = MODE_8k5;
         else if (avctx->bit_rate > 5750 ) ctx->mode = MODE_6k5;
         else                              ctx->mode = MODE_5k0;
+        av_log(avctx, AV_LOG_WARNING,
+               "Invalid block_align: %d. Mode %s guessed based on bitrate: %d\n",
+               avctx->block_align, modes[ctx->mode].mode_name, avctx->bit_rate);
     }
 
     av_log(avctx, AV_LOG_DEBUG, "Mode: %s\n", modes[ctx->mode].mode_name);
@@ -539,7 +542,7 @@ static int sipr_decode_frame(AVCodecContext *avctx, void *data,
     /* get output buffer */
     ctx->frame.nb_samples = mode_par->frames_per_packet * subframe_size *
                             mode_par->subframe_count;
-    if ((ret = avctx->get_buffer(avctx, &ctx->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &ctx->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }

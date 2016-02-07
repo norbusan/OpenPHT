@@ -39,7 +39,13 @@ using namespace XFILE;
 
 CTextureCache &CTextureCache::Get()
 {
+  /* PLEX */
+#ifdef OPENELEC
+  static CPlexTextureCache s_cache;
+#else
   static CTextureCache s_cache;
+#endif
+  /* END PLEX */
   return s_cache;
 }
 

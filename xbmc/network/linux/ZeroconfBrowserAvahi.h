@@ -106,10 +106,6 @@ class CZeroconfBrowserAvahi : public CZeroconfBrowser
     tDiscoveredServices m_discovered_services;
     CZeroconfBrowser::ZeroconfService m_resolving_service;
     CEvent m_resolved_event;
-
-    //2 variables below are needed for workaround of avahi bug (see destructor for details)
-    bool m_shutdown;
-    pthread_t m_thread_id;
 };
 
 #endif //HAS_AVAHI

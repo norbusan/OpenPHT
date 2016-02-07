@@ -34,6 +34,7 @@
  */
 
 #include "avcodec.h"
+#include "internal.h"
 #include "wma.h"
 
 #undef NDEBUG
@@ -84,6 +85,11 @@ static int wma_decode_init(AVCodecContext * avctx)
     WMACodecContext *s = avctx->priv_data;
     int i, flags2;
     uint8_t *extradata;
+
+    if (!avctx->block_align) {
+        av_log(avctx, AV_LOG_ERROR, "block_align is not set\n");
+        return AVERROR(EINVAL);
+    }
 
     s->avctx = avctx;
 
@@ -529,6 +535,10 @@ static int wma_decode_block(WMACodecContext *s)
        coef escape coding */
     total_gain = 1;
     for(;;) {
+        if (get_bits_left(&s->gb) < 7) {
+            av_log(s->avctx, AV_LOG_ERROR, "total_gain overread\n");
+            return AVERROR_INVALIDDATA;
+        }
         a = get_bits(&s->gb, 7);
         total_gain += a;
         if (a != 127)
@@ -855,7 +865,7 @@ static int wma_decode_superframe(AVCodecContext *avctx, void *data,
 
     /* get output buffer */
     s->frame.nb_samples = nb_frames * s->frame_len;
-    if ((ret = avctx->get_buffer(avctx, &s->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &s->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }

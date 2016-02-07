@@ -49,10 +49,11 @@ void CDemuxStreamAudio::GetStreamType(std::string& strInfo)
   if (iChannels == 1) strcat(sInfo, "Mono");
   else if (iChannels == 2) strcat(sInfo, "Stereo");
   else if (iChannels == 6) strcat(sInfo, "5.1");
+  else if (iChannels == 8) strcat(sInfo, "7.1");
   else if (iChannels != 0)
   {
     char temp[32];
-    sprintf(temp, " %d %s", iChannels, "Channels");
+    sprintf(temp, " %d%s", iChannels, "-chs");
     strcat(sInfo, temp);
   }
   strInfo = sInfo;

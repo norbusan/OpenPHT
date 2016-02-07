@@ -201,17 +201,6 @@
 				<animation effect="fade" start="0" end="100" time="0" condition="true">Conditional</animation>
 				<visible>true</visible>
 			</control>
-			<!-- positioning grid -->
-			<control type="largeimage">
-				<posy>0</posy>
-				<posx>0</posx>
-				<width>1280</width>
-				<height>720</height>
-				<aspectratio aligny="top">scale</aspectratio>
-				<texture>grid-black_.jpg</texture>
-				<animation effect="fade" start="0" end="100" time="0" condition="true">Conditional</animation>
-				<visible>true</visible>
-			</control>
 		</control>
 	</include>
 	<include name="SlideshowSettings">

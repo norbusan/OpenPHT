@@ -22,6 +22,7 @@
 
 #include "guilib/GUIDialog.h"
 
+class CEvent;
 
 class CGUIDialogBusy: public CGUIDialog
 {
@@ -37,6 +38,15 @@ public:
   void SetProgress(float progress);
 
   bool IsCanceled() { return m_bCanceled; }
+
+  /*! \brief Wait on an event while displaying the busy dialog.
+   Throws up the busy dialog after the given time.
+   \param even the CEvent to wait on.
+   \param displaytime the time in ms to wait prior to showing the busy dialog (defaults to 100ms)
+   \param allowCancel whether the user can cancel the wait, defaults to true.
+   \return true if the event completed, false if cancelled.
+   */
+  static bool WaitOnEvent(CEvent &event, unsigned int timeout = 100, bool allowCancel = true);
 protected:
   virtual void Show_Internal(); // modeless'ish
   bool m_bCanceled;

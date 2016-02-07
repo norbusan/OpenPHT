@@ -65,8 +65,8 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
     s->pb_frame = get_bits1(&s->gb);
 
     if (format < 6) {
-        s->width = h263_format[format][0];
-        s->height = h263_format[format][1];
+        s->width = ff_h263_format[format][0];
+        s->height = ff_h263_format[format][1];
         s->avctx->sample_aspect_ratio.num = 12;
         s->avctx->sample_aspect_ratio.den = 11;
     } else {
@@ -77,7 +77,7 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
         }
         if(get_bits(&s->gb, 2))
             av_log(s->avctx, AV_LOG_ERROR, "Bad value for reserved field\n");
-        s->loop_filter = get_bits1(&s->gb);
+        s->loop_filter = get_bits1(&s->gb) * !s->avctx->lowres;
         if(get_bits1(&s->gb))
             av_log(s->avctx, AV_LOG_ERROR, "Bad value for reserved field\n");
         if(get_bits1(&s->gb))

@@ -255,7 +255,7 @@ static void find_best_state(uint8_t best_state[256][256], const uint8_t one_stat
             occ[j]=1.0;
             for(k=0; k<256; k++){
                 double newocc[256]={0};
-                for(m=0; m<256; m++){
+                for(m=1; m<256; m++){
                     if(occ[m]){
                         len -=occ[m]*(     p *l2tab[    m]
                                       + (1-p)*l2tab[256-m]);
@@ -451,7 +451,7 @@ static av_always_inline int encode_line(FFV1Context *s, int w,
     int run_mode=0;
 
     if(s->ac){
-        if(c->bytestream_end - c->bytestream < w*20){
+        if(c->bytestream_end - c->bytestream < w*35){
             av_log(s->avctx, AV_LOG_ERROR, "encoded frame too large\n");
             return -1;
         }
@@ -722,6 +722,10 @@ static av_cold int init_slice_contexts(FFV1Context *f){
     int i;
 
     f->slice_count= f->num_h_slices * f->num_v_slices;
+    if (f->slice_count <= 0) {
+        av_log(f->avctx, AV_LOG_ERROR, "Invalid number of slices\n");
+        return AVERROR(EINVAL);
+    }
 
     for(i=0; i<f->slice_count; i++){
         FFV1Context *fs= av_mallocz(sizeof(*fs));
@@ -993,7 +997,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
                 }
             }
             gob_count= strtol(p, &next, 0);
-            if(next==p || gob_count <0){
+            if(next==p || gob_count <=0){
                 av_log(avctx, AV_LOG_ERROR, "2Pass file invalid\n");
                 return -1;
             }
@@ -1547,20 +1551,48 @@ static int read_header(FFV1Context *f){
     memset(state, 128, sizeof(state));
 
     if(f->version < 2){
-        f->version= get_symbol(c, state, 0);
-        f->ac= f->avctx->coder_type= get_symbol(c, state, 0);
-        if(f->ac>1){
-            for(i=1; i<256; i++){
-                f->state_transition[i]= get_symbol(c, state, 1) + c->one_state[i];
+        int chroma_h_shift, chroma_v_shift, colorspace, bits_per_raw_sample;
+        int transparency;
+        unsigned v = get_symbol(c, state, 0);
+        if (v > 1) {
+            av_log(f->avctx, AV_LOG_ERROR,
+                   "invalid version %d in version 1 header\n", v);
+            return AVERROR_INVALIDDATA;
+        }
+        f->version = v;
+
+        f->ac = f->avctx->coder_type = get_symbol(c, state, 0);
+
+        if (f->ac > 1) {
+            for (i = 1; i < 256; i++)
+                f->state_transition[i] =
+                    get_symbol(c, state, 1) + c->one_state[i];
+        }
+
+        colorspace          = get_symbol(c, state, 0); //YUV cs type
+        bits_per_raw_sample = f->version > 0 ? get_symbol(c, state, 0) : f->avctx->bits_per_raw_sample;
+        get_rac(c, state); //no chroma = false
+        chroma_h_shift      = get_symbol(c, state, 0);
+        chroma_v_shift      = get_symbol(c, state, 0);
+        transparency        = get_rac(c, state);
+
+        if (f->plane_count) {
+            if (colorspace          != f->colorspace                 ||
+                bits_per_raw_sample != f->avctx->bits_per_raw_sample ||
+                chroma_h_shift      != f->chroma_h_shift             ||
+                chroma_v_shift      != f->chroma_v_shift             ||
+                transparency        != f->transparency) {
+                av_log(f->avctx, AV_LOG_ERROR, "Invalid change of global parameters\n");
+                return AVERROR_INVALIDDATA;
             }
         }
-        f->colorspace= get_symbol(c, state, 0); //YUV cs type
-        if(f->version>0)
-            f->avctx->bits_per_raw_sample= get_symbol(c, state, 0);
-        get_rac(c, state); //no chroma = false
-        f->chroma_h_shift= get_symbol(c, state, 0);
-        f->chroma_v_shift= get_symbol(c, state, 0);
-        f->transparency= get_rac(c, state);
+
+        f->colorspace                 = colorspace;
+        f->avctx->bits_per_raw_sample = bits_per_raw_sample;
+        f->chroma_h_shift             = chroma_h_shift;
+        f->chroma_v_shift             = chroma_v_shift;
+        f->transparency               = transparency;
+
         f->plane_count= 2 + f->transparency;
     }
 

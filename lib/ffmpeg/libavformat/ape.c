@@ -255,7 +255,7 @@ static int ape_read_header(AVFormatContext * s, AVFormatParameters * ap)
                ape->totalframes);
         return -1;
     }
-    if (ape->seektablelength && (ape->seektablelength / sizeof(*ape->seektable)) < ape->totalframes) {
+    if (ape->seektablelength / sizeof(*ape->seektable) < ape->totalframes) {
         av_log(s, AV_LOG_ERROR,
                "Number of seek entries is less than number of frames: %zu vs. %"PRIu32"\n",
                ape->seektablelength / sizeof(*ape->seektable), ape->totalframes);
@@ -276,8 +276,13 @@ static int ape_read_header(AVFormatContext * s, AVFormatParameters * ap)
         ape->seektable = av_malloc(ape->seektablelength);
         if (!ape->seektable)
             return AVERROR(ENOMEM);
-        for (i = 0; i < ape->seektablelength / sizeof(uint32_t); i++)
+        for (i = 0;
+             i < ape->seektablelength / sizeof(uint32_t) && !pb->eof_reached;
+             i++)
             ape->seektable[i] = avio_rl32(pb);
+    }else{
+        av_log(s, AV_LOG_ERROR, "Missing seektable\n");
+        return -1;
     }
 
     ape->frames[0].pos     = ape->firstframe;

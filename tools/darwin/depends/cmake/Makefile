@@ -2,10 +2,10 @@ include ../Makefile.include
 
 # lib name, version
 APPNAME=cmake
-VERSION=2.8.12
+VERSION=3.3.2
 SOURCE=$(APPNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
-BASE_URL=http://www.cmake.org/files/v2.8
+BASE_URL=http://www.cmake.org/files/v3.3
 
 # configuration settings
 export PATH:=$(TOOLCHAIN)/bin:$(PATH)

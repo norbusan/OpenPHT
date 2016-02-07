@@ -37,11 +37,17 @@
 #include "cores/amlplayer/AMLUtils.h"
 #endif
 
-#define ALSA_OPTIONS (SND_PCM_NONBLOCK | SND_PCM_NO_AUTO_FORMAT | SND_PCM_NO_AUTO_CHANNELS | SND_PCM_NO_AUTO_RESAMPLE)
+#define ALSA_OPTIONS (SND_PCM_NO_AUTO_FORMAT | SND_PCM_NO_AUTO_CHANNELS | SND_PCM_NO_AUTO_RESAMPLE)
 
 #define ALSA_MAX_CHANNELS 16
 static enum AEChannel ALSAChannelMap[ALSA_MAX_CHANNELS + 1] = {
   AE_CH_FL      , AE_CH_FR      , AE_CH_BL      , AE_CH_BR      , AE_CH_FC      , AE_CH_LFE     , AE_CH_SL      , AE_CH_SR      ,
+  AE_CH_UNKNOWN1, AE_CH_UNKNOWN2, AE_CH_UNKNOWN3, AE_CH_UNKNOWN4, AE_CH_UNKNOWN5, AE_CH_UNKNOWN6, AE_CH_UNKNOWN7, AE_CH_UNKNOWN8, /* for p16v devices */
+  AE_CH_NULL
+};
+
+static enum AEChannel ALSAChannelMapWide[ALSA_MAX_CHANNELS + 1] = {
+  AE_CH_FL      , AE_CH_FR      , AE_CH_SL      , AE_CH_SR      , AE_CH_FC      , AE_CH_LFE     , AE_CH_BL      , AE_CH_BR      ,
   AE_CH_UNKNOWN1, AE_CH_UNKNOWN2, AE_CH_UNKNOWN3, AE_CH_UNKNOWN4, AE_CH_UNKNOWN5, AE_CH_UNKNOWN6, AE_CH_UNKNOWN7, AE_CH_UNKNOWN8, /* for p16v devices */
   AE_CH_NULL
 };
@@ -91,9 +97,15 @@ inline CAEChannelInfo CAESinkALSA::GetChannelLayout(AEAudioFormat format)
            count = 8;
   else
   {
+    // According to CEA-861-D only RL and RR are known. In case of a format having SL and SR channels
+    // but no BR BL channels, we use the wide map in order to open only the num of channels really
+    // needed.
+    enum AEChannel* channelMap = ALSAChannelMap;
+    if (format.m_channelLayout.HasChannel(AE_CH_SL) && !format.m_channelLayout.HasChannel(AE_CH_BL))
+      channelMap = ALSAChannelMapWide;
     for (unsigned int c = 0; c < 8; ++c)
       for (unsigned int i = 0; i < format.m_channelLayout.Count(); ++i)
-        if (format.m_channelLayout[i] == ALSAChannelMap[c])
+        if (format.m_channelLayout[i] == channelMap[c])
         {
           count = c + 1;
           break;
@@ -173,16 +185,7 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
   snd_config_t *config;
   snd_config_copy(&config, snd_config);
 
-  snd_config_t *dmixRateConf;
-  long dmixRate;
-
-  if (snd_config_search(config, "defaults.pcm.dmix.rate", &dmixRateConf) < 0
-      || snd_config_get_integer(dmixRateConf, &dmixRate) < 0)
-    dmixRate = 48000; /* assume default */
-
-
-  /* Prefer dmix for non-passthrough stereo when sample rate matches */
-  if (!OpenPCMDevice(device, AESParams, m_channelLayout.Count(), &m_pcm, config, format.m_sampleRate == (unsigned int) dmixRate && !m_passthrough))
+  if (!OpenPCMDevice(device, AESParams, m_channelLayout.Count(), &m_pcm, config))
   {
     CLog::Log(LOGERROR, "CAESinkALSA::Initialize - failed to initialize device \"%s\"", device.c_str());
     snd_config_delete(config);
@@ -201,7 +204,8 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
   if (!InitializeHW(format) || !InitializeSW(format))
     return false;
 
-  snd_pcm_nonblock(m_pcm, 1);
+  // we want it blocking
+  snd_pcm_nonblock(m_pcm, 0);
   snd_pcm_prepare (m_pcm);
 
   m_format              = format;
@@ -306,9 +310,9 @@ bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
       int bits    = snd_pcm_hw_params_get_sbits(hw_params);
       if (bits != fmtBits)
       {
-        /* if we opened in 32bit and only have 24bits, pack into 24 */
+        /* if we opened in 32bit and only have 24bits, signal it accordingly */
         if (fmtBits == 32 && bits == 24)
-          i = AE_FMT_S24NE4;
+          i = AE_FMT_S24NE4MSB;
         else
           continue;
       }
@@ -351,6 +355,14 @@ bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
   snd_pcm_hw_params_t *hw_params_copy;
   snd_pcm_hw_params_alloca(&hw_params_copy);
   snd_pcm_hw_params_copy(hw_params_copy, hw_params); // copy what we have and is already working
+
+  // Make sure to not initialize too large to not cause underruns
+  snd_pcm_uframes_t periodSizeMax = bufferSize / 3;
+  if(snd_pcm_hw_params_set_period_size_max(m_pcm, hw_params_copy, &periodSizeMax, NULL) != 0)
+  {
+    snd_pcm_hw_params_copy(hw_params_copy, hw_params); // restore working copy
+    CLog::Log(LOGDEBUG, "CAESinkALSA::InitializeHW - Request: Failed to limit periodSize to %lu", periodSizeMax);
+  }
   
   // first trying bufferSize, PeriodSize
   // for more info see here:
@@ -441,10 +453,9 @@ bool CAESinkALSA::InitializeSW(AEAudioFormat &format)
 
 void CAESinkALSA::Deinitialize()
 {
-  Stop();
-
   if (m_pcm)
   {
+    Stop();
     snd_pcm_close(m_pcm);
     m_pcm = NULL;
   }
@@ -513,23 +524,7 @@ unsigned int CAESinkALSA::AddPackets(uint8_t *data, unsigned int frames, bool ha
     CLog::Log(LOGDEBUG, "CAESinkALSA - the grAEken is hunger, feed it (I am the downmost fallback - fix your code)");
   }
 
-  int ret;
-
-  ret = snd_pcm_avail(m_pcm);
-  if (ret < 0) 
-  {
-    HandleError("snd_pcm_avail", ret);
-    ret = 0;
-  }
-
-  if ((unsigned int)ret < frames)
-  {
-    ret = snd_pcm_wait(m_pcm, m_timeout);
-    if (ret < 0)
-      HandleError("snd_pcm_wait", ret);
-  }
-
-  ret = snd_pcm_writei(m_pcm, (void*)data, frames);
+  int ret = snd_pcm_writei(m_pcm, (void*)data, frames);
   if (ret < 0)
   {
     HandleError("snd_pcm_writei(1)", ret);
@@ -581,9 +576,8 @@ void CAESinkALSA::Drain()
   if (!m_pcm)
     return;
 
-  snd_pcm_nonblock(m_pcm, 0);
   snd_pcm_drain(m_pcm);
-  snd_pcm_nonblock(m_pcm, 1);
+  snd_pcm_prepare(m_pcm);
 }
 
 void CAESinkALSA::AppendParams(std::string &device, const std::string &params)
@@ -633,7 +627,7 @@ bool CAESinkALSA::TryDeviceWithParams(const std::string &name, const std::string
   return TryDevice(name, pcmp, lconf);
 }
 
-bool CAESinkALSA::OpenPCMDevice(const std::string &name, const std::string &params, int channels, snd_pcm_t **pcmp, snd_config_t *lconf, bool preferDmixStereo)
+bool CAESinkALSA::OpenPCMDevice(const std::string &name, const std::string &params, int channels, snd_pcm_t **pcmp, snd_config_t *lconf)
 {
  /* Special name denoting surroundXX mangling. This is needed for some
    * devices for multichannel to work. */
@@ -661,12 +655,8 @@ bool CAESinkALSA::OpenPCMDevice(const std::string &name, const std::string &para
           return true;
     }
 
-    /* If preferDmix is false, try non-dmix configuration first.
-     * This allows output with non-48000 sample rate if device is free */
-    if (!preferDmixStereo && TryDeviceWithParams("front" + openName, params, pcmp, lconf))
-      return true;
-
-    /* Try "sysdefault" and "default" (they provide dmix),
+    /* Try "sysdefault" and "default" (they provide dmix if needed, and route
+     * audio to all extra channels on subdeviced cards),
      * unless the selected devices is not DEV=0 of the card, in which case
      * "sysdefault" and "default" would point to another device.
      * "sysdefault" is a newish device name that won't be overwritten in case
@@ -685,8 +675,8 @@ bool CAESinkALSA::OpenPCMDevice(const std::string &name, const std::string &para
         return true;
     }
 
-    /* Try non-dmix "front" */
-    if (preferDmixStereo && TryDeviceWithParams("front" + openName, params, pcmp, lconf))
+    /* Try "front" (no dmix, no audio in other channels on subdeviced cards) */
+    if (TryDeviceWithParams("front" + openName, params, pcmp, lconf))
       return true;
 
   }
@@ -905,7 +895,7 @@ std::string CAESinkALSA::GetParamFromName(const std::string &name, const std::st
 void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &device, const std::string &description, snd_config_t *config)
 {
   snd_pcm_t *pcmhandle = NULL;
-  if (!OpenPCMDevice(device, "", ALSA_MAX_CHANNELS, &pcmhandle, config, false))
+  if (!OpenPCMDevice(device, "", ALSA_MAX_CHANNELS, &pcmhandle, config))
     return;
 
   snd_pcm_info_t *pcminfo;
@@ -1055,7 +1045,7 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
   {
     /* Reopen the device if needed on the special "surroundXX" cases */
     if (info.m_deviceType == AE_DEVTYPE_PCM && (i == 8 || i == 6 || i == 4))
-      OpenPCMDevice(device, "", i, &pcmhandle, config, false);
+      OpenPCMDevice(device, "", i, &pcmhandle, config);
 
     if (snd_pcm_hw_params_test_channels(pcmhandle, hwparams, i) >= 0)
     {

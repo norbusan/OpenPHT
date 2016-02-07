@@ -855,6 +855,7 @@ void CGUIWindowSettingsCategory::UpdateSettings()
     else if (
              strSetting.Equals("audiooutput.passthroughdevice") ||
              strSetting.Equals("audiooutput.ac3passthrough") ||
+             strSetting.Equals("audiooutput.eac3passthrough") ||
              strSetting.Equals("audiooutput.dtspassthrough") ||
              strSetting.Equals("audiooutput.passthroughaac"))
     { // only visible if we are in digital mode

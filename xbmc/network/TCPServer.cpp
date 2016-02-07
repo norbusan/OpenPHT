@@ -456,6 +456,13 @@ bool CTCPServer::InitializeTCP()
     return false;
   }
 
+#ifdef WINSOCK_VERSION
+  int yes = 1;
+#else
+  unsigned int yes = 1;
+#endif
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes));
+
   if (bind(fd, (struct sockaddr*)&myaddr, sizeof myaddr) < 0)
   {
     CLog::Log(LOGERROR, "JSONRPC Server: Failed to bind serversocket");

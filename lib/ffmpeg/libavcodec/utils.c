@@ -202,8 +202,8 @@ void avcodec_align_dimensions2(AVCodecContext *s, int *width, int *height,
         break;
     case PIX_FMT_YUV411P:
     case PIX_FMT_UYYVYY411:
-        w_align=32;
-        h_align=8;
+        w_align = 32;
+        h_align = 16 * 2;
         break;
     case PIX_FMT_YUV410P:
         if(s->codec_id == CODEC_ID_SVQ1){
@@ -221,6 +221,10 @@ void avcodec_align_dimensions2(AVCodecContext *s, int *width, int *height,
         if(s->codec_id == CODEC_ID_SMC){
             w_align=4;
             h_align=4;
+        }
+        if (s->codec_id == CODEC_ID_JV) {
+            w_align = 8;
+            h_align = 8;
         }
         break;
     case PIX_FMT_BGR24:
@@ -614,7 +618,7 @@ int avcodec_default_reget_buffer(AVCodecContext *s, AVFrame *pic){
     if(pic->data[0] == NULL) {
         /* We will copy from buffer, so must be readable */
         pic->buffer_hints |= FF_BUFFER_HINTS_READABLE;
-        return s->get_buffer(s, pic);
+        return ff_get_buffer(s, pic);
     }
 
     /* If internal buffer type return the same buffer */
@@ -630,7 +634,7 @@ int avcodec_default_reget_buffer(AVCodecContext *s, AVFrame *pic){
         pic->data[i] = pic->base[i] = NULL;
     pic->opaque = NULL;
     /* Allocate new frame */
-    if (s->get_buffer(s, pic))
+    if (ff_get_buffer(s, pic))
         return -1;
     /* Copy image data from old buffer to new buffer */
     av_picture_copy((AVPicture*)pic, (AVPicture*)&temp_pic, s->pix_fmt, s->width,
@@ -895,6 +899,9 @@ int attribute_align_arg avcodec_open2(AVCodecContext *avctx, AVCodec *codec, AVD
         } else if (avctx->channel_layout) {
             avctx->channels = av_get_channel_layout_nb_channels(avctx->channel_layout);
         }
+
+        if (!avctx->rc_initial_buffer_occupancy)
+            avctx->rc_initial_buffer_occupancy = avctx->rc_buffer_size * 3 / 4;
     }
 
     avctx->pts_correction_num_faulty_pts =
@@ -1982,7 +1989,7 @@ int ff_thread_get_buffer(AVCodecContext *avctx, AVFrame *f)
 
     ff_init_buffer_info(avctx, f);
 
-    return avctx->get_buffer(avctx, f);
+    return ff_get_buffer(avctx, f);
 }
 
 void ff_thread_release_buffer(AVCodecContext *avctx, AVFrame *f)
@@ -2035,4 +2042,17 @@ enum AVMediaType avcodec_get_type(enum CodecID codec_id)
 int avcodec_is_open(AVCodecContext *s)
 {
     return !!s->internal;
+}
+
+int ff_get_buffer(AVCodecContext *avctx, AVFrame *frame)
+{
+    switch (avctx->codec_type) {
+        case AVMEDIA_TYPE_VIDEO:
+            if (av_image_check_size(avctx->width, avctx->height, 0, avctx)) {
+                av_log(avctx, AV_LOG_ERROR, "Invalid dimensions %dx%d\n",
+                       avctx->width, avctx->height);
+                return AVERROR_INVALIDDATA;
+            }
+    }
+    return avctx->get_buffer(avctx, frame);
 }

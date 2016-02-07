@@ -2,13 +2,13 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=fribidi
-VERSION=0.19.1
+VERSION=0.19.7
 SOURCE=$(LIBNAME)-$(VERSION)
-ARCHIVE=$(SOURCE).tar.gz
-
+ARCHIVE=$(SOURCE).tar.bz2
+export CFLAGS+=-D__STDC_INT64__
 # configuration settings
-CONFIGURE=./configure --prefix=$(PREFIX) \
-  --disable-docs
+CONFIGURE=./configure --prefix=$(PREFIX) --disable-docs --enable-malloc \
+          --with-glib=no
 
 LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
 

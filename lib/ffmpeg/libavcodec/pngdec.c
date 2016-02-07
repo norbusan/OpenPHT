@@ -121,7 +121,7 @@ static void png_put_interlaced_row(uint8_t *dst, int width,
 static void add_bytes_l2_c(uint8_t *dst, uint8_t *src1, uint8_t *src2, int w)
 {
     long i;
-    for(i=0; i<=w-sizeof(long); i+=sizeof(long)){
+    for(i=0; i<=w-(int)sizeof(long); i+=sizeof(long)){
         long a = *(long*)(src1+i);
         long b = *(long*)(src2+i);
         *(long*)(dst+i) = ((a&pb_7f) + (b&pb_7f)) ^ ((a^b)&pb_80);
@@ -378,6 +378,10 @@ static int png_decode_idat(PNGDecContext *s, int length)
             s->zstream.avail_out = s->crow_size;
             s->zstream.next_out = s->crow_buf;
         }
+        if (ret == Z_STREAM_END && s->zstream.avail_in > 0) {
+            av_log(NULL, AV_LOG_WARNING, "%d undecompressed bytes left in buffer\n", s->zstream.avail_in);
+            return 0;
+        }
     }
     return 0;
 }
@@ -433,6 +437,12 @@ static int decode_frame(AVCodecContext *avctx,
         case MKTAG('I', 'H', 'D', 'R'):
             if (length != 13)
                 goto fail;
+
+            if (s->state & PNG_IDAT) {
+                av_log(avctx, AV_LOG_ERROR, "IHDR after IDAT\n");
+                goto fail;
+            }
+
             s->width  = bytestream2_get_be32(&s->gb);
             s->height = bytestream2_get_be32(&s->gb);
             if(av_image_check_size(s->width, s->height, 0, avctx)){
@@ -479,13 +489,14 @@ static int decode_frame(AVCodecContext *avctx,
                 } else if (s->bit_depth == 16 &&
                            s->color_type == PNG_COLOR_TYPE_RGB) {
                     avctx->pix_fmt = PIX_FMT_RGB48BE;
-                } else if (s->color_type == PNG_COLOR_TYPE_PALETTE) {
+                } else if ((s->bits_per_pixel == 1 || s->bits_per_pixel == 2 || s->bits_per_pixel == 4 || s->bits_per_pixel == 8) &&
+                           s->color_type == PNG_COLOR_TYPE_PALETTE) {
                     avctx->pix_fmt = PIX_FMT_PAL8;
-                } else if (s->bit_depth == 1) {
+                } else if (s->bit_depth == 1 && s->bits_per_pixel == 1) {
                     avctx->pix_fmt = PIX_FMT_MONOBLACK;
                 } else if (s->bit_depth == 8 &&
                            s->color_type == PNG_COLOR_TYPE_GRAY_ALPHA) {
-                    avctx->pix_fmt = PIX_FMT_GRAY8A;
+                    avctx->pix_fmt = PIX_FMT_Y400A;
                 } else {
                     av_log(avctx, AV_LOG_ERROR, "unsupported bit depth %d "
                                                 "and color type %d\n",
@@ -645,9 +656,10 @@ static int decode_frame(AVCodecContext *avctx,
             int i, j;
             uint8_t *pd = s->current_picture->data[0];
             uint8_t *pd_last = s->last_picture->data[0];
+            int ls = FFMIN(av_image_get_linesize(s->current_picture->format, s->width, 0), s->width * s->bpp);
 
             for(j=0; j < s->height; j++) {
-                for(i=0; i < s->width * s->bpp; i++) {
+                for(i=0; i < ls; i++) {
                     pd[i] += pd_last[i];
                 }
                 pd += s->image_linesize;

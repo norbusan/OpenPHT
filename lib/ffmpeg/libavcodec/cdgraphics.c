@@ -20,6 +20,7 @@
  */
 
 #include "avcodec.h"
+#include "internal.h"
 #include "bytestream.h"
 
 /**
@@ -268,7 +269,7 @@ static void cdg_scroll(CDGraphicsContext *cc, uint8_t *data,
 static int cdg_decode_frame(AVCodecContext *avctx,
                             void *data, int *data_size, AVPacket *avpkt)
 {
-    const uint8_t *buf = avpkt->data;
+    GetByteContext gb;
     int buf_size       = avpkt->size;
     int ret;
     uint8_t command, inst;
@@ -280,6 +281,12 @@ static int cdg_decode_frame(AVCodecContext *avctx,
         av_log(avctx, AV_LOG_ERROR, "buffer too small for decoder\n");
         return AVERROR(EINVAL);
     }
+    if (buf_size > CDG_HEADER_SIZE + CDG_DATA_SIZE) {
+        av_log(avctx, AV_LOG_ERROR, "buffer too big for decoder\n");
+        return AVERROR(EINVAL);
+    }
+
+    bytestream2_init(&gb, avpkt->data, avpkt->size);
 
     ret = avctx->reget_buffer(avctx, &cc->frame);
     if (ret) {
@@ -287,11 +294,11 @@ static int cdg_decode_frame(AVCodecContext *avctx,
         return ret;
     }
 
-    command = bytestream_get_byte(&buf);
-    inst    = bytestream_get_byte(&buf);
+    command = bytestream2_get_byte(&gb);
+    inst    = bytestream2_get_byte(&gb);
     inst    &= CDG_MASK;
-    buf += 2;  /// skipping 2 unneeded bytes
-    bytestream_get_buffer(&buf, cdg_data, buf_size - CDG_HEADER_SIZE);
+    bytestream2_skip(&gb, 2);
+    bytestream2_get_buffer(&gb, cdg_data, sizeof(cdg_data));
 
     if ((command & CDG_MASK) == CDG_COMMAND) {
         switch (inst) {
@@ -333,7 +340,7 @@ static int cdg_decode_frame(AVCodecContext *avctx,
             }
 
             cdg_init_frame(&new_frame);
-            ret = avctx->get_buffer(avctx, &new_frame);
+            ret = ff_get_buffer(avctx, &new_frame);
             if (ret) {
                 av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
                 return ret;
@@ -350,11 +357,10 @@ static int cdg_decode_frame(AVCodecContext *avctx,
         *data_size = sizeof(AVFrame);
     } else {
         *data_size = 0;
-        buf_size   = 0;
     }
 
     *(AVFrame *) data = cc->frame;
-    return buf_size;
+    return avpkt->size;
 }
 
 static av_cold int cdg_decode_end(AVCodecContext *avctx)

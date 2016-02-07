@@ -58,6 +58,9 @@ set(osx_frameworks
   Cocoa
   CoreAudio
   CoreServices
+  CoreFoundation
+  CoreVideo
+  VideoDecodeAcceleration
   Foundation
   OpenGL
   AppKit
@@ -87,13 +90,15 @@ set(external_libs
   jpeg
   crypto
   SDL
-  SDL_mixer
   tinyxml
   boost_thread
   boost_system
   GLEW
   vorbis
-  vorbisenc
+  gmp
+  nettle
+  hogweed
+  gnutls
 )
 
 set(ffmpeg_libs
@@ -121,12 +126,10 @@ set(non_link_libs
   modplug
   vorbis
   vorbisfile
-  vorbisenc
   ogg
   ass
   mad
   mpeg2
-  bluray
   png
   tiff
   cec

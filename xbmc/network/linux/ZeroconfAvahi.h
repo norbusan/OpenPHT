@@ -59,8 +59,6 @@ private:
   static void clientCallback(AvahiClient* fp_client, AvahiClientState f_state, void*);
   ///here we get notified of group changes
   static void groupCallback(AvahiEntryGroup *fp_group, AvahiEntryGroupState f_state, void *);
-  //shutdown callback; works around a problem in avahi < 0.6.24 see destructor for details
-  static void shutdownCallback(AvahiTimeout *fp_e, void *);
 
   ///creates the avahi client;
   ///@return true on success
@@ -86,10 +84,6 @@ private:
 
   //this holds all published and unpublished services including info on howto create them
   tServiceMap m_services;
-
-  //2 variables below are needed for workaround of avahi bug (see destructor for details)
-  bool m_shutdown;
-  pthread_t m_thread_id;
 };
 
 #endif // HAS_AVAHI

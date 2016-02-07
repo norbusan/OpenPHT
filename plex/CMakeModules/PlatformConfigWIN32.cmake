@@ -58,7 +58,6 @@ set(external_libs
   sqlite3
   liblzo2
   dnssd
-  libcdio.dll
   zlib
   libsamplerate-0
 )
@@ -69,7 +68,9 @@ set(non_link_libs
   fontconfig
 )
 
-set(external_libs ${external_libs})
+if(ENABLE_DVD_DRIVE)
+  set(external_libs ${external_libs} libcdio.dll)
+endif(ENABLE_DVD_DRIVE)
 
 foreach(lib ${external_libs})
   plex_find_library(${lib} 0 1 ${dependdir}/lib 1)

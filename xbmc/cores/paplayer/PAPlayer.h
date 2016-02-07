@@ -26,6 +26,7 @@
 #include "threads/Thread.h"
 #include "AudioDecoder.h"
 #include "threads/SharedSection.h"
+#include "utils/Job.h"
 
 #include "cores/IAudioCallback.h"
 #include "cores/AudioEngine/Utils/AEChannelInfo.h"
@@ -33,8 +34,9 @@
 class IAEStream;
 
 class CFileItem;
-class PAPlayer : public IPlayer, public CThread
+class PAPlayer : public IPlayer, public CThread, public IJobCallback
 {
+friend class CQueueNextFileJob;
 public:
   PAPlayer(IPlayerCallback& callback);
   virtual ~PAPlayer();
@@ -77,6 +79,8 @@ public:
   /* END PLEX */
 
   static bool HandlesType(const CStdString &type);
+
+  virtual void OnJobComplete(unsigned int jobID, bool success, CJob *job);
 
   struct
   {
@@ -123,6 +127,7 @@ private:
     float             m_volume;              /* the initial volume level to set the stream to on creation */
 
     bool              m_isSlaved;            /* true if the stream has been slaved to another */
+    bool              m_waitOnDrain;         /* wait for stream being drained in AE */
   } StreamInfo;
 
   typedef std::list<StreamInfo*> StreamList;
@@ -143,14 +148,17 @@ private:
   CSharedSection      m_streamsLock;         /* lock for the stream list */
   StreamList          m_streams;             /* playing streams */  
   StreamList          m_finishing;           /* finishing streams */
+  int                 m_jobCounter;
+  CEvent              m_jobEvent;
+  bool                m_continueStream;
 
-  bool QueueNextFileEx(const CFileItem &file, bool fadeIn = true);
+  bool QueueNextFileEx(const CFileItem &file, bool fadeIn = true, bool job = false);
   void SoftStart(bool wait = false);
   void SoftStop(bool wait = false, bool close = true);
   void CloseAllStreams(bool fade = true);
-  void ProcessStreams(double &delay, double &buffer);
+  void ProcessStreams(double &freeBufferTime);
   bool PrepareStream(StreamInfo *si);
-  bool ProcessStream(StreamInfo *si, double &delay, double &buffer);
+  bool ProcessStream(StreamInfo *si, double &freeBufferTime);
   bool QueueData(StreamInfo *si);
   int64_t GetTotalTime64();
   void UpdateCrossfadeTime(const CFileItem& file);

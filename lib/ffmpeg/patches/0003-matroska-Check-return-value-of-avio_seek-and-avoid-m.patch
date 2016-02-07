@@ -33,6 +33,7 @@ index 135fddd..a9a0d1f 100644
          return 0;
  
      index_min = index;
+     tracks = matroska->tracks.elem;
      for (i=0; i < matroska->tracks.nb_elem; i++) {
 -        tracks[i].audio.pkt_cnt = 0;
 -        tracks[i].audio.sub_packet_cnt = 0;
@@ -40,7 +41,6 @@ index 135fddd..a9a0d1f 100644
 -        tracks[i].end_timecode = 0;
          if (tracks[i].type == MATROSKA_TRACK_TYPE_SUBTITLE
              && !tracks[i].stream->discard != AVDISCARD_ALL) {
-             index_sub = av_index_search_timestamp(tracks[i].stream, st->index_entries[index].timestamp, AVSEEK_FLAG_BACKWARD);
 @@ -2081,7 +2077,16 @@ static int matroska_read_seek(AVFormatContext *s, int stream_index,
          }
      }

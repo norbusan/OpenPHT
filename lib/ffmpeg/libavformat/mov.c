@@ -160,7 +160,7 @@ static int mov_read_mac_string(MOVContext *c, AVIOContext *pb, int len,
         uint8_t t, c = avio_r8(pb);
         if (c < 0x80 && p < end)
             *p++ = c;
-        else
+        else if (p < end)
             PUT_UTF8(mac_to_unicode[c-0x80], t, if (p < end) *p++ = t;);
     }
     *p = 0;
@@ -245,7 +245,7 @@ static int mov_read_udta_string(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 
     if (!key)
         return 0;
-    if (atom.size < 0)
+    if (atom.size < 0 || str_size >= INT_MAX/2)
         return AVERROR_INVALIDDATA;
 
     str_size = FFMIN3(sizeof(str)-1, str_size, atom.size);
@@ -253,7 +253,7 @@ static int mov_read_udta_string(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     if (parse)
         parse(c, pb, str_size, key);
     else {
-        if (data_type == 3 || (data_type == 0 && langcode < 0x800)) { // MAC Encoded
+        if (data_type == 3 || (data_type == 0 && (langcode < 0x400 || langcode == 0x7fff))) { // MAC Encoded
             mov_read_mac_string(c, pb, str_size, str, sizeof(str));
         } else {
             avio_read(pb, str, str_size);
@@ -360,6 +360,12 @@ static int mov_read_default(MOVContext *c, AVIOContext *pb, MOVAtom atom)
             left = a.size - avio_tell(pb) + start_pos;
             if (left > 0) /* skip garbage at atom end */
                 avio_skip(pb, left);
+            else if (left < 0) {
+                av_log(c->fc, AV_LOG_WARNING,
+                       "overread end of atom '%.4s' by %"PRId64" bytes\n",
+                       (char*)&a.type, -left);
+                avio_seek(pb, left, SEEK_CUR);
+            }
         }
 
         total_size += a.size;
@@ -754,6 +760,11 @@ static int mov_read_mdhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     st = c->fc->streams[c->fc->nb_streams-1];
     sc = st->priv_data;
 
+    if (sc->time_scale) {
+        av_log(c->fc, AV_LOG_ERROR, "Multiple mdhd?\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     version = avio_r8(pb);
     if (version > 1) {
         av_log_ask_for_sample(c, "unsupported version %d\n", version);
@@ -801,7 +812,8 @@ static int mov_read_mvhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     c->duration = (version == 1) ? avio_rb64(pb) : avio_rb32(pb); /* duration */
     // set the AVCodecContext duration because the duration of individual tracks
     // may be inaccurate
-    c->fc->duration = av_rescale(c->duration, AV_TIME_BASE, c->time_scale);
+    if (c->time_scale > 0 && !c->trex_data)
+        c->fc->duration = av_rescale(c->duration, AV_TIME_BASE, c->time_scale);
     avio_rb32(pb); /* preferred scale */
 
     avio_rb16(pb); /* preferred volume */
@@ -1575,6 +1587,7 @@ static int mov_read_stss(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         return 0;
     if (entries >= UINT_MAX / sizeof(int))
         return AVERROR_INVALIDDATA;
+    av_freep(&sc->keyframes);
     sc->keyframes = av_malloc(entries * sizeof(int));
     if (!sc->keyframes)
         return AVERROR(ENOMEM);
@@ -1682,6 +1695,7 @@ static int mov_read_stts(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     if (entries >= UINT_MAX / sizeof(*sc->stts_data))
         return -1;
 
+    av_free(sc->stts_data);
     sc->stts_data = av_malloc(entries * sizeof(*sc->stts_data));
     if (!sc->stts_data)
         return AVERROR(ENOMEM);
@@ -1698,6 +1712,10 @@ static int mov_read_stts(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         if (sample_duration < 0) {
             av_log(c->fc, AV_LOG_ERROR, "Invalid SampleDelta in STTS %d\n", sample_duration);
             sample_duration = 1;
+        }
+        if (sample_count < 0) {
+            av_log(c->fc, AV_LOG_ERROR, "Invalid sample_count=%d\n", sample_count);
+            return AVERROR_INVALIDDATA;
         }
         sc->stts_data[i].count= sample_count;
         sc->stts_data[i].duration= sample_duration;
@@ -1767,6 +1785,7 @@ static void mov_build_index(MOVContext *mov, AVStream *st)
     unsigned int stps_index = 0;
     unsigned int i, j;
     uint64_t stream_size = 0;
+    AVIndexEntry *mem;
 
     /* adjust first dts according to edit list */
     if ((sc->empty_duration || sc->start_time) && mov->time_scale > 0) {
@@ -1796,12 +1815,13 @@ static void mov_build_index(MOVContext *mov, AVStream *st)
 
         if (!sc->sample_count)
             return;
-        if (sc->sample_count >= UINT_MAX / sizeof(*st->index_entries))
+        if (sc->sample_count >= UINT_MAX / sizeof(*st->index_entries) - st->nb_index_entries)
             return;
-        st->index_entries = av_malloc(sc->sample_count*sizeof(*st->index_entries));
-        if (!st->index_entries)
+        mem = av_realloc(st->index_entries, (st->nb_index_entries + sc->sample_count) * sizeof(*st->index_entries));
+        if (!mem)
             return;
-        st->index_entries_allocated_size = sc->sample_count*sizeof(*st->index_entries);
+        st->index_entries = mem;
+        st->index_entries_allocated_size = (st->nb_index_entries + sc->sample_count) * sizeof(*st->index_entries);
 
         for (i = 0; i < sc->chunk_count; i++) {
             current_offset = sc->chunk_offsets[i];
@@ -1885,12 +1905,13 @@ static void mov_build_index(MOVContext *mov, AVStream *st)
         }
 
         av_dlog(mov->fc, "chunk count %d\n", total);
-        if (total >= UINT_MAX / sizeof(*st->index_entries))
+        if (total >= UINT_MAX / sizeof(*st->index_entries) - st->nb_index_entries)
             return;
-        st->index_entries = av_malloc(total*sizeof(*st->index_entries));
-        if (!st->index_entries)
+        mem = av_realloc(st->index_entries, (st->nb_index_entries + total) * sizeof(*st->index_entries));
+        if (!mem)
             return;
-        st->index_entries_allocated_size = total*sizeof(*st->index_entries);
+        st->index_entries = mem;
+        st->index_entries_allocated_size = (st->nb_index_entries + total) * sizeof(*st->index_entries);
 
         // populate index
         for (i = 0; i < sc->chunk_count; i++) {
@@ -2067,9 +2088,6 @@ static int mov_read_trak(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 #endif
 #if CONFIG_H263_DECODER
     case CODEC_ID_H263:
-#endif
-#if CONFIG_H264_DECODER
-    case CODEC_ID_H264:
 #endif
 #if CONFIG_MPEG4_DECODER
     case CODEC_ID_MPEG4:
@@ -2831,7 +2849,7 @@ static int mov_read_packet(AVFormatContext *s, AVPacket *pkt)
 
     pkt->stream_index = sc->ffindex;
     pkt->dts = sample->timestamp;
-    if (sc->ctts_data) {
+    if (sc->ctts_data && sc->ctts_index < sc->ctts_count) {
         pkt->pts = pkt->dts + sc->dts_shift + sc->ctts_data[sc->ctts_index].duration;
         /* update ctts context */
         sc->ctts_sample++;

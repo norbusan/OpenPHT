@@ -60,6 +60,13 @@ static av_cold int mm_decode_init(AVCodecContext *avctx)
 
     avctx->pix_fmt = PIX_FMT_PAL8;
 
+    if (!avctx->width || !avctx->height ||
+        (avctx->width & 1) || (avctx->height & 1)) {
+        av_log(avctx, AV_LOG_ERROR, "Invalid video dimensions: %dx%d\n",
+               avctx->width, avctx->height);
+        return AVERROR(EINVAL);
+    }
+
     avcodec_get_frame_defaults(&s->frame);
     s->frame.reference = 3;
 
@@ -107,7 +114,7 @@ static int mm_decode_intra(MmContext * s, int half_horiz, int half_vert)
 
         if (color) {
             memset(s->frame.data[0] + y*s->frame.linesize[0] + x, color, run_length);
-            if (half_vert)
+            if (half_vert && y + half_vert < s->avctx->height)
                 memset(s->frame.data[0] + (y+1)*s->frame.linesize[0] + x, color, run_length);
         }
         x+= run_length;
@@ -152,6 +159,8 @@ static int mm_decode_inter(MmContext * s, int half_horiz, int half_vert)
             int replace_array = bytestream2_get_byte(&s->gb);
             for(j=0; j<8; j++) {
                 int replace = (replace_array >> (7-j)) & 1;
+                if (x + half_horiz >= s->avctx->width)
+                    return AVERROR_INVALIDDATA;
                 if (replace) {
                     int color = bytestream2_get_byte(&data_ptr);
                     s->frame.data[0][y*s->frame.linesize[0] + x] = color;

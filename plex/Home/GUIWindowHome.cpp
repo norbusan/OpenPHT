@@ -317,6 +317,12 @@ bool CGUIWindowHome::OnPopupMenu()
   if (choice == -1)
     return false;
 
+  if (choice == ACTION_PLEX_GOTO_SHOW || choice == ACTION_PLEX_GOTO_SEASON)
+  {
+    // save current focused controls
+    m_focusSaver.SaveFocus(this);
+  }
+
   if (g_plexApplication.defaultActionHandler->OnAction(WINDOW_HOME, choice, GetCurrentFanoutItem(), CFileItemListPtr()))
     return true;
   
@@ -793,7 +799,7 @@ void CGUIWindowHome::UpdateSections()
       else if (item->HasProperty("plexchannels"))
       {
         haveChannels = true;
-        if (g_plexApplication.dataLoader->HasChannels() && !g_plexApplication.myPlexManager->GetCurrentUserInfo().restricted)
+        if (!g_guiSettings.GetBool("myplex.hidechannels") && g_plexApplication.dataLoader->HasChannels())
           newList.push_back(item);
         else
           listUpdated = true;
@@ -880,7 +886,7 @@ void CGUIWindowHome::UpdateSections()
     newList.push_back(item);
   }
 
-  if (g_plexApplication.dataLoader->HasChannels() && !haveChannels)
+  if (!g_guiSettings.GetBool("myplex.hidechannels") && g_plexApplication.dataLoader->HasChannels() && !haveChannels)
   {
     /* We need the channel button as well */
     CGUIStaticItemPtr item = CGUIStaticItemPtr(new CGUIStaticItem);

@@ -551,10 +551,10 @@ static int adpcm_encode_frame(AVCodecContext *avctx,
     {
         int ch, i;
         PutBitContext pb;
-        init_put_bits(&pb, dst, buf_size * 8);
+        init_put_bits(&pb, dst, buf_size);
 
         for (ch = 0; ch < avctx->channels; ch++) {
-            put_bits(&pb, 9, (c->status[ch].prev_sample + 0x10000) >> 7);
+            put_bits(&pb, 9, (c->status[ch].prev_sample & 0xFFFF) >> 7);
             put_bits(&pb, 7,  c->status[ch].step_index);
             if (avctx->trellis > 0) {
                 uint8_t buf[64];
@@ -582,7 +582,7 @@ static int adpcm_encode_frame(AVCodecContext *avctx,
     {
         int i;
         PutBitContext pb;
-        init_put_bits(&pb, dst, buf_size * 8);
+        init_put_bits(&pb, dst, buf_size);
 
         n = avctx->frame_size - 1;
 

@@ -37,7 +37,10 @@ enum ESHADERMETHOD
   SM_TEXTURE_NOBLEND,
   SM_MULTI_BLENDCOLOR,
   SM_TEXTURE_RGBA,
+  SM_TEXTURE_RGBA_OES,
   SM_TEXTURE_RGBA_BLENDCOLOR,
+  SM_TEXTURE_RGBA_BOB,
+  SM_TEXTURE_RGBA_BOB_OES,
   SM_ESHADERCOUNT
 };
 
@@ -76,7 +79,7 @@ public:
   virtual bool TestRender();
 
   virtual void Project(float &x, float &y, float &z);
-  
+
   void InitialiseGUIShader();
   void EnableGUIShader(ESHADERMETHOD method);
   void DisableGUIShader();
@@ -85,12 +88,19 @@ public:
   GLint GUIShaderGetCol();
   GLint GUIShaderGetCoord0();
   GLint GUIShaderGetCoord1();
+  GLint GUIShaderGetUniCol();
+  GLint GUIShaderGetCoord0Matrix();
+  GLint GUIShaderGetField();
+  GLint GUIShaderGetStep();
+  GLint GUIShaderGetContrast();
+  GLint GUIShaderGetBrightness();
+  GLint GUIShaderGetModel();
 
 protected:
   virtual void SetVSyncImpl(bool enable) = 0;
   virtual bool PresentRenderImpl(const CDirtyRegionList &dirty) = 0;
   void CalculateMaxTexturesize();
-  
+
   int        m_iVSyncMode;
   int        m_iVSyncErrors;
   int64_t    m_iSwapStamp;
@@ -105,8 +115,6 @@ protected:
   CGUIShader  **m_pGUIshader;  // One GUI shader for each method
   ESHADERMETHOD m_method;      // Current GUI Shader method
 
-  GLfloat    m_view[16];
-  GLfloat    m_projection[16];
   GLint      m_viewPort[4];
 };
 

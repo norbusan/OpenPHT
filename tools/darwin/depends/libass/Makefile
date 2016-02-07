@@ -2,12 +2,12 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=libass
-VERSION=0.9.13
+VERSION=0.12.3
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 
 # configuration settings
-CONFIGURE=./configure --prefix=$(PREFIX)
+CONFIGURE=./configure --prefix=$(PREFIX) --disable-enca --disable-asm
 
 LIBDYLIB=$(SOURCE)/$(LIBNAME)/.libs/$(LIBNAME).dylib
 

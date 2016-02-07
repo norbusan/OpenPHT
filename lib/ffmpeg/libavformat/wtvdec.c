@@ -258,7 +258,12 @@ static AVIOContext * wtvfile_open2(AVFormatContext *s, const uint8_t *buf, int b
         dir_length  = AV_RL16(buf + 16);
         file_length = AV_RL64(buf + 24);
         name_size   = 2 * AV_RL32(buf + 32);
-        if (buf + 48 + name_size > buf_end) {
+        if (name_size < 0) {
+            av_log(s, AV_LOG_ERROR,
+                   "bad filename length, remaining directory entries ignored\n");
+            break;
+        }
+        if (48 + name_size > buf_end - buf) {
             av_log(s, AV_LOG_ERROR, "filename exceeds buffer size; remaining directory entries ignored\n");
             break;
         }
@@ -423,6 +428,7 @@ static void get_attachment(AVFormatContext *s, AVIOContext *pb, int length)
     st->codec->codec_id   = CODEC_ID_MJPEG;
     st->codec->codec_type = AVMEDIA_TYPE_ATTACHMENT;
     st->codec->extradata  = av_mallocz(filesize);
+    st->id = -1;
     if (!st->codec->extradata)
         goto done;
     st->codec->extradata_size = filesize;
@@ -565,8 +571,10 @@ static AVStream * new_stream(AVFormatContext *s, AVStream *st, int sid, int code
         if (!wst)
             return NULL;
         st = avformat_new_stream(s, NULL);
-        if (!st)
+        if (!st) {
+            av_free(wst);
             return NULL;
+        }
         st->id = sid;
         st->priv_data = wst;
     }

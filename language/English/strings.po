@@ -1808,7 +1808,11 @@ msgctxt "#471"
 msgid "Modchip"
 msgstr ""
 
-#empty strings from id 472 to 473
+msgctxt "#472"
+msgid "- Dolby Digital Plus (E-AC3) capable receiver"
+msgstr ""
+
+#empty string with id 473
 
 msgctxt "#474"
 msgid "Off"
@@ -5113,7 +5117,12 @@ msgctxt "#13434"
 msgid "Play only this"
 msgstr ""
 
-#empty strings from id 13435 to 13499
+#: system/settings/settings.xml
+msgctxt "#13435"
+msgid "Enable HQ Scalers for scalings above"
+msgstr ""
+
+#empty strings from id 13436 to 13499
 
 msgctxt "#13500"
 msgid "A/V sync method"
@@ -11295,7 +11304,9 @@ msgctxt "#36009"
 msgid "Put devices in standby mode when activating screensaver"
 msgstr ""
 
-#empty string with id 36010
+msgctxt "#36010"
+msgid "Wake devices when deactivating screensaver"
+msgstr ""
 
 msgctxt "#36011"
 msgid "Could not detect the CEC com port. Set it up manually."
@@ -11419,4 +11430,9 @@ msgstr ""
 
 msgctxt "#36041"
 msgid "* Item folder"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#36042"
+msgid "Use limited colour range (16-235)"
 msgstr ""

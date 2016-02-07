@@ -2,7 +2,7 @@ include ../Makefile.buildtools
 
 # lib name, version
 APPNAME=automake
-VERSION=1.10.3
+VERSION=1.15
 SOURCE=$(APPNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 

@@ -15,10 +15,10 @@ Subject: [PATCH] [ffmpeg] - ARM: generate position independent code to access
  lib/ffmpeg/libavcodec/arm/vp8_armv6.S      |    4 +-
  6 files changed, 80 insertions(+), 10 deletions(-)
 
-diff --git a/lib/ffmpeg/libavcodec/arm/ac3dsp_armv6.S b/lib/ffmpeg/libavcodec/arm/ac3dsp_armv6.S
+diff --git a/libavcodec/arm/ac3dsp_armv6.S b/libavcodec/arm/ac3dsp_armv6.S
 index b6aee86..97099d6 100644
---- a/lib/ffmpeg/libavcodec/arm/ac3dsp_armv6.S
-+++ b/lib/ffmpeg/libavcodec/arm/ac3dsp_armv6.S
+--- a/libavcodec/arm/ac3dsp_armv6.S
++++ b/libavcodec/arm/ac3dsp_armv6.S
 @@ -26,8 +26,8 @@ function ff_ac3_bit_alloc_calc_bap_armv6, export=1
          beq             4f
          push            {r4-r11,lr}
@@ -30,10 +30,10 @@ index b6aee86..97099d6 100644
          ldm             r5,  {r5-r7}
          ldrb            r4,  [r4, r2]
          add             r1,  r1,  r2,  lsl #1           @ psd + start
-diff --git a/lib/ffmpeg/libavcodec/arm/asm.S b/lib/ffmpeg/libavcodec/arm/asm.S
+diff --git a/libavcodec/arm/asm.S b/libavcodec/arm/asm.S
 index e540eac..d34a16d 100644
---- a/lib/ffmpeg/libavcodec/arm/asm.S
-+++ b/lib/ffmpeg/libavcodec/arm/asm.S
+--- a/libavcodec/arm/asm.S
++++ b/libavcodec/arm/asm.S
 @@ -62,7 +62,14 @@ ELF     .eabi_attribute 25, \val
  .endm
  
@@ -130,10 +130,10 @@ index e540eac..d34a16d 100644
  .macro  ldr_pre         rt,  rn,  rm:vararg
  A       ldr             \rt, [\rn, \rm]!
  T       add             \rn, \rn, \rm
-diff --git a/lib/ffmpeg/libavcodec/arm/fft_fixed_neon.S b/lib/ffmpeg/libavcodec/arm/fft_fixed_neon.S
+diff --git a/libavcodec/arm/fft_fixed_neon.S b/libavcodec/arm/fft_fixed_neon.S
 index 0316b80..d6b7dac 100644
---- a/lib/ffmpeg/libavcodec/arm/fft_fixed_neon.S
-+++ b/lib/ffmpeg/libavcodec/arm/fft_fixed_neon.S
+--- a/libavcodec/arm/fft_fixed_neon.S
++++ b/libavcodec/arm/fft_fixed_neon.S
 @@ -214,7 +214,7 @@ function fft\n\()_neon
          bl              fft\n4\()_neon
          mov             r0,  r4
@@ -143,10 +143,10 @@ index 0316b80..d6b7dac 100644
          mov             r2,  #\n4/2
          b               fft_pass_neon
  endfunc
-diff --git a/lib/ffmpeg/libavcodec/arm/fft_neon.S b/lib/ffmpeg/libavcodec/arm/fft_neon.S
+diff --git a/libavcodec/arm/fft_neon.S b/libavcodec/arm/fft_neon.S
 index ef8e4d4..d36927b 100644
---- a/lib/ffmpeg/libavcodec/arm/fft_neon.S
-+++ b/lib/ffmpeg/libavcodec/arm/fft_neon.S
+--- a/libavcodec/arm/fft_neon.S
++++ b/libavcodec/arm/fft_neon.S
 @@ -143,7 +143,7 @@ function fft16_neon
          vswp            d29, d30                @ q14{r12,i12,i14,r15} q15{r13,i13,i15,r14}
          vadd.f32        q0,  q12, q13           @ {t1,t2,t5,t6}
@@ -165,10 +165,10 @@ index ef8e4d4..d36927b 100644
          mov             r2,  #\n4/2
          b               fft_pass_neon
  endfunc
-diff --git a/lib/ffmpeg/libavcodec/arm/vp3dsp_neon.S b/lib/ffmpeg/libavcodec/arm/vp3dsp_neon.S
+diff --git a/libavcodec/arm/vp3dsp_neon.S b/libavcodec/arm/vp3dsp_neon.S
 index ae3e402..90d9f80 100644
---- a/lib/ffmpeg/libavcodec/arm/vp3dsp_neon.S
-+++ b/lib/ffmpeg/libavcodec/arm/vp3dsp_neon.S
+--- a/libavcodec/arm/vp3dsp_neon.S
++++ b/libavcodec/arm/vp3dsp_neon.S
 @@ -116,9 +116,8 @@ function vp3_idct_start_neon
      vadd.s16        q1,  q8,  q12
      vsub.s16        q8,  q8,  q12
@@ -180,10 +180,10 @@ index ae3e402..90d9f80 100644
      vmull.s16       q2,  d18, xC1S7     // (ip[1] * C1) << 16
      vmull.s16       q3,  d19, xC1S7
      vmull.s16       q4,  d2,  xC4S4     // ((ip[0] + ip[4]) * C4) << 16
-diff --git a/lib/ffmpeg/libavcodec/arm/vp8_armv6.S b/lib/ffmpeg/libavcodec/arm/vp8_armv6.S
+diff --git a/libavcodec/arm/vp8_armv6.S b/libavcodec/arm/vp8_armv6.S
 index 8a3beb9..adb49f7 100644
---- a/lib/ffmpeg/libavcodec/arm/vp8_armv6.S
-+++ b/lib/ffmpeg/libavcodec/arm/vp8_armv6.S
+--- a/libavcodec/arm/vp8_armv6.S
++++ b/libavcodec/arm/vp8_armv6.S
 @@ -65,7 +65,7 @@ T       orrcs           \cw, \cw, \t1
  
  function ff_decode_block_coeffs_armv6, export=1

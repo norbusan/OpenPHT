@@ -68,9 +68,9 @@
 
 /* cdrip */
 #define DLL_PATH_LAME_ENC      "special://xbmcbin/system/cdrip/lame_enc.dll"
-#define DLL_PATH_OGG           "special://xbmcbin/system/cdrip/ogg.dll"
+#define DLL_PATH_OGG           "special://xbmcbin/system/cdrip/libogg.dll"
 #define DLL_PATH_VORBIS_ENC    "special://xbmcbin/system/cdrip/vorbisenc.dll"
-#define DLL_PATH_VORBIS        "special://xbmcbin/system/cdrip/vorbis.dll"
+#define DLL_PATH_VORBIS        "special://xbmcbin/system/cdrip/libvorbis.dll"
 
 /* libbluray */
 #define DLL_PATH_LIBBLURAY     "special://xbmcbin/system/players/dvdplayer/libbluray.dll"

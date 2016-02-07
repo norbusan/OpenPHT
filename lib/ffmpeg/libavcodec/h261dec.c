@@ -66,7 +66,7 @@ static av_cold void h261_decode_init_vlc(H261Context *h){
         INIT_VLC_STATIC(&h261_cbp_vlc, H261_CBP_VLC_BITS, 63,
                  &h261_cbp_tab[0][1], 2, 1,
                  &h261_cbp_tab[0][0], 2, 1, 512);
-        init_rl(&h261_rl_tcoeff, ff_h261_rl_table_store);
+        ff_init_rl(&h261_rl_tcoeff, ff_h261_rl_table_store);
         INIT_VLC_RL(h261_rl_tcoeff, 552);
     }
 }
@@ -286,6 +286,11 @@ static int h261_decode_mb(H261Context *h){
 
     // Read mtype
     h->mtype = get_vlc2(&s->gb, h261_mtype_vlc.table, H261_MTYPE_VLC_BITS, 2);
+    if (h->mtype < 0) {
+        av_log(s->avctx, AV_LOG_ERROR, "Invalid mtype index %d\n",
+               h->mtype);
+        return SLICE_ERROR;
+    }
     h->mtype = h261_mtype_map[h->mtype];
 
     // Read mquant

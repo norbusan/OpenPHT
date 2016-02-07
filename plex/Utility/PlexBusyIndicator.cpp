@@ -2,6 +2,7 @@
 #include "JobManager.h"
 #include "dialogs/GUIDialogBusy.h"
 #include "guilib/GUIWindowManager.h"
+#include "settings/AdvancedSettings.h"
 #include "boost/foreach.hpp"
 #include "log.h"
 #include "Application.h"
@@ -26,7 +27,7 @@ bool CPlexBusyIndicator::blockWaitingForJob(CJob* job, IJobCallback* callback, C
   lk.Leave();
 
   // wait an initial 300ms if this is a fast operation.
-  if (m_blockEvent.WaitMSec(300))
+  if (m_blockEvent.WaitMSec(g_advancedSettings.m_videoBusyDialogDelay_ms))
     return true;
 
   CGUIDialogBusy* busy = NULL;
@@ -44,7 +45,11 @@ bool CPlexBusyIndicator::blockWaitingForJob(CJob* job, IJobCallback* callback, C
   while (m_callbackMap.size() > 0)
   {
     lk.Leave();
+#ifdef TARGET_RASPBERRY_PI
+    while (!m_blockEvent.WaitMSec(100))
+#else
     while (!m_blockEvent.WaitMSec(20))
+#endif
     {
       g_windowManager.ProcessRenderLoop(false);
       if (busy && busy->IsCanceled())

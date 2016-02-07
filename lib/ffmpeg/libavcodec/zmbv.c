@@ -416,11 +416,16 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPac
     }
 
     /* parse header */
+    if (len < 1)
+        return AVERROR_INVALIDDATA;
     c->flags = buf[0];
     buf++; len--;
     if (c->flags & ZMBV_KEYFRAME) {
         void *decode_intra = NULL;
         c->decode_intra= NULL;
+
+        if (len < 6)
+            return AVERROR_INVALIDDATA;
         hi_ver = buf[0];
         lo_ver = buf[1];
         c->comp = buf[2];
@@ -500,10 +505,13 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPac
         return -1;
     }
 
-    if (c->comp == 0) { //Uncompressed data
-        memcpy(c->decomp_buf, buf, len);
-        c->decomp_size = 1;
-    } else { // ZLIB-compressed data
+     if (c->comp == 0) { //Uncompressed data
+         if (c->decomp_size < len) {
+             av_log(avctx, AV_LOG_ERROR, "Buffer too small\n");
+             return AVERROR_INVALIDDATA;
+         }
+         memcpy(c->decomp_buf, buf, len);
+     } else { // ZLIB-compressed data
         c->zstream.total_in = c->zstream.total_out = 0;
         c->zstream.next_in = buf;
         c->zstream.avail_in = len;

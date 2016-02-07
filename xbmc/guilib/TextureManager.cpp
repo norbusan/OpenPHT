@@ -35,10 +35,6 @@
 #include "URL.h"
 #include <assert.h>
 
-/* PLEX */
-#include "plex/PlexUtils.h"
-/* END PLEX */
-
 using namespace std;
 
 
@@ -475,6 +471,7 @@ void CGUITextureManager::FreeUnusedTextures()
 
 void CGUITextureManager::ReleaseHwTexture(unsigned int texture)
 {
+  CSingleLock lock(g_graphicsContext);
   m_unusedHwTextures.push_back(texture);
 }
 

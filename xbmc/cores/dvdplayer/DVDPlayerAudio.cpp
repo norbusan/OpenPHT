@@ -176,9 +176,14 @@ void CDVDPlayerAudio::OpenStream( CDVDStreamInfo &hints, CDVDAudioCodec* codec )
   /* store our stream hints */
   m_streaminfo = hints;
 
-  /* update codec information from what codec gave ut */
-  m_streaminfo.channels = m_pAudioCodec->GetChannels();
-  m_streaminfo.samplerate = m_pAudioCodec->GetSampleRate();
+  /* update codec information from what codec gave out, if any */
+  int channelsFromCodec   = m_pAudioCodec->GetEncodedChannels();
+  int samplerateFromCodec = m_pAudioCodec->GetEncodedSampleRate();
+
+  if (channelsFromCodec > 0)
+    m_streaminfo.channels = channelsFromCodec;
+  if (samplerateFromCodec > 0)
+    m_streaminfo.samplerate = samplerateFromCodec;
 
   /* check if we only just got sample rate, in which case the previous call
    * to CreateAudioCodec() couldn't have started passthrough */
@@ -308,12 +313,12 @@ int CDVDPlayerAudio::DecodeFrame(DVDAudioFrame &audioframe, bool bDropPacket)
       audioframe.encoded_sample_rate   = m_pAudioCodec->GetEncodedSampleRate();
       audioframe.passthrough           = m_pAudioCodec->NeedPassthrough();
 
-      if (m_streaminfo.samplerate != audioframe.sample_rate)
+      if (audioframe.encoded_sample_rate && m_streaminfo.samplerate != audioframe.encoded_sample_rate)
       {
         // The sample rate has changed or we just got it for the first time
         // for this stream. See if we should enable/disable passthrough due
         // to it.
-        m_streaminfo.samplerate = audioframe.sample_rate;
+        m_streaminfo.samplerate = audioframe.encoded_sample_rate;
         if (!switched && SwitchCodecIfNeeded()) {
           // passthrough has been enabled/disabled, reprocess the packet
           m_decode.data -= len;
@@ -517,13 +522,14 @@ void CDVDPlayerAudio::Process()
 
     if( result & DECODE_FLAG_TIMEOUT )
     {
-      m_stalled = true;
-
       // Flush as the audio output may keep looping if we don't
-      if(m_speed == DVD_PLAYSPEED_NORMAL)
+      if(m_speed == DVD_PLAYSPEED_NORMAL && !m_stalled)
       {
         m_dvdAudio.Drain();
         m_dvdAudio.Flush();
+        m_stalled = true;
+        // avoid busy spinning here
+        Sleep(10);
       }
 
       continue;
@@ -543,7 +549,7 @@ void CDVDPlayerAudio::Process()
     if( audioframe.size == 0 )
       continue;
 
-    packetadded = true;
+    packetadded = false;
 
     // we have succesfully decoded an audio frame, setup renderer to match
     if (!m_dvdAudio.IsValidFormat(audioframe))
@@ -560,6 +566,8 @@ void CDVDPlayerAudio::Process()
 
       if(!m_dvdAudio.Create(audioframe, m_streaminfo.codec, m_setsynctype == SYNC_RESAMPLE))
         CLog::Log(LOGERROR, "%s - failed to create audio renderer", __FUNCTION__);
+
+      m_streaminfo.channels = audioframe.passthrough ? audioframe.encoded_channel_count : audioframe.channel_count;
     }
 
     // Zero out the frame data if we are supposed to silence the audio
@@ -589,13 +597,14 @@ void CDVDPlayerAudio::Process()
       // add any packets play
       packetadded = OutputPacket(audioframe);
 
-      // we are not running until something is cached in output device
-      if(m_stalled && m_dvdAudio.GetCacheTime() > 0.0)
+      // we are not running until something is cached in output device and
+      // we still have a minimum level in the message queue
+      if(m_stalled && m_dvdAudio.GetCacheTime() > 0.0 && m_messageQueue.GetLevel() > 5)
         m_stalled = false;
     }
 
     // signal to our parent that we have initialized
-    if(m_started == false)
+    if(m_started == false && !(result & DECODE_FLAG_DROP))
     {
       m_started = true;
       m_messageParent.Put(new CDVDMsgInt(CDVDMsg::PLAYER_STARTED, DVDPLAYER_AUDIO));
@@ -865,6 +874,11 @@ string CDVDPlayerAudio::GetPlayerInfo()
 int CDVDPlayerAudio::GetAudioBitrate()
 {
   return (int)m_audioStats.GetBitrate();
+}
+
+int CDVDPlayerAudio::GetAudioChannels()
+{
+  return m_streaminfo.channels;
 }
 
 bool CDVDPlayerAudio::IsPassthrough() const

@@ -2,9 +2,9 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=flac
-VERSION=1.2.1
+VERSION=1.3.1
 SOURCE=$(LIBNAME)-$(VERSION)
-ARCHIVE=$(SOURCE).tar.gz
+ARCHIVE=$(SOURCE).tar.xz
 
 # configuration settings
 CONFIGURE=./configure --prefix=$(PREFIX) \
@@ -21,7 +21,7 @@ $(TARBALLS_LOCATION)/$(ARCHIVE):
 
 $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	rm -rf $(SOURCE)
-	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
+	$(ARCHIVE_TOOL) xJf $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
 	cd $(SOURCE); $(CONFIGURE)
 	if test "$(DARWIN)" = "ios"; then \

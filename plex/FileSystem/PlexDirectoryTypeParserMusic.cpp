@@ -117,7 +117,9 @@ CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContaine
     item.SetArt(PLEX_ART_THUMB, mediaContainer.GetArt(PLEX_ART_THUMB));
   song.strThumb = item.GetArt(PLEX_ART_THUMB);
 
-  if (item.HasProperty("grandparentTitle"))
+  if (item.HasProperty("originalTitle"))
+    song.artist.push_back(item.GetProperty("originalTitle").asString());
+  else if (item.HasProperty("grandparentTitle"))
     song.artist.push_back(item.GetProperty("grandparentTitle").asString());
   else if (mediaContainer.HasProperty("grandparentTitle"))
     song.artist.push_back(mediaContainer.GetProperty("grandparentTitle").asString());

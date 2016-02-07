@@ -86,6 +86,7 @@
  * subframe in order to reconstruct the output samples.
  */
 
+#include "libavutil/avassert.h"
 #include "libavutil/intfloat.h"
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
@@ -106,6 +107,7 @@
 
 #define WMAPRO_BLOCK_MIN_BITS  6                                           ///< log2 of min block size
 #define WMAPRO_BLOCK_MAX_BITS 12                                           ///< log2 of max block size
+#define WMAPRO_BLOCK_MIN_SIZE (1 << WMAPRO_BLOCK_MIN_BITS)                 ///< minimum block size
 #define WMAPRO_BLOCK_MAX_SIZE (1 << WMAPRO_BLOCK_MAX_BITS)                 ///< maximum block size
 #define WMAPRO_BLOCK_SIZES    (WMAPRO_BLOCK_MAX_BITS - WMAPRO_BLOCK_MIN_BITS + 1) ///< possible block sizes
 
@@ -280,6 +282,11 @@ static av_cold int decode_init(AVCodecContext *avctx)
     int log2_max_num_subframes;
     int num_possible_block_sizes;
 
+    if (!avctx->block_align) {
+        av_log(avctx, AV_LOG_ERROR, "block_align is not set\n");
+        return AVERROR(EINVAL);
+    }
+
     s->avctx = avctx;
     dsputil_init(&s->dsp, avctx);
     ff_fmt_convert_init(&s->fmt_conv, avctx);
@@ -327,6 +334,17 @@ static av_cold int decode_init(AVCodecContext *avctx)
     if (s->max_num_subframes > MAX_SUBFRAMES) {
         av_log(avctx, AV_LOG_ERROR, "invalid number of subframes %i\n",
                s->max_num_subframes);
+        return AVERROR_INVALIDDATA;
+    }
+
+    if (s->min_samples_per_subframe < WMAPRO_BLOCK_MIN_SIZE) {
+        av_log(avctx, AV_LOG_ERROR, "Invalid minimum block size %i\n",
+               s->max_num_subframes);
+        return AVERROR_INVALIDDATA;
+    }
+
+    if (s->avctx->sample_rate <= 0) {
+        av_log(avctx, AV_LOG_ERROR, "invalid sample rate\n");
         return AVERROR_INVALIDDATA;
     }
 
@@ -398,6 +416,9 @@ static av_cold int decode_init(AVCodecContext *avctx)
             offset &= ~3;
             if (offset > s->sfb_offsets[i][band - 1])
                 s->sfb_offsets[i][band++] = offset;
+
+            if (offset >= subframe_len)
+                break;
         }
         s->sfb_offsets[i][band - 1] = subframe_len;
         s->num_sfb[i]               = band - 1;
@@ -418,7 +439,8 @@ static av_cold int decode_init(AVCodecContext *avctx)
             for (x = 0; x < num_possible_block_sizes; x++) {
                 int v = 0;
                 while (s->sfb_offsets[x][v + 1] << x < offset)
-                    ++v;
+                    if (++v >= MAX_BANDS)
+                        return AVERROR_INVALIDDATA;
                 s->sf_offsets[i][x][b] = v;
             }
         }
@@ -710,6 +732,7 @@ static int decode_channel_transform(WMAProDecodeCtx* s)
                     if (get_bits1(&s->gb)) {
                         av_log_ask_for_sample(s->avctx,
                                               "unsupported channel transform type\n");
+                        return AVERROR_PATCHWELCOME;
                     }
                 } else {
                     chgroup->transform = 1;
@@ -1112,11 +1135,12 @@ static int decode_subframe(WMAProDecodeCtx *s)
     cur_subwoofer_cutoff = s->subwoofer_cutoffs[s->table_idx];
 
     /** configure the decoder for the current subframe */
+    offset += s->samples_per_frame >> 1;
+
     for (i = 0; i < s->channels_for_cur_subframe; i++) {
         int c = s->channel_indexes_for_cur_subframe[i];
 
-        s->channel[c].coeffs = &s->channel[c].out[(s->samples_per_frame >> 1)
-                                                  + offset];
+        s->channel[c].coeffs = &s->channel[c].out[offset];
     }
 
     s->subframe_len = subframe_len;
@@ -1157,6 +1181,7 @@ static int decode_subframe(WMAProDecodeCtx *s)
             transmit_coeffs = 1;
     }
 
+    av_assert0(s->subframe_len <= WMAPRO_BLOCK_MAX_SIZE);
     if (transmit_coeffs) {
         int step;
         int quant_step = 90 * s->bits_per_sample >> 4;
@@ -1166,7 +1191,13 @@ static int decode_subframe(WMAProDecodeCtx *s)
             int num_bits = av_log2((s->subframe_len + 3)/4) + 1;
             for (i = 0; i < s->channels_for_cur_subframe; i++) {
                 int c = s->channel_indexes_for_cur_subframe[i];
-                s->channel[c].num_vec_coeffs = get_bits(&s->gb, num_bits) << 2;
+                int num_vec_coeffs = get_bits(&s->gb, num_bits) << 2;
+                if (num_vec_coeffs > s->subframe_len) {
+                    av_log(s->avctx, AV_LOG_ERROR, "num_vec_coeffs %d is too large\n", num_vec_coeffs);
+                    return AVERROR_INVALIDDATA;
+                }
+                av_assert0(num_vec_coeffs + offset <= FF_ARRAY_ELEMS(s->channel[c].out));
+                s->channel[c].num_vec_coeffs = num_vec_coeffs;
             }
         } else {
             for (i = 0; i < s->channels_for_cur_subframe; i++) {
@@ -1359,7 +1390,7 @@ static int decode_frame(WMAProDecodeCtx *s, int *got_frame_ptr)
 
     /* get output buffer */
     s->frame.nb_samples = s->samples_per_frame;
-    if ((ret = avctx->get_buffer(avctx, &s->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &s->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         s->packet_loss = 1;
         return 0;
@@ -1451,6 +1482,14 @@ static void save_bits(WMAProDecodeCtx *s, GetBitContext* gb, int len,
         return;
     }
 
+    if (len > put_bits_left(&s->pb)) {
+        av_log(s->avctx, AV_LOG_ERROR,
+               "Cannot append %d bits, only %d bits available.\n",
+               len, put_bits_left(&s->pb));
+        s->packet_loss = 1;
+        return;
+    }
+
     s->num_saved_bits += len;
     if (!append) {
         avpriv_copy_bits(&s->pb, gb->buffer + (get_bits_count(gb) >> 3),
@@ -1497,8 +1536,11 @@ static int decode_packet(AVCodecContext *avctx, void *data,
         s->packet_done = 0;
 
         /** sanity check for the buffer length */
-        if (buf_size < avctx->block_align)
-            return 0;
+        if (buf_size < avctx->block_align) {
+            av_log(avctx, AV_LOG_ERROR, "Input packet too small (%d < %d)\n",
+                   buf_size, avctx->block_align);
+            return AVERROR_INVALIDDATA;
+        }
 
         s->next_packet_start = buf_size - avctx->block_align;
         buf_size = avctx->block_align;

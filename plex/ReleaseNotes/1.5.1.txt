@@ -1,0 +1,23 @@
+NEW:
+  - Support for Rotten Tomatoes rating
+  - Preferences option to show watched items in recently added fanout
+  - Preferences option to hide channels from main menu
+  - Skin option to show shutdown/restart for managed users
+  - Added go to show/season to context menu for episodes
+  - Support for shared channels for managed users (need to enable in PMS/Users)
+  - Support for using ffmpeg avio for stream transport/buffering
+  - Support for limited color range (16-235)
+  - Support for gapless music playback
+  - Lots of depends packages have been updated
+  - ffmpeg updated from 0.10.2 to 0.10.16
+
+FIXES:
+  - Show correct artist for tracks with other artists i.e. Various Artists tracks
+  - Update now playing visualization showing correct track artist and artist/album/track order
+  - Show all filter and sort options for home movies
+  - Fixed a Plex Home user switching bug involving previous menu action
+  - Ensures plex.tv sign in pin is no longer truncated to ... if it is too wide
+  - OpenPHT is now listed under Home Theater in Plex Web
+  - The home menu used when "Hide Quit and Shut Down in menu" is selected now works correctly
+  - CEC fixes backported from RasPlex and libcec upgraded to 2.2.0
+  - Backport of rendering, audio engine, dvdplayer and other improvements from RasPlex

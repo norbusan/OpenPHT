@@ -27,6 +27,8 @@
 #include "MatrixGLES.h"
 #include "utils/log.h"
 
+using namespace Shaders;
+
 CGUIShader::CGUIShader( const char *shader ) : CGLSLShaderProgram("guishader_vert.glsl", shader)
 {
   // Initialise values
@@ -38,6 +40,12 @@ CGUIShader::CGUIShader( const char *shader ) : CGLSLShaderProgram("guishader_ver
   m_hCol    = 0;
   m_hCord0  = 0;
   m_hCord1  = 0;
+  m_hUniCol = 0;
+  m_hCoord0Matrix = 0;
+  m_hField  = 0;
+  m_hStep   = 0;
+  m_hContrast = 0;
+  m_hBrightness = 0;
 
   m_proj   = NULL;
   m_model  = NULL;
@@ -50,9 +58,18 @@ void CGUIShader::OnCompiledAndLinked()
   // Variables passed directly to the Fragment shader
   m_hTex0   = glGetUniformLocation(ProgramHandle(), "m_samp0");
   m_hTex1   = glGetUniformLocation(ProgramHandle(), "m_samp1");
+  m_hUniCol = glGetUniformLocation(ProgramHandle(), "m_unicol");
+  m_hField  = glGetUniformLocation(ProgramHandle(), "m_field");
+  m_hStep   = glGetUniformLocation(ProgramHandle(), "m_step");
+  m_hContrast   = glGetUniformLocation(ProgramHandle(), "m_contrast");
+  m_hBrightness = glGetUniformLocation(ProgramHandle(), "m_brightness");
+
   // Variables passed directly to the Vertex shader
-  m_hProj   = glGetUniformLocation(ProgramHandle(), "m_proj");
-  m_hModel  = glGetUniformLocation(ProgramHandle(), "m_model");
+  m_hProj  = glGetUniformLocation(ProgramHandle(), "m_proj");
+  m_hModel = glGetUniformLocation(ProgramHandle(), "m_model");
+  m_hCoord0Matrix = glGetUniformLocation(ProgramHandle(), "m_coord0Matrix");
+
+  // Vertex attributes
   m_hPos    = glGetAttribLocation(ProgramHandle(),  "m_attrpos");
   m_hCol    = glGetAttribLocation(ProgramHandle(),  "m_attrcol");
   m_hCord0  = glGetAttribLocation(ProgramHandle(),  "m_attrcord0");
@@ -62,6 +79,16 @@ void CGUIShader::OnCompiledAndLinked()
   glUseProgram( ProgramHandle() );
   glUniform1i(m_hTex0, 0);
   glUniform1i(m_hTex1, 1);
+  glUniform4f(m_hUniCol, 1.0, 1.0, 1.0, 1.0);
+
+  const float identity[16] = {
+    1.0f, 0.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f
+  };
+  glUniformMatrix4fv(m_hCoord0Matrix,  1, GL_FALSE, identity);
+
   glUseProgram( 0 );
 }
 
@@ -69,8 +96,11 @@ bool CGUIShader::OnEnabled()
 {
   // This is called after glUseProgram()
 
-  glUniformMatrix4fv(m_hProj,  1, GL_FALSE, g_matrices.GetMatrix(MM_PROJECTION));
-  glUniformMatrix4fv(m_hModel, 1, GL_FALSE, g_matrices.GetMatrix(MM_MODELVIEW));
+  glUniformMatrix4fv(m_hProj,  1, GL_FALSE, glMatrixProject.Get());
+  glUniformMatrix4fv(m_hModel, 1, GL_FALSE, glMatrixModview.Get());
+
+  glUniform1f(m_hBrightness, 0.0f);
+  glUniform1f(m_hContrast, 1.0f);
 
   return true;
 }

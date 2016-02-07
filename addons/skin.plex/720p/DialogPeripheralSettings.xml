@@ -14,40 +14,40 @@
 			<posy>0</posy>
 			<control type="image">
 				<description>Background</description>
-				<width>600</width>
-				<height>480</height>
+				<width>700</width>
+				<height>570</height>
 				<include>DialogBG</include>
 			</control>
 			<control type="image">
 				<description>Title bg</description>
-				<width>600</width>
+				<width>700</width>
 				<height>80</height>
 				<include>DialogHeaderBG</include>
 			</control>
 			<control type="image">
 				<description>Title bg bottom border</description>
-				<width>600</width>
+				<width>700</width>
 				<posy>30</posy>
 				<include>DialogHeaderBorder</include>
 			</control>
 			<control type="image">
 				<description>Background border</description>
-				<width>602</width>
-				<height>482</height>
+				<width>702</width>
+				<height>572</height>
 				<include>DialogBorder</include>
 			</control>
 			<control type="image">
 				<description>Dialog arrow</description>
-				<posx>285</posx>
-				<posy>480</posy>
+				<posx>335</posx>
+				<posy>570</posy>
 				<include>DialogArrow</include>
 			</control>
 		</control>
 		<control type="label" id="1">
 			<description>Heading</description>
 			<posx>0</posx>
-			<posy>20</posy>
-			<width>560</width>
+			<posy>25</posy>
+			<width>700</width>
 			<height>30</height>
 			<label>-</label>
 			<include>DialogHeading</include>
@@ -57,7 +57,7 @@
 			<description>No Settings Label</description>
 			<posx>0</posx>
 			<posy>200</posy>
-			<width>640</width>
+			<width>700</width>
 			<align>center</align>
 			<label>35004</label>
 			<font>Regular-18</font>
@@ -66,8 +66,8 @@
 			<description>control area</description>
 			<posx>20</posx>
 			<posy>100</posy>
-			<width>560</width>
-			<height>270</height>
+			<width>660</width>
+			<height>380</height>
 			<itemgap>5</itemgap>
 			<pagecontrol>60</pagecontrol>
 			<onleft>28</onleft>
@@ -77,28 +77,28 @@
 		</control>
 		<control type="scrollbar" id="60">
 			<description>Scroll Bar</description>
-			<posx>580</posx>
+			<posx>680</posx>
 			<posy>95</posy>
 			<width>20</width>
-			<height>280</height>
+			<height>390</height>
 			<showonepage>true</showonepage>
 		</control>
 		<control type="button" id="7">
 			<description>Default Button</description>
-			<width>550</width>
+			<width>650</width>
 		</control>
 		<control type="radiobutton" id="8">
 			<description>Default RadioButton</description>
-			<width>550</width>
+			<width>650</width>
 		</control>
 		<control type="spincontrolex" id="9">
 			<description>Default SpinControlex</description>
-			<width>550</width>
+			<width>650</width>
 			<reverse>yes</reverse>
 		</control>
 		<control type="sliderex" id="10">
 			<description>Default Slider</description>
-			<width>550</width>
+			<width>650</width>
 		</control>
 		<control type="image" id="11">
 			<description>separator image</description>
@@ -109,8 +109,8 @@
 			<visible>false</visible>
 		</control>
 		<control type="group" id="9000">
-			<posx>20</posx>
-			<posy>410</posy>
+			<posx>70</posx>
+			<posy>500</posy>
 			<control type="button" id="29">
 				<description>Cancel Button</description>
 				<posy>0</posy>

@@ -1,0 +1,2 @@
+; filename                        source of the file
+plex-depends.7z                   https://rasplex.blob.core.windows.net/build-deps/win32

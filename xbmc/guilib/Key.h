@@ -333,6 +333,8 @@
 #define ACTION_PLEX_PL_CREATE         314
 #define ACTION_PLEX_PLAY_EXTRA        315
 #define ACTION_PLEX_PQ_PLAYFROMHERE   316
+#define ACTION_PLEX_GOTO_SHOW         317
+#define ACTION_PLEX_GOTO_SEASON       318
 
 // related items action range (ie Plex/mix)
 #define ACTION_PLEX_RELATED_START     500

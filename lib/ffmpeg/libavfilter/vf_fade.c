@@ -103,14 +103,14 @@ static av_cold int init(AVFilterContext *ctx, const char *args, void *opaque)
         if ((ret = av_opt_set(fade, "start_frame", expr, 0)) < 0) {
             av_log(ctx, AV_LOG_ERROR,
                    "Invalid value '%s' for start_frame option\n", expr);
-            return ret;
+            goto end;
         }
     }
     if (expr = av_strtok(NULL, ":", &bufptr)) {
         if ((ret = av_opt_set(fade, "nb_frames", expr, 0)) < 0) {
             av_log(ctx, AV_LOG_ERROR,
                    "Invalid value '%s' for nb_frames option\n", expr);
-            return ret;
+            goto end;
         }
     }
 
@@ -191,9 +191,9 @@ static int config_props(AVFilterLink *inlink)
     fade->alpha = fade->alpha ? ff_fmt_is_in(inlink->format, alpha_pix_fmts) : 0;
     fade->is_packed_rgb = ff_fill_rgba_map(fade->rgba_map, inlink->format) >= 0;
 
-    /* CCIR601/709 black level unless input is RGB or has alpha */
+    /* use CCIR601/709 black level for studio-level pixel non-alpha components */
     fade->black_level =
-            ff_fmt_is_in(inlink->format, studio_level_pix_fmts) || fade->alpha ? 0 : 16;
+            ff_fmt_is_in(inlink->format, studio_level_pix_fmts) && !fade->alpha ? 16 : 0;
     /* 32768 = 1 << 15, it is an integer representation
      * of 0.5 and is for rounding. */
     fade->black_level_scaled = (fade->black_level << 16) + 32768;

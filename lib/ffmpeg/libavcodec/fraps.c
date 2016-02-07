@@ -113,13 +113,13 @@ static int fraps2_decode_plane(FrapsContext *s, uint8_t *dst, int stride, int w,
             if(j) dst[i] += dst[i - stride];
             else if(Uoff) dst[i] += 0x80;
             if (get_bits_left(&gb) < 0) {
-                free_vlc(&vlc);
+                ff_free_vlc(&vlc);
                 return AVERROR_INVALIDDATA;
             }
         }
         dst += stride;
     }
-    free_vlc(&vlc);
+    ff_free_vlc(&vlc);
     return 0;
 }
 
@@ -141,6 +141,11 @@ static int decode_frame(AVCodecContext *avctx,
     int i, j, is_chroma;
     const int planes = 3;
     enum PixelFormat pix_fmt;
+
+    if (buf_size < 4) {
+        av_log(avctx, AV_LOG_ERROR, "Packet is too short\n");
+        return AVERROR_INVALIDDATA;
+    }
 
     header = AV_RL32(buf);
     version = header & 0xff;
@@ -180,7 +185,7 @@ static int decode_frame(AVCodecContext *avctx,
     }
     avctx->pix_fmt = pix_fmt;
 
-    switch(version) {
+    switch (version) {
     case 0:
     default:
         /* Fraps v0 is a reordered YUV420 */
@@ -219,6 +224,7 @@ static int decode_frame(AVCodecContext *avctx,
 
     case 1:
         /* Fraps v1 is an upside-down BGR24 */
+
         if (avctx->reget_buffer(avctx, f)) {
             av_log(avctx, AV_LOG_ERROR, "reget_buffer() failed\n");
             return -1;

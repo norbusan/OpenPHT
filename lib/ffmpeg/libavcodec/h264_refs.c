@@ -63,20 +63,22 @@ static int split_field_copy(Picture *dest, Picture *src,
     return match;
 }
 
-static int build_def_list(Picture *def, Picture **in, int len, int is_long, int sel){
+static int build_def_list(Picture *def, int def_len,
+                          Picture **in, int len, int is_long, int sel)
+{
     int i[2]={0};
     int index=0;
 
-    while(i[0]<len || i[1]<len){
+    while ((i[0] < len || i[1] < len) && index < def_len) {
         while (i[0] < len && !(in[ i[0] ] && (in[ i[0] ]->f.reference & sel)))
             i[0]++;
         while (i[1] < len && !(in[ i[1] ] && (in[ i[1] ]->f.reference & (sel^3))))
             i[1]++;
-        if(i[0] < len){
+        if (i[0] < len && index < def_len) {
             in[ i[0] ]->pic_id= is_long ? i[0] : in[ i[0] ]->frame_num;
             split_field_copy(&def[index++], in[ i[0]++ ], sel  , 1);
         }
-        if(i[1] < len){
+        if (i[1] < len && index < def_len) {
             in[ i[1] ]->pic_id= is_long ? i[1] : in[ i[1] ]->frame_num;
             split_field_copy(&def[index++], in[ i[1]++ ], sel^3, 0);
         }
@@ -124,9 +126,12 @@ int ff_h264_fill_default_ref_list(H264Context *h){
             len= add_sorted(sorted    , h->short_ref, h->short_ref_count, cur_poc, 1^list);
             len+=add_sorted(sorted+len, h->short_ref, h->short_ref_count, cur_poc, 0^list);
             assert(len<=32);
-            len= build_def_list(h->default_ref_list[list]    , sorted     , len, 0, s->picture_structure);
-            len+=build_def_list(h->default_ref_list[list]+len, h->long_ref, 16 , 1, s->picture_structure);
-            assert(len<=32);
+
+            len  = build_def_list(h->default_ref_list[list], FF_ARRAY_ELEMS(h->default_ref_list[0]),
+                                  sorted, len, 0, s->picture_structure);
+            len += build_def_list(h->default_ref_list[list] + len,
+                                  FF_ARRAY_ELEMS(h->default_ref_list[0]) - len,
+                                  h->long_ref, 16, 1, s->picture_structure);
 
             if(len < h->ref_count[list])
                 memset(&h->default_ref_list[list][len], 0, sizeof(Picture)*(h->ref_count[list] - len));
@@ -139,19 +144,22 @@ int ff_h264_fill_default_ref_list(H264Context *h){
                 FFSWAP(Picture, h->default_ref_list[1][0], h->default_ref_list[1][1]);
         }
     }else{
-        len = build_def_list(h->default_ref_list[0]    , h->short_ref, h->short_ref_count, 0, s->picture_structure);
-        len+= build_def_list(h->default_ref_list[0]+len, h-> long_ref, 16                , 1, s->picture_structure);
-        assert(len <= 32);
+        len  = build_def_list(h->default_ref_list[0], FF_ARRAY_ELEMS(h->default_ref_list[0]),
+                              h->short_ref, h->short_ref_count, 0, s->picture_structure);
+        len += build_def_list(h->default_ref_list[0] + len,
+                              FF_ARRAY_ELEMS(h->default_ref_list[0]) - len,
+                              h-> long_ref, 16, 1, s->picture_structure);
+
         if(len < h->ref_count[0])
             memset(&h->default_ref_list[0][len], 0, sizeof(Picture)*(h->ref_count[0] - len));
     }
 #ifdef TRACE
     for (i=0; i<h->ref_count[0]; i++) {
-        tprintf(h->s.avctx, "List0: %s fn:%d 0x%p\n", (h->default_ref_list[0][i].long_ref ? "LT" : "ST"), h->default_ref_list[0][i].pic_id, h->default_ref_list[0][i].data[0]);
+        tprintf(h->s.avctx, "List0: %s fn:%d 0x%p\n", (h->default_ref_list[0][i].long_ref ? "LT" : "ST"), h->default_ref_list[0][i].pic_id, h->default_ref_list[0][i].f.data[0]);
     }
     if(h->slice_type_nos==AV_PICTURE_TYPE_B){
         for (i=0; i<h->ref_count[1]; i++) {
-            tprintf(h->s.avctx, "List1: %s fn:%d 0x%p\n", (h->default_ref_list[1][i].long_ref ? "LT" : "ST"), h->default_ref_list[1][i].pic_id, h->default_ref_list[1][i].data[0]);
+            tprintf(h->s.avctx, "List1: %s fn:%d 0x%p\n", (h->default_ref_list[1][i].long_ref ? "LT" : "ST"), h->default_ref_list[1][i].pic_id, h->default_ref_list[1][i].f.data[0]);
         }
     }
 #endif
@@ -516,7 +524,7 @@ int ff_h264_execute_ref_pic_marking(H264Context *h, MMCO *mmco, int mmco_count){
             if(!pic){
                 if(mmco[i].opcode != MMCO_SHORT2LONG || !h->long_ref[mmco[i].long_arg]
                    || h->long_ref[mmco[i].long_arg]->frame_num != frame_num) {
-                    av_log(h->s.avctx, AV_LOG_ERROR, "mmco: unref short failure\n");
+                    av_log(h->s.avctx, h->short_ref_count ? AV_LOG_ERROR : AV_LOG_DEBUG, "mmco: unref short failure\n");
                     err = AVERROR_INVALIDDATA;
                 }
                 continue;
@@ -653,8 +661,10 @@ int ff_h264_execute_ref_pic_marking(H264Context *h, MMCO *mmco, int mmco_count){
     print_short_term(h);
     print_long_term(h);
 
-    if(err >= 0 && h->long_ref_count==0 && h->short_ref_count<=2 && h->pps.ref_count[0]<=1 + (s->picture_structure != PICT_FRAME) && s->current_picture_ptr->f.pict_type == AV_PICTURE_TYPE_I){
+    if(err >= 0 && h->long_ref_count==0 && h->short_ref_count<=2 && h->pps.ref_count[0]<=2 + (s->picture_structure != PICT_FRAME) && s->current_picture_ptr->f.pict_type == AV_PICTURE_TYPE_I){
         s->current_picture_ptr->sync |= 1;
+        if(!h->s.avctx->has_b_frames)
+            h->sync = 2;
     }
 
     return (h->s.avctx->err_recognition & AV_EF_EXPLODE) ? err : 0;

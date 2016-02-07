@@ -45,6 +45,7 @@ bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &op
     return false;
 
   bool bSupportsAC3Out    = false;
+  bool bSupportsEAC3Out   = false;
   bool bSupportsDTSOut    = false;
   bool bSupportsTrueHDOut = false;
   bool bSupportsDTSHDOut  = false;
@@ -53,6 +54,7 @@ bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &op
   if (AUDIO_IS_BITSTREAM(audioMode))
   {
     bSupportsAC3Out = g_guiSettings.GetBool("audiooutput.ac3passthrough");
+    bSupportsEAC3Out = g_guiSettings.GetBool("audiooutput.eac3passthrough");
     bSupportsDTSOut = g_guiSettings.GetBool("audiooutput.dtspassthrough");
   }
 
@@ -66,17 +68,16 @@ bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &op
   m_info.SetCoreOnly(!bSupportsDTSHDOut);
   m_bufferSize = 0;
 
-  if (
-      (hints.codec == CODEC_ID_AC3 && bSupportsAC3Out) ||
+  /* 32kHz E-AC-3 passthrough requires 128kHz IEC 60958 stream
+   * which HDMI does not support, and IEC 61937 does not mention
+   * reduced sample rate support, so support only 44.1 and 48 */
+  if ((hints.codec == CODEC_ID_AC3 && bSupportsAC3Out) ||
+      (hints.codec == CODEC_ID_EAC3 && bSupportsEAC3Out && (hints.samplerate == 44100 || hints.samplerate == 48000)) ||
       (hints.codec == CODEC_ID_DTS && bSupportsDTSOut) ||
-      (audioMode == AUDIO_HDMI &&
-        (
-          (hints.codec == CODEC_ID_EAC3   && bSupportsAC3Out   ) ||
-          (hints.codec == CODEC_ID_TRUEHD && bSupportsTrueHDOut)
-        )
-      )
-  )
-    return true;
+      (hints.codec == CODEC_ID_TRUEHD && bSupportsTrueHDOut))
+  {
+     return true;
+  }
 
   return false;
 }

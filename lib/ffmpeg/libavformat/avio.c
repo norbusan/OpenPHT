@@ -297,7 +297,9 @@ int ffurl_alloc(URLContext **puc, const char *filename, int flags,
                                      "Missing call to av_register_all()?\n");
     }
 
-    if (filename[proto_len] != ':' &&  filename[proto_len] != ',' || is_dos_path(filename))
+    if (filename[proto_len] != ':' &&
+        (filename[proto_len] != ',' || !strchr(filename + proto_len + 1, ':')) ||
+        is_dos_path(filename))
         strcpy(proto_str, "file");
     else
         av_strlcpy(proto_str, filename, FFMIN(proto_len+1, sizeof(proto_str)));
@@ -357,7 +359,7 @@ static inline int retry_transfer_wrapper(URLContext *h, unsigned char *buf, int 
             else
                 usleep(1000);
         } else if (ret < 1)
-            return ret < 0 ? ret : len;
+            return (ret < 0 && ret != AVERROR_EOF) ? ret : len;
         if (ret)
            fast_retries = FFMAX(fast_retries, 2);
         len += ret;

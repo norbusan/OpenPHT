@@ -464,21 +464,21 @@ static void ff_id3v2_parse(AVFormatContext *s, int len, uint8_t version, uint8_t
 
     unsync = flags & 0x80;
 
-    /* Extended header present, just skip over it */
-    if (isv34 && flags & 0x40) {
-        int size = get_size(s->pb, 4);
-        if (size < 6) {
-            reason = "extended header too short.";
+    if (isv34 && flags & 0x40) { /* Extended header present, just skip over it */
+        int extlen = get_size(s->pb, 4);
+        if (version == 4)
+            extlen -= 4;     // in v2.4 the length includes the length field we just read
+
+        if (extlen < 0) {
+            reason = "invalid extended header length";
             goto error;
         }
-        len -= size;
+        avio_skip(s->pb, extlen);
+        len -= extlen + 4;
         if (len < 0) {
             reason = "extended header too long.";
             goto error;
         }
-        /* already seeked past size, skip the reset */
-        size -= 4;
-        avio_skip(s->pb, size);
     }
 
     while (len >= taghdrlen) {
@@ -543,13 +543,15 @@ static void ff_id3v2_parse(AVFormatContext *s, int len, uint8_t version, uint8_t
         /* check for text tag or supported special meta tag */
         } else if (tag[0] == 'T' || (extra_meta && (extra_func = get_extra_meta_func(tag, isv34)))) {
             if (unsync || tunsync || tcomp) {
-                int i, j;
+                int64_t end = avio_tell(s->pb) + tlen;
+                uint8_t *b;
 
                 av_fast_malloc(&buffer, &buffer_size, dlen);
                 if (!buffer) {
                     av_log(s, AV_LOG_ERROR, "Failed to alloc %ld bytes\n", dlen);
                     goto seek;
                 }
+                b = buffer;
 #if CONFIG_ZLIB
                 if (tcomp) {
                     int n, err;
@@ -573,19 +575,25 @@ static void ff_id3v2_parse(AVFormatContext *s, int len, uint8_t version, uint8_t
                         av_log(s, AV_LOG_ERROR, "Failed to uncompress tag: %d\n", err);
                         goto seek;
                     }
+                    b += dlen;
                 }
 #endif
-
-                for (i = 0, j = 0; i < dlen; i++, j++) {
-                    if (!tcomp)
-                        buffer[j] = avio_r8(s->pb);
-                    if (j > 0 && !buffer[j] && buffer[j - 1] == 0xff) {
-                        /* Unsynchronised byte, skip it */
-                        j--;
+                if (unsync || tunsync) {
+                    if (tcomp) {
+                        av_log_ask_for_sample(s, "tcomp with unsync\n");
+                        goto seek;
+                    }
+                while (avio_tell(s->pb) < end && !s->pb->eof_reached) {
+                    *b++ = avio_r8(s->pb);
+                    if (*(b - 1) == 0xff && avio_tell(s->pb) < end - 1 &&
+                        !s->pb->eof_reached) {
+                        uint8_t val = avio_r8(s->pb);
+                        *b++ = val ? val : avio_r8(s->pb);
                     }
                 }
-                ffio_init_context(&pb, buffer, j, 0, NULL, NULL, NULL, NULL);
-                tlen = j;
+                }
+                ffio_init_context(&pb, buffer, b - buffer, 0, NULL, NULL, NULL, NULL);
+                tlen = b - buffer;
                 pbx = &pb; // read from sync buffer
             } else {
                 pbx = s->pb; // read straight from input

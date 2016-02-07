@@ -84,7 +84,7 @@ const uint8_t ff_vc1_mbmode_intfrp[2][15][4] = {
     }
 };
 
-const int ff_vc1_fps_nr[5] = { 24, 25, 30, 50, 60 },
+const int ff_vc1_fps_nr[7] = { 24, 25, 30, 50, 60, 48, 72 },
           ff_vc1_fps_dr[2] = { 1000, 1001 };
 const uint8_t ff_vc1_pquant_table[3][32] = {
     /* Implicit quantizer */
@@ -1128,4 +1128,8 @@ const uint16_t vc1_b_field_mvpred_scales[7][4] = {
     {  11,     13,     14,     14 },   // SCALEZONE1_Y
     {  26,     17,     12,     10 },   // ZONE1OFFSET_X
     {   7,      4,      3,      3 }    // ZONE1OFFSET_Y
+};
+
+const int ff_vc1_ac_sizes[AC_MODES] = {
+    186, 169, 133, 149, 103, 103, 163, 175
 };

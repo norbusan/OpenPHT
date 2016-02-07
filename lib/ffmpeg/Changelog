@@ -3,6 +3,264 @@ releases are sorted from youngest to oldest.
 
 version next:
 
+
+version 0.10.11
+
+- pthread: Avoid spurious wakeups
+- pthread: Fix deadlock during thread initialization
+- mpegvideo: Initialize chroma_*_shift and codec_tag even if the size is 0
+- vc1dec: Don't decode slices when the latest slice header failed to decode
+- vc1dec: Make sure last_picture is initialized in vc1_decode_skip_blocks
+- r3d: Add more input value validation
+- fraps: Make the input buffer size checks more strict
+- svq3: Avoid a division by zero
+- rmdec: Validate the fps value
+- twinvqdec: Check the ibps parameter separately
+- asfdec: Check the return value of asf_read_stream_properties
+- mxfdec: set audio timebase to 1/samplerate
+- pcx: Check the packet size before assuming it fits a palette
+- rpza: Fix a buffer size check
+- xxan: Disallow odd width
+- xan: Only read within the data that actually was initialized
+- xan: Use bytestream2 to limit reading to within the buffer
+- pcx: Consume the whole packet if giving up due to missing palette
+- pngdec: Stop trying to decode once inflate returns Z_STREAM_END
+- mov: Make sure the read sample count is nonnegative
+- bfi: Add some very basic sanity checks for input packet sizes
+- bfi: Avoid divisions by zero
+- electronicarts: Add more sanity checking for the number of channels
+- riffdec: Add sanity checks for the sample rate
+- mvi: Add sanity checking for the audio frame size
+- xwma: Avoid division by zero
+- avidec: Make sure a packet is large enough before reading its data
+- vqf: Make sure the bitrate is in the valid range
+- vqf: Make sure sample_rate is set to a valid value
+- vc1dec: Undo mpegvideo initialization if unable to allocate tables
+- vc1dec: Fix leaks in ff_vc1_decode_init_alloc_tables on errors
+- wnv1: Make sure the input packet is large enough
+- dca: Validate the lfe parameter
+- rl2: Avoid a division by zero
+- wtv: Add more sanity checks for a length read from the file
+- segafilm: Validate the number of audio channels
+- qpeg: Add checks for running out of rows in qpeg_decode_inter
+- mpegaudiodec: Validate that the number of channels fits at the given offset
+- asv1: Verify the amount of extradata
+- idroqdec: Make sure a video stream has been allocated before returning packets
+- rv10: Validate the dimensions set from the container
+- xmv: Add more sanity checks for parameters read from the bitstream
+- ffv1: Make sure at least one slice context is initialized
+- truemotion2: Use av_freep properly in an error path
+- eacmv: Make sure a reference frame exists before referencing it
+- mpeg4videodec: Check the width/height in mpeg4_decode_sprite_trajectory
+- ivi_common: Make sure color planes have been initialized
+- oggparseogm: Convert to use bytestream2
+- rv34: Check the return value from ff_rv34_decode_init
+- matroskadec: Verify realaudio codec parameters
+- mace: Make sure that the channel count is set to a valid value
+- svq3: Check for any negative return value from ff_h264_check_intra_pred_mode
+- vp3: Check the framerate for validity
+- cavsdec: Make sure a sequence header has been decoded before decoding pictures
+- sierravmd: Do sanity checking of frame sizes
+- omadec: Properly check lengths before incrementing the position
+- mpc8: Make sure the first stream exists before parsing the seek table
+- mpc8: Check the seek table size parsed from the bitstream
+- zmbvdec: Check the buffer size for uncompressed data
+- ape: Don't allow the seektable to be omitted
+- shorten: Break out of loop looking for fmt chunk if none is found
+- shorten: Use a checked bytestream reader for the wave header
+- smacker: Make sure we don't fill in huffman codes out of range
+- smacker: Avoid integer overflow when allocating packets
+- smacker: Don't return packets in unallocated streams
+- dsicin: Add some basic sanity checks for fields read from the file
+- roqvideodec: check dimensions validity
+- qdm2: check array index before use, fix out of array accesses
+- alsdec: check block length
+
+
+version 0.10.10
+
+- x86: fft: Remove 3DNow! optimizations, they break FATE
+- x86: ac3dsp: Drop mmx variant of ac3_max_msb_abs_int16
+- aac: Check init_get_bits return value
+- aac: return meaningful errors
+- dsicinav: K&R formatting cosmetics
+- mov: Seek back if overreading an individual atom
+- vcr1: add sanity checks
+- pictordec: pass correct context to avpriv_request_sample
+- dsicinav: Clip the source size to the expected maximum
+- alsdec: Clean up error paths
+- ogg: Fix potential infinite discard loop
+- nuv: check rtjpeg_decode_frame_yuv420 return value
+- nuv: Reset the frame on resize
+- nuv: Use av_fast_realloc
+- nuv: return meaningful error codes.
+- nuv: Pad the lzo outbuf
+- nuv: Do not ignore lzo decompression failures
+- oma: correctly mark and decrypt partial packets
+- oma: check geob tag boundary
+- oma: refactor seek function
+- 8bps: Bound-check the input buffer
+- rtmp: Do not misuse memcmp
+- rtmp: rename data_size to size
+- lavc: set the default rc_initial_buffer_occupancy
+- 4xm: Reject not a multiple of 16 dimension
+- 4xm: do not overread the prestream buffer
+- 4xm: validate the buffer size before parsing it
+- indeo: Do not reference mismatched tiles
+- indeo: Sanitize ff_ivi_init_planes fail paths
+- indeo: Bound-check before applying motion compensation
+- indeo: Bound-check before applying transform
+- indeo: reject negative array indexes
+- indeo: Cosmetic formatting
+- indeo: Refactor ff_ivi_init_tiles and ivi_decode_blocks
+- indeo: Refactor ff_ivi_dec_huff_desc
+- lavf: fix the comparison in an overflow check
+- dv: Add a guard to not overread the ppcm array
+- mpegvideo: Avoid 32-bit wrapping of linesize multiplications
+- mjpegb: Detect changing number of planes in interlaced video
+- matroskadec: Check that .lang was allocated and set before reading it
+- ape demuxer: check for EOF in potentially long loops
+- lavf: avoid integer overflow when estimating bitrate
+- pictordec: break out of both decoding loops when y drops below 0
+- ac3: Return proper error codes
+- ac3: Clean up the error paths
+- ac3: Do not clash with normal AVERROR
+- dxa: Make sure the reference frame exists
+- h261: check the mtype index
+- segafilm: Error out on impossible packet size
+- ogg: Always alloc the private context in vorbis_header
+- vc1: check mb_height validity.
+- vc1: check the source buffer in vc1_mc functions
+- bink: Bound check the quantization matrix.
+- xl: Make sure the width is valid
+- alsdec: Fix the clipping range
+- dsicinav: Bound-check the source buffer when needed
+- mov: Do not allow updating the time scale after it has been set
+- ac3dec: Don't consume more data than the actual input packet size
+- indeo: Reject impossible FRAMETYPE_NULL
+- indeo5: return proper error codes
+- indeo4: Validate scantable dimension
+- indeo4: Check the quantization matrix index
+- indeo4: Do not access missing reference MV
+- adpcm: Unbreak ima-dk4
+- ac3dec: validate channel output mode against channel count
+- dca: Respect the current limits in the downmixing capabilities
+- dca: Error out on missing DSYNC
+- pcm: always use codec->id instead of codec_id
+- mlpdec: Do not set invalid context in read_restart_header
+- pcx: Do not overread source buffer in pcx_rle_decode
+- wmavoice: conceal clearly corrupted blocks
+- iff: Do not read over the source buffer
+- qdm2: Conceal broken samples
+- qdm2: refactor joined stereo support
+- adpcm: Write the correct number of samples for ima-dk4
+- imc: Catch a division by zero
+- atrac3: Error on impossible encoding/channel combinations
+- atrac3: set the getbits context the right buffer_end
+- atrac3: fix error handling
+- qdm2: check and reset dithering index per channel
+- westwood_vqa: do not free extradata on error in read_header
+- vqavideo: check the version
+- rmdec: Use the AVIOContext given as parameter in rm_read_metadata()
+- avio: Handle AVERROR_EOF in the same way as the return value 0
+- wtv: Mark attachment with a negative stream id
+- avidec: Let the inner dv demuxer take care of discarding
+- swfdec: do better validation of tag length
+
+
+version 0.10.8
+- kmvc: Clip pixel position to valid range
+- kmvc: use fixed sized arrays in the context
+- indeo: use a typedef for the mc function pointer
+- lavc: check for overflow in init_get_bits
+- mjpegdec: properly report unsupported disabled features
+- jpegls: return meaningful errors
+- jpegls: factorize return paths
+- jpegls: check the scan offset
+- wavpack: validate samples size parsed in wavpack_decode_block
+- ljpeg: use the correct number of components in yuv
+- mjpeg: Validate sampling factors
+- mjpegdec: validate parameters in mjpeg_decode_scan_progressive_ac
+- wavpack: check packet size early
+- wavpack: return meaningful errors
+- apetag: use int64_t for filesize
+- tiff: do not overread the source buffer
+- Prepare for 0.8.8 Release
+- smacker: fix an off by one in huff.length computation
+- smacker: check the return value of smacker_decode_tree
+- smacker: pad the extradata allocation
+- smacker: check frame size validity
+- vmdav: convert to bytestream2
+- 4xm: don't rely on get_buffer() initializing the frame.
+- 4xm: check the return value of read_huffman_tables().
+- 4xm: use the correct logging context
+- 4xm: reject frames not compatible with the declared version
+- 4xm: check bitstream_size boundary before using it
+- 4xm: do not overread the source buffer in decode_p_block
+- avfiltergraph: check for sws opts being non-NULL before using them
+- bmv: check for len being valid in bmv_decode_frame()
+- dfa: check for invalid access in decode_wdlt()
+- indeo3: check motion vectors
+- indeo3: fix data size check
+- indeo3: switch parsing the header to bytestream2
+- lavf: make sure stream probe data gets freed.
+- oggdec: fix faulty cleanup prototype
+- oma: Validate sample rates
+- qdm2: check that the FFT size is a power of 2
+- rv10: check that extradata is large enough
+- xmv: check audio track parameters validity
+- xmv: do not leak memory in the error paths in xmv_read_header()
+- aac: check the maximum number of channels
+- indeo3: fix off by one in MV validity check, Bug #503
+- id3v2: check for end of file while unescaping tags
+- wav: Always seek to an even offset, Bug #500, LP: #1174737
+- proresdec: support mixed interlaced/non-interlaced content
+
+
+version 0.10.6:
+
+- many bug fixes that where found with Coverity
+
+- The following CVE fixes where backported:
+  CVE-2012-2796, CVE-2012-2775, CVE-2012-2772, CVE-2012-2776,
+  CVE-2012-2779, CVE-2012-2787, CVE-2012-2794, CVE-2012-2800,
+  CVE-2012-2802, CVE-2012-2801, CVE-2012-2786, CVE-2012-2798,
+  CVE-2012-2793, CVE-2012-2789, CVE-2012-2788, CVE-2012-2790,
+  CVE-2012-2777, CVE-2012-2784
+
+- hundreads of other bug fixes, some possibly security relevant,
+  see the git log for details.
+
+
+version 0.10.5:
+
+- Several bugs and crashes have been fixed as well as build problems
+  with recent mingw64
+
+
+version 0.10.4:
+
+- Several bugs and crashes have been fixed
+  Note, CVE-2012-0851 and CVE-2011-3937 have been fixed in previous releases
+
+version 0.10.3:
+
+- Security fixes in the 4xm demuxer, avi demuxer, cook decoder,
+  mm demuxer, mpegvideo decoder, vqavideo decoder (CVE-2012-0947) and
+  xmv demuxer.
+
+- Several bugs and crashes have been fixed in the following codecs: AAC,
+  APE, H.263, H.264, Indeo 4, Mimic, MJPEG, Motion Pixels Video, RAW,
+  TTA, VC1, VQA, WMA Voice, vqavideo.
+
+- Several bugs and crashes have been fixed in the following formats:
+  ASF, ID3v2, MOV, xWMA
+
+- This release additionally updates the following codecs to the
+  bytestream2 API, and therefore benefit from additional overflow
+  checks: truemotion2, utvideo, vqavideo
+
+
 version 0.10.1
 - Several security fixes, many bugfixes affecting many formats and
   codecs, the list below is not complete.

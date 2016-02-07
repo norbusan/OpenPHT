@@ -292,17 +292,17 @@ static av_cold int vp3_decode_end(AVCodecContext *avctx)
         return 0;
 
     for (i = 0; i < 16; i++) {
-        free_vlc(&s->dc_vlc[i]);
-        free_vlc(&s->ac_vlc_1[i]);
-        free_vlc(&s->ac_vlc_2[i]);
-        free_vlc(&s->ac_vlc_3[i]);
-        free_vlc(&s->ac_vlc_4[i]);
+        ff_free_vlc(&s->dc_vlc[i]);
+        ff_free_vlc(&s->ac_vlc_1[i]);
+        ff_free_vlc(&s->ac_vlc_2[i]);
+        ff_free_vlc(&s->ac_vlc_3[i]);
+        ff_free_vlc(&s->ac_vlc_4[i]);
     }
 
-    free_vlc(&s->superblock_run_length_vlc);
-    free_vlc(&s->fragment_run_length_vlc);
-    free_vlc(&s->mode_code_vlc);
-    free_vlc(&s->motion_vector_vlc);
+    ff_free_vlc(&s->superblock_run_length_vlc);
+    ff_free_vlc(&s->fragment_run_length_vlc);
+    ff_free_vlc(&s->mode_code_vlc);
+    ff_free_vlc(&s->motion_vector_vlc);
 
     /* release all frames */
     vp3_decode_flush(avctx);
@@ -2150,6 +2150,10 @@ static int theora_decode_header(AVCodecContext *avctx, GetBitContext *gb)
     fps.num = get_bits_long(gb, 32);
     fps.den = get_bits_long(gb, 32);
     if (fps.num && fps.den) {
+        if (fps.num < 0 || fps.den < 0) {
+            av_log(avctx, AV_LOG_ERROR, "Invalid framerate\n");
+            return AVERROR_INVALIDDATA;
+        }
         av_reduce(&avctx->time_base.num, &avctx->time_base.den,
                   fps.den, fps.num, 1<<30);
     }

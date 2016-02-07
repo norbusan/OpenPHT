@@ -217,6 +217,12 @@ bool CGUIWindowStartup::OnAction(const CAction& action)
       OnBackSpace();
     return true;
   }
+  else if (action.GetID() == ACTION_PREVIOUS_MENU)
+  {
+    if (m_allowEscOut)
+      PreviousWindow();
+    return true;
+  }
   else if ((action.GetID() == ACTION_MOVE_RIGHT) || (action.GetID() == ACTION_MOVE_LEFT))
   {
     CGUIControl *listControl = GetFocusedControl();

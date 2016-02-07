@@ -38,6 +38,7 @@ typedef struct DNXHDContext {
     GetBitContext gb;
     int cid;                            ///< compression id
     unsigned int width, height;
+    enum PixelFormat pix_fmt;
     unsigned int mb_width, mb_height;
     uint32_t mb_scan_index[68];         /* max for 1080p */
     int cur_field;                      ///< current interlaced field
@@ -84,9 +85,9 @@ static int dnxhd_init_vlc(DNXHDContext *ctx, int cid)
         }
         ctx->cid_table = &ff_dnxhd_cid_table[index];
 
-        free_vlc(&ctx->ac_vlc);
-        free_vlc(&ctx->dc_vlc);
-        free_vlc(&ctx->run_vlc);
+        ff_free_vlc(&ctx->ac_vlc);
+        ff_free_vlc(&ctx->dc_vlc);
+        ff_free_vlc(&ctx->run_vlc);
 
         init_vlc(&ctx->ac_vlc, DNXHD_VLC_BITS, 257,
                  ctx->cid_table->ac_bits, 1, 1,
@@ -129,7 +130,7 @@ static int dnxhd_decode_header(DNXHDContext *ctx, const uint8_t *buf, int buf_si
     av_dlog(ctx->avctx, "width %d, height %d\n", ctx->width, ctx->height);
 
     if (buf[0x21] & 0x40) {
-        ctx->avctx->pix_fmt = PIX_FMT_YUV422P10;
+        ctx->pix_fmt = PIX_FMT_YUV422P10;
         ctx->avctx->bits_per_raw_sample = 10;
         if (ctx->bit_depth != 10) {
             dsputil_init(&ctx->dsp, ctx->avctx);
@@ -137,7 +138,7 @@ static int dnxhd_decode_header(DNXHDContext *ctx, const uint8_t *buf, int buf_si
             ctx->decode_dct_block = dnxhd_decode_dct_block_10;
         }
     } else {
-        ctx->avctx->pix_fmt = PIX_FMT_YUV422P;
+        ctx->pix_fmt = PIX_FMT_YUV422P;
         ctx->avctx->bits_per_raw_sample = 8;
         if (ctx->bit_depth != 8) {
             dsputil_init(&ctx->dsp, ctx->avctx);
@@ -380,9 +381,15 @@ static int dnxhd_decode_frame(AVCodecContext *avctx, void *data, int *data_size,
                avctx->width, avctx->height, ctx->width, ctx->height);
         first_field = 1;
     }
+    if (avctx->pix_fmt != PIX_FMT_NONE && avctx->pix_fmt != ctx->pix_fmt) {
+        av_log(avctx, AV_LOG_WARNING, "pix_fmt changed: %s -> %s\n",
+               av_get_pix_fmt_name(avctx->pix_fmt), av_get_pix_fmt_name(ctx->pix_fmt));
+        first_field = 1;
+    }
 
     if (av_image_check_size(ctx->width, ctx->height, 0, avctx))
         return -1;
+    avctx->pix_fmt = ctx->pix_fmt;
     avcodec_set_dimensions(avctx, ctx->width, ctx->height);
 
     if (first_field) {
@@ -416,9 +423,9 @@ static av_cold int dnxhd_decode_close(AVCodecContext *avctx)
 
     if (ctx->picture.data[0])
         ff_thread_release_buffer(avctx, &ctx->picture);
-    free_vlc(&ctx->ac_vlc);
-    free_vlc(&ctx->dc_vlc);
-    free_vlc(&ctx->run_vlc);
+    ff_free_vlc(&ctx->ac_vlc);
+    ff_free_vlc(&ctx->dc_vlc);
+    ff_free_vlc(&ctx->run_vlc);
     return 0;
 }
 

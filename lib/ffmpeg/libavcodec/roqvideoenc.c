@@ -59,7 +59,9 @@
 #include "roqvideo.h"
 #include "bytestream.h"
 #include "elbg.h"
+#include "internal.h"
 #include "mathops.h"
+#include "internal.h"
 
 #define CHROMA_BIAS 1
 
@@ -941,6 +943,8 @@ static int roq_encode_init(AVCodecContext *avctx)
 
     av_lfg_init(&enc->randctx, 1);
 
+    enc->avctx = avctx;
+
     enc->framesSinceKeyframe = 0;
     if ((avctx->width & 0xf) || (avctx->height & 0xf)) {
         av_log(avctx, AV_LOG_ERROR, "Dimensions must be divisible by 16\n");
@@ -1031,8 +1035,8 @@ static int roq_encode_frame(AVCodecContext *avctx, unsigned char *buf, int buf_s
     if (enc->first_frame) {
         /* Alloc memory for the reconstruction data (we must know the stride
          for that) */
-        if (avctx->get_buffer(avctx, enc->current_frame) ||
-            avctx->get_buffer(avctx, enc->last_frame)) {
+        if (ff_get_buffer(avctx, enc->current_frame) ||
+            ff_get_buffer(avctx, enc->last_frame)) {
             av_log(avctx, AV_LOG_ERROR, "  RoQ: get_buffer() failed\n");
             return -1;
         }

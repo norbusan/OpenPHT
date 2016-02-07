@@ -20,7 +20,9 @@
  */
 
 #include "avcodec.h"
+#include "internal.h"
 #include "bytestream.h"
+#include "libavutil/avassert.h"
 
 enum BMVFlags{
     BMV_NOP = 0,
@@ -52,7 +54,7 @@ typedef struct BMVDecContext {
 
 static int decode_bmv_frame(const uint8_t *source, int src_len, uint8_t *frame, int frame_off)
 {
-    int val, saved_val = 0;
+    unsigned val, saved_val = 0;
     int tmplen = src_len;
     const uint8_t *src, *source_end = source + src_len;
     uint8_t *frame_end = frame + SCREEN_WIDE * SCREEN_HIGH;
@@ -98,6 +100,8 @@ static int decode_bmv_frame(const uint8_t *source, int src_len, uint8_t *frame, 
         }
         if (!(val & 0xC)) {
             for (;;) {
+                if(shift>22)
+                    return -1;
                 if (!read_two_nibbles) {
                     if (src < source || src >= source_end)
                         return -1;
@@ -131,15 +135,16 @@ static int decode_bmv_frame(const uint8_t *source, int src_len, uint8_t *frame, 
         }
         advance_mode = val & 1;
         len = (val >> 1) - 1;
+        av_assert0(len>0);
         mode += 1 + advance_mode;
         if (mode >= 4)
             mode -= 3;
-        if (FFABS(dst_end - dst) < len)
+        if (len <= 0 || FFABS(dst_end - dst) < len)
             return -1;
         switch (mode) {
         case 1:
             if (forward) {
-                if (dst - frame + SCREEN_WIDE < frame_off ||
+                if (dst - frame + SCREEN_WIDE < -frame_off ||
                         frame_end - dst < frame_off + len)
                     return -1;
                 for (i = 0; i < len; i++)
@@ -147,7 +152,7 @@ static int decode_bmv_frame(const uint8_t *source, int src_len, uint8_t *frame, 
                 dst += len;
             } else {
                 dst -= len;
-                if (dst - frame + SCREEN_WIDE < frame_off ||
+                if (dst - frame + SCREEN_WIDE < -frame_off ||
                         frame_end - dst < frame_off + len)
                     return -1;
                 for (i = len - 1; i >= 0; i--)
@@ -264,8 +269,13 @@ static av_cold int decode_init(AVCodecContext *avctx)
     c->avctx = avctx;
     avctx->pix_fmt = PIX_FMT_PAL8;
 
+    if (avctx->width != SCREEN_WIDE || avctx->height != SCREEN_HIGH) {
+        av_log(avctx, AV_LOG_ERROR, "Invalid dimension %dx%d\n", avctx->width, avctx->height);
+        return AVERROR_INVALIDDATA;
+    }
+
     c->pic.reference = 1;
-    if (avctx->get_buffer(avctx, &c->pic) < 0) {
+    if (ff_get_buffer(avctx, &c->pic) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return -1;
     }
@@ -330,7 +340,7 @@ static int bmv_aud_decode_frame(AVCodecContext *avctx, void *data,
 
     /* get output buffer */
     c->frame.nb_samples = total_blocks * 32;
-    if ((ret = avctx->get_buffer(avctx, &c->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &c->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }

@@ -95,6 +95,7 @@ const unsigned int CAEUtil::DataFormatToBits(const enum AEDataFormat dataFormat)
     32,                  /* S24BE  */
     32,                  /* S24LE  */
     32,                  /* S24NE  */
+    32,                  /* S24NER */
 
     24,                  /* S24BE3 */
     24,                  /* S24LE3 */
@@ -136,6 +137,7 @@ const char* CAEUtil::DataFormatToStr(const enum AEDataFormat dataFormat)
     "AE_FMT_S24BE4",
     "AE_FMT_S24LE4",
     "AE_FMT_S24NE4",  /* S24 in 4 bytes */
+    "AE_FMT_S24NE4MSB",
 
     "AE_FMT_S24BE3",
     "AE_FMT_S24LE3",

@@ -776,7 +776,9 @@ static int mkv_write_tag(AVFormatContext *s, AVDictionary *m, unsigned int eleme
     end_ebml_master(s->pb, targets);
 
     while ((t = av_dict_get(m, "", t, AV_DICT_IGNORE_SUFFIX)))
-        if (av_strcasecmp(t->key, "title") && av_strcasecmp(t->key, "stereo_mode"))
+        if (av_strcasecmp(t->key, "title") &&
+            av_strcasecmp(t->key, "stereo_mode") &&
+            av_strcasecmp(t->key, "encoding_tool"))
             mkv_write_simpletag(s->pb, t);
 
     end_ebml_master(s->pb, tag);
@@ -936,7 +938,10 @@ static int mkv_write_header(AVFormatContext *s)
             segment_uid[i] = av_lfg_get(&lfg);
 
         put_ebml_string(pb, MATROSKA_ID_MUXINGAPP , LIBAVFORMAT_IDENT);
-        put_ebml_string(pb, MATROSKA_ID_WRITINGAPP, LIBAVFORMAT_IDENT);
+        if ((tag = av_dict_get(s->metadata, "encoding_tool", NULL, 0)))
+            put_ebml_string(pb, MATROSKA_ID_WRITINGAPP, tag->value);
+        else
+            put_ebml_string(pb, MATROSKA_ID_WRITINGAPP, LIBAVFORMAT_IDENT);
         put_ebml_binary(pb, MATROSKA_ID_SEGMENTUID, segment_uid, 16);
     }
 
@@ -1295,6 +1300,32 @@ static int mkv_query_codec(enum CodecID codec_id, int std_compliance)
     return 0;
 }
 
+const AVCodecTag additional_audio_tags[] = {
+    { CODEC_ID_ALAC,      0XFFFFFFFF },
+    { CODEC_ID_EAC3,      0XFFFFFFFF },
+    { CODEC_ID_MLP,       0xFFFFFFFF },
+    { CODEC_ID_PCM_S16BE, 0xFFFFFFFF },
+    { CODEC_ID_PCM_S24BE, 0xFFFFFFFF },
+    { CODEC_ID_PCM_S32BE, 0xFFFFFFFF },
+    { CODEC_ID_QDM2,      0xFFFFFFFF },
+    { CODEC_ID_RA_144,    0xFFFFFFFF },
+    { CODEC_ID_RA_288,    0xFFFFFFFF },
+    { CODEC_ID_COOK,      0xFFFFFFFF },
+    { CODEC_ID_TRUEHD,    0xFFFFFFFF },
+    { CODEC_ID_TTA,       0xFFFFFFFF },
+    { CODEC_ID_WAVPACK,   0xFFFFFFFF },
+    { CODEC_ID_NONE,      0xFFFFFFFF }
+};
+
+const AVCodecTag additional_video_tags[] = {
+    { CODEC_ID_PRORES,    0xFFFFFFFF },
+    { CODEC_ID_RV10,      0xFFFFFFFF },
+    { CODEC_ID_RV20,      0xFFFFFFFF },
+    { CODEC_ID_RV30,      0xFFFFFFFF },
+    { CODEC_ID_RV40,      0xFFFFFFFF },
+    { CODEC_ID_NONE,      0xFFFFFFFF }
+};
+
 #if CONFIG_MATROSKA_MUXER
 AVOutputFormat ff_matroska_muxer = {
     .name              = "matroska",
@@ -1316,6 +1347,10 @@ AVOutputFormat ff_matroska_muxer = {
     .write_packet      = mkv_write_packet,
     .write_trailer     = mkv_write_trailer,
     .flags             = AVFMT_GLOBALHEADER | AVFMT_VARIABLE_FPS,
+    .codec_tag         = (const AVCodecTag* const []){
+         ff_codec_bmp_tags, ff_codec_wav_tags,
+         additional_audio_tags, additional_video_tags, 0
+    },
     .subtitle_codec    = CODEC_ID_SSA,
     .query_codec       = mkv_query_codec,
 };
@@ -1354,5 +1389,8 @@ AVOutputFormat ff_matroska_audio_muxer = {
     .write_packet      = mkv_write_packet,
     .write_trailer     = mkv_write_trailer,
     .flags = AVFMT_GLOBALHEADER,
+    .codec_tag         = (const AVCodecTag* const []){
+        ff_codec_wav_tags, additional_audio_tags, 0
+    },
 };
 #endif

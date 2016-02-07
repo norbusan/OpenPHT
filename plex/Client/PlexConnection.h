@@ -89,6 +89,7 @@ public:
   bool Equals(const CPlexConnectionPtr &other);
 
   bool isSSL() const { return m_url.GetProtocol() == "https"; }
+  bool IsReachable() const { return m_state == CONNECTION_STATE_REACHABLE; }
 
   int m_type;
 

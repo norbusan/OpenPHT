@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "put_bits.h"
 #include "bytestream.h"
@@ -556,7 +557,7 @@ static int adpcm_decode_frame(AVCodecContext *avctx, void *data,
 
     /* get output buffer */
     c->frame.nb_samples = nb_samples;
-    if ((ret = avctx->get_buffer(avctx, &c->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &c->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }
@@ -717,7 +718,7 @@ static int adpcm_decode_frame(AVCodecContext *avctx, void *data,
             src++;
             *samples++ = cs->predictor;
         }
-        for (n = nb_samples >> (1 - st); n > 0; n--, src++) {
+        for (n = (nb_samples >> (1 - st)) - 1; n > 0; n--, src++) {
             uint8_t v = *src;
             *samples++ = adpcm_ima_expand_nibble(&c->status[0 ], v >> 4  , 3);
             *samples++ = adpcm_ima_expand_nibble(&c->status[st], v & 0x0F, 3);

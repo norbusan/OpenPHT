@@ -255,6 +255,12 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPac
     case 5:
         c->pic.key_frame = !(compr & 1);
         c->pic.pict_type = (compr & 1) ? AV_PICTURE_TYPE_P : AV_PICTURE_TYPE_I;
+
+        if (!tmpptr && !c->pic.key_frame) {
+            av_log(avctx, AV_LOG_ERROR, "Missing reference frame.\n");
+            return AVERROR_INVALIDDATA;
+        }
+
         for(j = 0; j < avctx->height; j++){
             if(compr & 1){
                 for(i = 0; i < avctx->width; i++)
@@ -294,6 +300,11 @@ static av_cold int decode_init(AVCodecContext *avctx)
 
     c->avctx = avctx;
     avctx->pix_fmt = PIX_FMT_PAL8;
+
+    if (avctx->width%4 || avctx->height%4) {
+        av_log(avctx, AV_LOG_ERROR, "dimensions are not a multiple of 4");
+        return AVERROR_INVALIDDATA;
+    }
 
     avcodec_get_frame_defaults(&c->pic);
     avcodec_get_frame_defaults(&c->prev);

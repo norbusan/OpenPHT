@@ -31,6 +31,7 @@
 
 #define BITSTREAM_READER_LE
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "dsputil.h"
 #include "fft.h"
@@ -207,7 +208,7 @@ static void vorbis_free(vorbis_context *vc)
 
     for (i = 0; i < vc->codebook_count; ++i) {
         av_free(vc->codebooks[i].codevectors);
-        free_vlc(&vc->codebooks[i].vlc);
+        ff_free_vlc(&vc->codebooks[i].vlc);
     }
     av_freep(&vc->codebooks);
 
@@ -578,7 +579,11 @@ static int vorbis_parse_setup_hdr_floors(vorbis_context *vc)
             }
 
 // Precalculate order of x coordinates - needed for decode
-            ff_vorbis_ready_floor1_list(floor_setup->data.t1.list, floor_setup->data.t1.x_list_dim);
+            if (ff_vorbis_ready_floor1_list(vc->avccontext,
+                                            floor_setup->data.t1.list,
+                                            floor_setup->data.t1.x_list_dim)) {
+                return AVERROR_INVALIDDATA;
+            }
 
             for (j=1; j<floor_setup->data.t1.x_list_dim; j++) {
                 if (   floor_setup->data.t1.list[ floor_setup->data.t1.list[j-1].sort ].x
@@ -595,6 +600,11 @@ static int vorbis_parse_setup_hdr_floors(vorbis_context *vc)
             floor_setup->data.t0.order          = get_bits(gb,  8);
             floor_setup->data.t0.rate           = get_bits(gb, 16);
             floor_setup->data.t0.bark_map_size  = get_bits(gb, 16);
+            if (floor_setup->data.t0.bark_map_size == 0) {
+                av_log(vc->avccontext, AV_LOG_ERROR,
+                       "Floor 0 bark map size is 0.\n");
+                return AVERROR_INVALIDDATA;
+            }
             floor_setup->data.t0.amplitude_bits = get_bits(gb,  6);
             /* zero would result in a div by zero later *
              * 2^0 - 1 == 0                             */
@@ -1671,7 +1681,7 @@ static int vorbis_decode_frame(AVCodecContext *avccontext, void *data,
 
     /* get output buffer */
     vc->frame.nb_samples = len;
-    if ((ret = avccontext->get_buffer(avccontext, &vc->frame)) < 0) {
+    if ((ret = ff_get_buffer(avccontext, &vc->frame)) < 0) {
         av_log(avccontext, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }

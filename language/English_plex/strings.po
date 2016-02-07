@@ -457,8 +457,8 @@ msgid "I am Special!"
 msgstr "I am Special!"
 
 msgctxt "#40007"
-msgid "Preview"
-msgstr "Preview"
+msgid "Pre-release"
+msgstr "Pre-release"
 
 msgctxt "#40016"
 msgid "Check for update now..."
@@ -1012,6 +1012,14 @@ msgctxt "#52211"
 msgid "Automatic sign in"
 msgstr "Automatic sign in"
 
+msgctxt "#52212"
+msgid "Show watched in recently added"
+msgstr "Show watched in recently added"
+
+msgctxt "#52213"
+msgid "Hide channels in menu"
+msgstr "Hide channels in menu"
+
 msgctxt "#52300"
 msgid "Media Server went away"
 msgstr "Media Server went away"
@@ -1163,3 +1171,11 @@ msgstr "Play extra"
 msgctxt "#52634"
 msgid "Play from here"
 msgstr "Play from here"
+
+msgctxt "#52635"
+msgid "Go to Show"
+msgstr "Go to Show"
+
+msgctxt "#52636"
+msgid "Go to Season"
+msgstr "Go to Season"

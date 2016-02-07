@@ -37,6 +37,7 @@
 #include "Util.h"
 #include "win32/WIN32Util.h"
 #include "video/VideoReferenceClock.h"
+#include "cores/VideoRenderers/RenderManager.h"
 #if (D3DX_SDK_VERSION >= 42) //aug 2009 sdk and up use dxerr
   #include <Dxerr.h>
 #else
@@ -174,9 +175,15 @@ void CRenderSystemDX::SetMonitor(HMONITOR monitor)
 
 bool CRenderSystemDX::ResetRenderSystem(int width, int height, bool fullScreen, float refreshRate)
 {
-  HMONITOR hMonitor = MonitorFromWindow(m_hDeviceWnd, MONITOR_DEFAULTTONULL);
-  if (hMonitor)
-    SetMonitor(hMonitor);
+  if (!m_pD3DDevice)
+    return false;
+
+  if (m_hDeviceWnd != NULL)
+  {
+    HMONITOR hMonitor = MonitorFromWindow(m_hDeviceWnd, MONITOR_DEFAULTTONULL);
+    if (hMonitor)
+      SetMonitor(hMonitor);
+  }
 
   SetRenderParams(width, height, fullScreen, refreshRate);
 
@@ -366,6 +373,8 @@ void CRenderSystemDX::OnDeviceReset()
   { // we're back
     for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); i++)
       (*i)->OnResetDevice();
+
+    g_renderManager.Flush();
 
     g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
   }
@@ -699,7 +708,9 @@ bool CRenderSystemDX::BeginRender()
   }
 
   IDirect3DSurface9 *pBackBuffer;
-  m_pD3DDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer);
+  if(m_pD3DDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer) != D3D_OK)
+    return false;
+
   m_pD3DDevice->SetRenderTarget(0, pBackBuffer);
   pBackBuffer->Release();
 
@@ -799,10 +810,8 @@ void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, i
     return;
 
   // grab the viewport dimensions and location
-  D3DVIEWPORT9 viewport;
-  m_pD3DDevice->GetViewport(&viewport);
-  float w = viewport.Width*0.5f;
-  float h = viewport.Height*0.5f;
+  float w = m_viewPort.Width*0.5f;
+  float h = m_viewPort.Height*0.5f;
 
   CPoint offset = camera - CPoint(screenWidth*0.5f, screenHeight*0.5f);
 
@@ -816,7 +825,7 @@ void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, i
   // position.
   D3DXMATRIX flipY, translate, mtxView;
   D3DXMatrixScaling(&flipY, 1.0f, -1.0f, 1.0f);
-  D3DXMatrixTranslation(&translate, -(viewport.X + w + offset.x), -(viewport.Y + h + offset.y), 2*h);
+  D3DXMatrixTranslation(&translate, -(w + offset.x), -(h + offset.y), 2*h);
   D3DXMatrixMultiply(&mtxView, &translate, &flipY);
   m_pD3DDevice->SetTransform(D3DTS_VIEW, &mtxView);
 
@@ -828,7 +837,6 @@ void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, i
   m_world = mtxWorld;
   m_view = mtxView;
   m_projection = mtxProjection;
-  m_viewPort = viewport;
 }
 
 void CRenderSystemDX::Project(float &x, float &y, float &z)
@@ -925,13 +933,10 @@ void CRenderSystemDX::GetViewPort(CRect& viewPort)
   if (!m_bRenderCreated)
     return;
 
-  D3DVIEWPORT9 d3dviewport;
-  m_pD3DDevice->GetViewport(&d3dviewport);
-
-  viewPort.x1 = (float)d3dviewport.X;
-  viewPort.y1 = (float)d3dviewport.Y;
-  viewPort.x2 = (float)d3dviewport.X + d3dviewport.Width;
-  viewPort.y2 = (float)d3dviewport.Y + d3dviewport.Height;
+  viewPort.x1 = (float)m_viewPort.X;
+  viewPort.y1 = (float)m_viewPort.Y;
+  viewPort.x2 = (float)m_viewPort.X + m_viewPort.Width;
+  viewPort.y2 = (float)m_viewPort.Y + m_viewPort.Height;
 }
 
 void CRenderSystemDX::SetViewPort(CRect& viewPort)
@@ -939,15 +944,13 @@ void CRenderSystemDX::SetViewPort(CRect& viewPort)
   if (!m_bRenderCreated)
     return;
 
-  D3DVIEWPORT9 newviewport;
-
-  newviewport.MinZ   = 0.0f;
-  newviewport.MaxZ   = 1.0f;
-  newviewport.X      = (DWORD)viewPort.x1;
-  newviewport.Y      = (DWORD)viewPort.y1;
-  newviewport.Width  = (DWORD)(viewPort.x2 - viewPort.x1);
-  newviewport.Height = (DWORD)(viewPort.y2 - viewPort.y1);
-  m_pD3DDevice->SetViewport(&newviewport);
+  m_viewPort.MinZ   = 0.0f;
+  m_viewPort.MaxZ   = 1.0f;
+  m_viewPort.X      = (DWORD)viewPort.x1;
+  m_viewPort.Y      = (DWORD)viewPort.y1;
+  m_viewPort.Width  = (DWORD)(viewPort.x2 - viewPort.x1);
+  m_viewPort.Height = (DWORD)(viewPort.y2 - viewPort.y1);
+  m_pD3DDevice->SetViewport(&m_viewPort);
 }
 
 void CRenderSystemDX::SetScissors(const CRect& rect)
@@ -998,6 +1001,19 @@ CStdString CRenderSystemDX::GetErrorDescription(HRESULT hr)
   strError.Format("%X - %s (%s)", hr, DXGetErrorString(hr), DXGetErrorDescription(hr));
 
   return strError;
+}
+
+void CRenderSystemDX::FlushGPU()
+{
+  IDirect3DQuery9* pEvent = NULL;
+
+  m_pD3DDevice->CreateQuery(D3DQUERYTYPE_EVENT, &pEvent);
+  if (pEvent != NULL)
+  {
+    pEvent->Issue(D3DISSUE_END);
+    while (S_FALSE == pEvent->GetData(NULL, 0, D3DGETDATA_FLUSH))
+      Sleep(1);
+  }
 }
 
 #endif

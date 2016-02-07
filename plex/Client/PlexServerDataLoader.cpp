@@ -227,14 +227,18 @@ bool CPlexServerDataLoaderJob::DoWork()
     if (!m_sectionList)
       return false;
     
-    m_playlistList = FetchList("/playlists");
+    if (!m_server->GetSynced())
+      m_playlistList = FetchList("/playlists/all");
 
     if (!m_server->IsShared() && m_server->GetServerClass().empty())
     {
       loadPreferences();
       if (m_abort)
         return false;
+    }
 
+    if (m_server->GetServerClass().empty() && m_server->AllowChannelAccess())
+    {
       m_channelList = FetchList("/channels/all");
     }
   }

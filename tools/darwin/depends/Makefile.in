@@ -6,20 +6,20 @@ BUILDTOOLS+= liblzo2-native libjpeg-turbo-native libpng-native libtiff-native li
 endif
 
 SUBDIRS := \
-	Backrow pcre expat gettext readline sqlite3 \
-	liblzo2 freetype2 fontconfig \
-	openssl libssh libssh2 librtmp curl \
-	libjpeg-turbo tiff libpng libogg \
-	libvorbis libflac libmp3lame libmad fribidi libmpeg2 \
-	libass libcdio libsamplerate libcrystalhd \
-	libGLEW libsdl libsdl_mixer libsdl_image \
-	libmicrohttpd libmodplug libbluray libyajl libffi \
+	Backrow pcre expat gettext sqlite3 \
 	libgpg-error libgcrypt \
+	liblzo2 freetype2 fontconfig \
+	openssl gmp nettle gnutls librtmp curl \
+	libjpeg-turbo tiff libpng libogg \
+	libvorbis libflac libmad fribidi libmpeg2 \
+	libass libcdio libsamplerate libcrystalhd \
+	libGLEW libsdl libsdl_image \
+	libmicrohttpd libmodplug libyajl libffi \
 	libplist libshairport libcec tinyxml \
-    boost breakpad
+	boost breakpad
 
 ifeq ($(DARWIN), ios)
-  EXCLUDED = libcec libcrystalhd libGLEW libsdl libsdl_mixer libsdl_image
+  EXCLUDED = libcec libcrystalhd libGLEW libsdl libsdl_image
 else
   EXCLUDED = Backrow
 endif

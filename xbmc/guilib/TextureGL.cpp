@@ -23,6 +23,7 @@
 #include "windowing/WindowingFactory.h"
 #include "utils/log.h"
 #include "utils/GLUtils.h"
+#include "guilib/TextureManager.h"
 
 #if defined(HAS_GL) || defined(HAS_GLES)
 
@@ -50,7 +51,7 @@ void CGLTexture::CreateTextureObject()
 void CGLTexture::DestroyTextureObject()
 {
   if (m_texture)
-    glDeleteTextures(1, (GLuint*) &m_texture);
+    g_TextureManager.ReleaseHwTexture(m_texture);
 }
 
 void CGLTexture::LoadToGPU()
@@ -185,14 +186,10 @@ void CGLTexture::LoadToGPU()
 
 void CGLTexture::BindToUnit(unsigned int unit)
 {
-  // we support only 2 texture units at present
+  glActiveTexture(GL_TEXTURE0 + unit);
+  glBindTexture(GL_TEXTURE_2D, m_texture);
 #ifndef HAS_GLES
-  glActiveTexture((unit == 1) ? GL_TEXTURE1_ARB : GL_TEXTURE0_ARB);
-  glBindTexture(GL_TEXTURE_2D, m_texture);
   glEnable(GL_TEXTURE_2D);
-#else // GLES
-  glActiveTexture((unit == 1) ? GL_TEXTURE1 : GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, m_texture);
 #endif
 }
 

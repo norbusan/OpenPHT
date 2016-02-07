@@ -59,7 +59,7 @@ enum AVDiscard;
 
 enum StreamType
 {
-  STREAM_NONE,    // if unknown
+  STREAM_NONE = 0,// if unknown
   STREAM_AUDIO,   // audio stream
   STREAM_VIDEO,   // video stream
   STREAM_DATA,    // data stream
@@ -91,7 +91,7 @@ public:
     codec = (CodecID)0; // CODEC_ID_NONE
     codec_fourcc = 0;
     profile = FF_PROFILE_UNKNOWN;
-    level = 0;
+    level = FF_LEVEL_UNKNOWN;
     type = STREAM_NONE;
     source = STREAM_SOURCE_NONE;
     iDuration = 0;

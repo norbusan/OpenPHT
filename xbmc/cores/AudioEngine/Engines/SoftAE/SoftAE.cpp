@@ -523,6 +523,7 @@ void CSoftAE::OnSettingsChange(const std::string& setting)
       setting == "audiooutput.audiodevice"       ||
       setting == "audiooutput.mode"              ||
       setting == "audiooutput.ac3passthrough"    ||
+      setting == "audiooutput.eac3passthrough"    ||
       setting == "audiooutput.dtspassthrough"    ||
       setting == "audiooutput.passthroughaac"    ||
       setting == "audiooutput.truehdpassthrough" ||

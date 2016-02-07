@@ -402,7 +402,7 @@ static int svq1_encode_plane(SVQ1Context *s, int plane, unsigned char *src_plane
                 int mx, my, pred_x, pred_y, dxy;
                 int16_t *motion_ptr;
 
-                motion_ptr= h263_pred_motion(&s->m, 0, 0, &pred_x, &pred_y);
+                motion_ptr= ff_h263_pred_motion(&s->m, 0, 0, &pred_x, &pred_y);
                 if(s->m.mb_type[x + y*s->m.mb_stride]&CANDIDATE_MB_TYPE_INTER){
                     for(i=0; i<6; i++)
                         init_put_bits(&s->reorder_pb[i], reorder_buffer[1][i], 7*32);
@@ -486,13 +486,14 @@ static av_cold int svq1_encode_init(AVCodecContext *avctx)
 
     s->avctx= avctx;
     s->m.avctx= avctx;
+    s->m.picture_structure = PICT_FRAME;
     s->m.me.temp      =
     s->m.me.scratchpad= av_mallocz((avctx->width+64)*2*16*2*sizeof(uint8_t));
     s->m.me.map       = av_mallocz(ME_MAP_SIZE*sizeof(uint32_t));
     s->m.me.score_map = av_mallocz(ME_MAP_SIZE*sizeof(uint32_t));
     s->mb_type        = av_mallocz((s->y_block_width+1)*s->y_block_height*sizeof(int16_t));
     s->dummy          = av_mallocz((s->y_block_width+1)*s->y_block_height*sizeof(int32_t));
-    h263_encode_init(&s->m); //mv_penalty
+    ff_h263_encode_init(&s->m); //mv_penalty
 
     return 0;
 }
@@ -512,8 +513,8 @@ static int svq1_encode_frame(AVCodecContext *avctx, unsigned char *buf,
     }
 
     if(!s->current_picture.data[0]){
-        avctx->get_buffer(avctx, &s->current_picture);
-        avctx->get_buffer(avctx, &s->last_picture);
+        ff_get_buffer(avctx, &s->current_picture);
+        ff_get_buffer(avctx, &s->last_picture);
         s->scratchbuf = av_malloc(s->current_picture.linesize[0] * 16 * 2);
     }
 

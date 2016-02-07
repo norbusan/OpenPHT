@@ -618,7 +618,9 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
             if (ret < 0)
                 return ret;
         } else if (!ff_guidcmp(&g, &ff_asf_stream_header)) {
-            asf_read_stream_properties(s, gsize);
+            int ret = asf_read_stream_properties(s, gsize);
+            if (ret < 0)
+                return ret;
         } else if (!ff_guidcmp(&g, &ff_asf_comment_header)) {
             asf_read_content_desc(s, gsize);
         } else if (!ff_guidcmp(&g, &ff_asf_language_guid)) {
@@ -1100,6 +1102,8 @@ static int ff_asf_parse_packet(AVFormatContext *s, AVIOContext *pb, AVPacket *pk
             //printf("packet %d %d\n", asf_st->pkt.size, asf->packet_frag_size);
             asf_st->pkt.size = 0;
             asf_st->pkt.data = 0;
+            asf_st->pkt.side_data_elems = 0;
+            asf_st->pkt.side_data = NULL;
             break; // packet completed
         }
     }

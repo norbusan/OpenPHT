@@ -110,11 +110,11 @@ av_cold void ff_ccitt_unpack_init(void)
     ccitt_vlc[1].table = code_table2;
     ccitt_vlc[1].table_allocated = 648;
     for(i = 0; i < 2; i++){
-        init_vlc_sparse(&ccitt_vlc[i], 9, CCITT_SYMS,
-                        ccitt_codes_lens[i], 1, 1,
-                        ccitt_codes_bits[i], 1, 1,
-                        ccitt_syms, 2, 2,
-                        INIT_VLC_USE_NEW_STATIC);
+        ff_init_vlc_sparse(&ccitt_vlc[i], 9, CCITT_SYMS,
+                           ccitt_codes_lens[i], 1, 1,
+                           ccitt_codes_bits[i], 1, 1,
+                           ccitt_syms, 2, 2,
+                           INIT_VLC_USE_NEW_STATIC);
     }
     INIT_VLC_STATIC(&ccitt_group3_2d_vlc, 9, 11,
                     ccitt_group3_2d_lens, 1, 1,
@@ -228,7 +228,7 @@ static int decode_group3_2d_line(AVCodecContext *avctx, GetBitContext *gb,
             mode = !mode;
         }
         //sync line pointers
-        while(run_off <= offs){
+        while(offs < width && run_off <= offs){
             run_off += *ref++;
             run_off += *ref++;
         }
@@ -243,7 +243,7 @@ static void put_line(uint8_t *dst, int size, int width, const int *runs)
     PutBitContext pb;
     int run, mode = ~0, pix_left = width, run_idx = 0;
 
-    init_put_bits(&pb, dst, size*8);
+    init_put_bits(&pb, dst, size);
     while(pix_left > 0){
         run = runs[run_idx++];
         mode = ~mode;

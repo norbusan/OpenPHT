@@ -27,6 +27,7 @@
 
 #include "libavutil/lfg.h"
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "dsputil.h"
 #include "mpegaudiodsp.h"
@@ -138,7 +139,8 @@ static av_cold int mpc8_decode_init(AVCodecContext * avctx)
     c->frames = 1 << (get_bits(&gb, 3) * 2);
 
     avctx->sample_fmt = AV_SAMPLE_FMT_S16;
-    avctx->channel_layout = (avctx->channels==2) ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
+    avctx->channel_layout = (channels==2) ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
+    avctx->channels = channels;
 
     if(vlc_initialized) return 0;
     av_log(avctx, AV_LOG_DEBUG, "Initing VLC\n");
@@ -184,13 +186,13 @@ static av_cold int mpc8_decode_init(AVCodecContext * avctx)
 
     q3_vlc[0].table = q3_0_table;
     q3_vlc[0].table_allocated = 512;
-    init_vlc_sparse(&q3_vlc[0], MPC8_Q3_BITS, MPC8_Q3_SIZE,
+    ff_init_vlc_sparse(&q3_vlc[0], MPC8_Q3_BITS, MPC8_Q3_SIZE,
              mpc8_q3_bits,  1, 1,
              mpc8_q3_codes, 1, 1,
              mpc8_q3_syms,  1, 1, INIT_VLC_USE_NEW_STATIC);
     q3_vlc[1].table = q3_1_table;
     q3_vlc[1].table_allocated = 516;
-    init_vlc_sparse(&q3_vlc[1], MPC8_Q4_BITS, MPC8_Q4_SIZE,
+    ff_init_vlc_sparse(&q3_vlc[1], MPC8_Q4_BITS, MPC8_Q4_SIZE,
              mpc8_q4_bits,  1, 1,
              mpc8_q4_codes, 1, 1,
              mpc8_q4_syms,  1, 1, INIT_VLC_USE_NEW_STATIC);
@@ -252,7 +254,7 @@ static int mpc8_decode_frame(AVCodecContext * avctx, void *data,
 
     /* get output buffer */
     c->frame.nb_samples = MPC_FRAME_SIZE;
-    if ((res = avctx->get_buffer(avctx, &c->frame)) < 0) {
+    if ((res = ff_get_buffer(avctx, &c->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return res;
     }

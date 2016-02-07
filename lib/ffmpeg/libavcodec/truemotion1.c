@@ -320,6 +320,11 @@ static int truemotion1_decode_header(TrueMotion1Context *s)
         return -1;
     }
 
+    if (header.header_size + 1 > s->size) {
+        av_log(s->avctx, AV_LOG_ERROR, "Input packet too small.\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     /* unscramble the header bytes with a XOR operation */
     memset(header_buffer, 0, 128);
     for (i = 1; i < header.header_size; i++)
@@ -520,6 +525,10 @@ hres,vres,i,i%vres (0 < i < 4)
 }
 
 #define APPLY_C_PREDICTOR() \
+    if(index > 1023){\
+        av_log(s->avctx, AV_LOG_ERROR, " index %d went out of bounds\n", index); \
+        return; \
+    }\
     predictor_pair = s->c_predictor_table[index]; \
     horiz_pred += (predictor_pair >> 1); \
     if (predictor_pair & 1) { \
@@ -537,6 +546,10 @@ hres,vres,i,i%vres (0 < i < 4)
         index++;
 
 #define APPLY_C_PREDICTOR_24() \
+    if(index > 1023){\
+        av_log(s->avctx, AV_LOG_ERROR, " index %d went out of bounds\n", index); \
+        return; \
+    }\
     predictor_pair = s->c_predictor_table[index]; \
     horiz_pred += (predictor_pair >> 1); \
     if (predictor_pair & 1) { \
@@ -555,6 +568,10 @@ hres,vres,i,i%vres (0 < i < 4)
 
 
 #define APPLY_Y_PREDICTOR() \
+    if(index > 1023){\
+        av_log(s->avctx, AV_LOG_ERROR, " index %d went out of bounds\n", index); \
+        return; \
+    }\
     predictor_pair = s->y_predictor_table[index]; \
     horiz_pred += (predictor_pair >> 1); \
     if (predictor_pair & 1) { \
@@ -572,6 +589,10 @@ hres,vres,i,i%vres (0 < i < 4)
         index++;
 
 #define APPLY_Y_PREDICTOR_24() \
+    if(index > 1023){\
+        av_log(s->avctx, AV_LOG_ERROR, " index %d went out of bounds\n", index); \
+        return; \
+    }\
     predictor_pair = s->y_predictor_table[index]; \
     horiz_pred += (predictor_pair >> 1); \
     if (predictor_pair & 1) { \

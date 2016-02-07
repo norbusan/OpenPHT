@@ -257,13 +257,6 @@ int CDVDAudioCodecFFmpeg::GetSampleRate()
   return 0;
 }
 
-int CDVDAudioCodecFFmpeg::GetEncodedSampleRate()
-{
-  if (m_pCodecContext)
-    return m_pCodecContext->sample_rate;
-  return 0;
-}
-
 enum AEDataFormat CDVDAudioCodecFFmpeg::GetDataFormat()
 {
   if(m_bLpcmMode)

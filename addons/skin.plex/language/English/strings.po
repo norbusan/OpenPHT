@@ -1124,7 +1124,7 @@ msgid "Show all media flags in details view"
 msgstr ""
 
 msgctxt "#32118"
-msgid "Hide Quit and Shutdown from Home menu"
+msgid "Hide Quit and Shut Down from Home menu"
 msgstr ""
 
 msgctxt "#32119"
@@ -1133,6 +1133,14 @@ msgstr ""
 
 msgctxt "#32120"
 msgid "Hide Secure Server Indicators"
+msgstr ""
+
+msgctxt "#32121"
+msgid "Hide Rotten Tomatoes Rating"
+msgstr ""
+
+msgctxt "#32122"
+msgid "Show Shut Down and Restart to restricted users"
 msgstr ""
 
 msgctxt "#41000"

@@ -47,6 +47,7 @@
 
 
 #include "avcodec.h"
+#include "internal.h"
 #include "get_bits.h"
 #include "bytestream.h"
 #include "unary.h"
@@ -417,7 +418,7 @@ static int alac_decode_frame(AVCodecContext *avctx, void *data,
         return AVERROR_INVALIDDATA;
     }
     alac->frame.nb_samples = outputsamples;
-    if ((ret = avctx->get_buffer(avctx, &alac->frame)) < 0) {
+    if ((ret = ff_get_buffer(avctx, &alac->frame)) < 0) {
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return ret;
     }
@@ -615,6 +616,12 @@ static int alac_set_info(ALACContext *alac)
 
     /* buffer size / 2 ? */
     alac->setinfo_max_samples_per_frame = bytestream_get_be32(&ptr);
+    if (!alac->setinfo_max_samples_per_frame ||
+        alac->setinfo_max_samples_per_frame > INT_MAX / sizeof(int32_t)) {
+        av_log(alac->avctx, AV_LOG_ERROR, "max samples per frame invalid: %u\n",
+               alac->setinfo_max_samples_per_frame);
+        return AVERROR_INVALIDDATA;
+    }
     ptr++;                          /* compatible version */
     alac->setinfo_sample_size           = *ptr++;
     alac->setinfo_rice_historymult      = *ptr++;
@@ -636,10 +643,9 @@ static av_cold int alac_decode_init(AVCodecContext * avctx)
     alac->avctx = avctx;
 
     /* initialize from the extradata */
-    if (alac->avctx->extradata_size != ALAC_EXTRADATA_SIZE) {
-        av_log(avctx, AV_LOG_ERROR, "alac: expected %d extradata bytes\n",
-            ALAC_EXTRADATA_SIZE);
-        return -1;
+    if (alac->avctx->extradata_size < ALAC_EXTRADATA_SIZE) {
+        av_log(avctx, AV_LOG_ERROR, "alac: extradata is too small\n");
+        return AVERROR_INVALIDDATA;
     }
     if (alac_set_info(alac)) {
         av_log(avctx, AV_LOG_ERROR, "alac: set_info failed\n");

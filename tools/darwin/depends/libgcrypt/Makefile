@@ -2,7 +2,7 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=libgcrypt
-VERSION=1.4.5
+VERSION=1.6.4
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.bz2
 
@@ -11,7 +11,7 @@ export PATH:=$(TOOLCHAIN)/bin:$(PATH)
 CONFIGURE=./configure --prefix=$(PREFIX)
 
 ifeq ($(DARWIN),osx)
-CONFIGURE+=--disable-asm
+CONFIGURE+=--disable-asm --disable-avx-support --disable-avx2-support
 endif
 
 LIBDYLIB=$(SOURCE)/.libs/libgcrypt.dylib
@@ -27,9 +27,10 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
-	cd $(SOURCE); autoreconf -vif
-	cd $(SOURCE); patch -p1 < ../01-inline-gcc.patch
-	cd $(SOURCE); patch -p0 < ../02-armasm.patch
+	#cd $(SOURCE); patch -p1 < ../01-asm-Allow-building-x86-and-amd64-using-old-compilers.patch
+	#cd $(SOURCE); patch -p0 < ../02-armasm.patch
+	cd $(SOURCE); patch -p0 < ../03-gcrypt-android-select.patch
+	#cd $(SOURCE); patch -p0 < ../04-oflagmunging.patch
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
