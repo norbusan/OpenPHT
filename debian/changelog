@@ -1,3 +1,10 @@
+openpht (1.5.1.508-1) unstable; urgency=medium
+
+  * new upstream release
+  * disable all patches, included upstream
+
+ -- Norbert Preining <preining@debian.org>  Sun, 07 Feb 2016 13:27:10 +0900
+
 openpht (1.5.0.502-1) unstable; urgency=medium
 
   * switch to openpht sources
