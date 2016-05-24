@@ -21,6 +21,8 @@ namespace XFILE
     virtual int Stat(const CURL& url, struct __stat64* buffer);
     virtual int IoControl(EIoControl request, void* param);
 
+    bool DownloadFile(const CStdString& strURL, const CStdString& strFileName);
+
     static std::vector<std::pair<std::string, std::string> > GetHeaderList();
     static bool BuildHTTPURL(CURL& url);
 

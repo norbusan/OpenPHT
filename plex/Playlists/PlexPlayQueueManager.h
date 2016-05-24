@@ -15,7 +15,7 @@ public:
   CPlexPlayQueueOptions(bool playing = true, bool prompts = true, bool doshuffle = false,
                         const std::string& startItem = "")
     : startPlaying(playing), showPrompts(prompts), shuffle(doshuffle), startItemKey(startItem),
-      forceTrailers(false), isFlung(false)
+      resumeOffset(0), forceTrailers(false), isFlung(false)
   {}
 
   // if the PQ should start playing when it's loaded or created

@@ -111,6 +111,10 @@ void CGUIDialogAudioSubtitleSettings::CreateSettings()
     AddSpin(AUDIO_SETTINGS_DIGITAL_ANALOG, 337, &m_outputmode, 3, settings);
 #endif
 
+  // Do not display subtitle settings if subtitle is burned in when transcoding
+  if (g_application.m_pPlayer && g_application.m_pPlayer->IsTranscoded() && g_guiSettings.GetBool("plexmediaserver.transcodesubtitles"))
+    return;
+
   AddSeparator(7);
   /* PLEX */
   if (!g_application.m_pPlayer)
@@ -180,20 +184,21 @@ void CGUIDialogAudioSubtitleSettings::AddAudioStreams(unsigned int id)
     CStdString strItem;
     CStdString strName;
     g_application.m_pPlayer->GetAudioStreamName(i, strName);
-    if (strName.length() == 0)
-      strName = "Unnamed";
+    if (strName.empty())
+      strName = g_localizeStrings.Get(13205); // Unknown
 
     strItem.Format("%s (%i/%i)", strName.c_str(), i + 1, (int)setting.max + 1);
     setting.entry.push_back(make_pair(setting.entry.size(), strItem));
   }
 
   if( setting.max < 0 )
-  {
+  { // no audio streams - just add a "None" entry
     setting.max = 0;
-    setting.entry.push_back(make_pair(setting.entry.size(), g_localizeStrings.Get(231)));
+    //setting.entry.push_back(make_pair(setting.entry.size(), g_localizeStrings.Get(231)));
   }
 
-  m_settings.push_back(setting);
+  if (!setting.entry.empty())
+    m_settings.push_back(setting);
 }
 
 void CGUIDialogAudioSubtitleSettings::AddSubtitleStreams(unsigned int id)
@@ -205,12 +210,12 @@ void CGUIDialogAudioSubtitleSettings::AddSubtitleStreams(unsigned int id)
   setting.type = SettingInfo::SPIN;
   setting.min = 0;
   setting.data = &m_subtitleStream;
+
+  // get the number of subtitle strams for the current movie
+  setting.max = (float)g_application.m_pPlayer->GetSubtitleCount() - 1;
   m_subtitleStream = g_application.m_pPlayer->GetSubtitle();
 
   if(m_subtitleStream < 0) m_subtitleStream = 0;
-
-  // get the number of audio strams for the current movie
-  setting.max = (float)g_application.m_pPlayer->GetSubtitleCount() - 1;
 
   // cycle through each subtitle and add it to our entry list
   for (int i = 0; i <= setting.max; ++i)
@@ -218,14 +223,8 @@ void CGUIDialogAudioSubtitleSettings::AddSubtitleStreams(unsigned int id)
     CStdString strItem;
     CStdString strName;
     g_application.m_pPlayer->GetSubtitleName(i, strName);
-    if (strName.length() == 0)
-      strName = "Unnamed";
-
-    CStdString strLanguage;
-    g_application.m_pPlayer->GetSubtitleLanguage(i, strLanguage);
-
-    if (strName != strLanguage)
-      strName.Format("%s [%s]", strName.c_str(), strLanguage.c_str());
+    if (strName.empty())
+      strName = g_localizeStrings.Get(13205); // Unknown
 
     strItem.Format("%s (%i/%i)", strName.c_str(), i + 1, (int)setting.max + 1);
 
@@ -234,7 +233,6 @@ void CGUIDialogAudioSubtitleSettings::AddSubtitleStreams(unsigned int id)
 
   if (setting.max < 0)
   { // no subtitle streams - just add a "None" entry
-    m_subtitleStream = 0;
     setting.max = 0;
     setting.entry.push_back(make_pair(setting.entry.size(), g_localizeStrings.Get(231)));
   }

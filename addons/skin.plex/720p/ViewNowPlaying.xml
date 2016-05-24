@@ -530,7 +530,6 @@
 		<control type="largeimage">
 			<include>FullScreenScaled</include>
 			<texture>$INFO[Player.Art(fanart)]</texture>
-			<include>BackgroundFade</include>
 			<animation effect="fade" end="70" time="0" condition="true">conditional</animation>
 		</control>
 		<!-- backup bg -->

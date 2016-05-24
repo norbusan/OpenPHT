@@ -2,6 +2,12 @@
 
 #include <string>
 #include "threads/Thread.h"
+#include "GUIInfoManager.h"
+
+#ifdef TARGET_RASPBERRY_PI
+#include "RaspberryPiProcReader.h"
+#include "dialogs/GUIDialogOK.h"
+#endif
 
 class CrashSubmitter : public CThread
 {

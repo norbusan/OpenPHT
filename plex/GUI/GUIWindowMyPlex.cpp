@@ -29,6 +29,7 @@
 #include "dialogs/GUIDialogYesNo.h"
 #include "ApplicationMessenger.h"
 #include "addons/Skin.h"
+#include "settings/Settings.h"
 
 #include "PlexApplication.h"
 
@@ -165,6 +166,8 @@ void CGUIWindowMyPlex::HandleMyPlexState(int state, int errorCode)
     {
       SET_CONTROL_HIDDEN(ID_SPINNER);
       ShowSuccess();
+      // ensure settings is saved once we are logged in
+      g_settings.Save();
       break;
     }
 

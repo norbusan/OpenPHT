@@ -13,7 +13,7 @@
 
 #include <string>
 
-#include "GUIInfoManager.h"
+#include "git_revision.h"
 
 #ifdef HAVE_BREAKPAD
 
@@ -34,9 +34,7 @@ static inline bool BreakPad_MinidumpCallback(const google_breakpad::MinidumpDesc
   char finalPath[PATH_MAX+1];
   strcpy(finalPath, desc.path());
   finalPath[strlen(finalPath)-4] = '\0';
-  strcat(finalPath, "-v-");
-  strcat(finalPath, PLEX_MEDIA_SERVER_VERSION);
-  strcat(finalPath, ".dmp");
+  strcat(finalPath, "-v-" PLEX_VERSION ".dmp");
   rename(desc.path(), finalPath);
 
   fprintf(stderr, "****** %s CRASHED, CRASH REPORT WRITTEN: %s\n", (const char*)context, finalPath);
@@ -78,7 +76,7 @@ bool BreakPad_MinidumpCallback(const wchar_t* dump_path,
   {
     // Rename the file, best effort
     std::wstring dumpPath = (std::wstring)dump_path + L"\\" + minidump_id + L".dmp";
-    std::wstring newDumpPath = (std::wstring)dump_path + L"\\" + minidump_id + L"-v-" + utf8to16(g_infoManager.GetVersion()) + L".dmp";
+    std::wstring newDumpPath = (std::wstring)dump_path + L"\\" + minidump_id + L"-v-" PLEX_VERSION_WIDE L".dmp";
     MoveFileW(dumpPath.c_str(), newDumpPath.c_str());
   }
   return succeeded;
@@ -95,7 +93,7 @@ static inline bool BreakPad_MinidumpCallback(const char *dump_dir, const char *m
     return false;
 
   std::string dumpPath = dp + "/" + mid + ".dmp";
-  std::string finalPath = dp + "/" + mid + "-v-" + g_infoManager.GetVersion().c_str() + ".dmp";
+  std::string finalPath = dp + "/" + mid + "-v-" PLEX_VERSION ".dmp";
   fprintf(stderr, "***** moving %s to %s", dumpPath.c_str(), finalPath.c_str());
   rename(dumpPath.c_str(), finalPath.c_str());
 

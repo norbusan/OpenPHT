@@ -779,10 +779,24 @@ void CPeripheralCecAdapter::GetNextKey(void)
 
 void CPeripheralCecAdapter::PushCecKeypress(const CecButtonPress &key)
 {
+#ifdef TARGET_OPENELEC
+  CLog::Log(LOGDEBUG, "%s - received key %2x duration %d (rep:%d size:%d)", __FUNCTION__, key.iButton, key.iDuration, m_configuration.iButtonRepeatRateMs, m_buttonQueue.size());
+#else
   CLog::Log(LOGDEBUG, "%s - received key %2x duration %d", __FUNCTION__, key.iButton, key.iDuration);
+#endif
 
   CSingleLock lock(m_critSection);
+#ifdef TARGET_OPENELEC
+  // avoid the queue getting too long
+  if (m_configuration.iButtonRepeatRateMs && m_buttonQueue.size() > 5)
+  {
+    CLog::Log(LOGDEBUG, "%s - discarded key %2x", __FUNCTION__, key.iButton);
+    return;
+  }
+  if (m_configuration.iButtonRepeatRateMs == 0 && key.iDuration > 0)
+#else
   if (key.iDuration > 0)
+#endif
   {
     if (m_currentButton.iButton == key.iButton && m_currentButton.iDuration == 0)
     {
@@ -1271,6 +1285,14 @@ void CPeripheralCecAdapter::SetConfigurationFromLibCEC(const CEC::libcec_configu
   bChanged |= SetSetting("double_tap_timeout_ms", (int)m_configuration.iDoubleTapTimeoutMs);
 #endif
 
+#ifdef TARGET_OPENELEC
+  m_configuration.iButtonRepeatRateMs = config.iButtonRepeatRateMs;
+  bChanged |= SetSetting("button_repeat_rate_ms", (int)m_configuration.iButtonRepeatRateMs);
+
+  m_configuration.iButtonReleaseDelayMs = config.iButtonReleaseDelayMs;
+  bChanged |= SetSetting("button_release_delay_ms", (int)m_configuration.iButtonReleaseDelayMs);
+#endif
+
   m_configuration.iFirmwareVersion = config.iFirmwareVersion;
   m_configuration.bShutdownOnStandby = config.bShutdownOnStandby;
 
@@ -1376,6 +1398,10 @@ void CPeripheralCecAdapter::SetConfigurationFromSettings(void)
 #else
   // backwards compatibility. will be removed once the next major release of libCEC is out
   m_configuration.iDoubleTapTimeoutMs = GetSettingInt("double_tap_timeout_ms");
+#endif
+#ifdef TARGET_OPENELEC
+  m_configuration.iButtonRepeatRateMs = GetSettingInt("button_repeat_rate_ms");
+  m_configuration.iButtonReleaseDelayMs = GetSettingInt("button_release_delay_ms");
 #endif
 }
 

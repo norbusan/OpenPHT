@@ -32,6 +32,9 @@
 #include "guilib/TextureManager.h"
 #include "cores/dvdplayer/DVDFileInfo.h"
 #include "cores/AudioEngine/AEFactory.h"
+#ifdef TARGET_RASPBERRY_PI
+#include "cores/AudioEngine/Utils/AEChannelInfo.h"
+#endif
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "PlayListPlayer.h"
 #include "Autorun.h"
@@ -678,50 +681,56 @@ bool CApplication::Create()
   g_settings.LoadProfiles(PROFILES_FILE);
 
   CLog::Log(LOGNOTICE, "-----------------------------------------------------------------------");
-#ifndef __PLEX__
-#if defined(TARGET_DARWIN_OSX)
-  CLog::Log(LOGNOTICE, "Starting XBMC (%s), Platform: Darwin OSX (%s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(TARGET_DARWIN_IOS)
-  CLog::Log(LOGNOTICE, "Starting XBMC (%s), Platform: Darwin iOS (%s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(__FreeBSD__)
-  CLog::Log(LOGNOTICE, "Starting XBMC (%s), Platform: FreeBSD (%s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(_LINUX)
-  CLog::Log(LOGNOTICE, "Starting XBMC (%s), Platform: Linux (%s, %s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetLinuxDistro().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(_WIN32)
-  CLog::Log(LOGNOTICE, "Starting XBMC (%s), Platform: %s. Built on %s (compiler %i)", g_infoManager.GetVersion().c_str(), g_sysinfo.GetKernelVersion().c_str(), __DATE__, _MSC_VER);
-#if defined(__arm__)
-  if (g_cpuInfo.GetCPUFeatures() & CPU_FEATURE_NEON)
-    CLog::Log(LOGNOTICE, "ARM Features: Neon enabled");
-  else
-    CLog::Log(LOGNOTICE, "ARM Features: Neon disabled");
-#endif
-  CLog::Log(LOGNOTICE, g_cpuInfo.getCPUModel().c_str());
-  CLog::Log(LOGNOTICE, CWIN32Util::GetResInfoString());
-  CLog::Log(LOGNOTICE, "Running with %s rights", (CWIN32Util::IsCurrentUserLocalAdministrator() == TRUE) ? "administrator" : "restricted");
-  CLog::Log(LOGNOTICE, "Aero is %s", (g_sysinfo.IsAeroDisabled() == true) ? "disabled" : "enabled");
-#endif
+  CLog::Log(LOGNOTICE, "Starting %s (%s). Platform: %s %s %d-bit", g_sysinfo.GetAppName().c_str(), g_infoManager.GetVersion().c_str(),
+            g_sysinfo.GetBuildTargetPlatformName().c_str(), g_sysinfo.GetBuildTargetCpuFamily().c_str(), g_sysinfo.GetXbmcBitness());
+
+  CStdString buildType;
+#if defined(_DEBUG)
+  buildType = "Debug";
+#elif defined(NDEBUG)
+  buildType = "Release";
 #else
-#if defined(TARGET_DARWIN_OSX)
-  CLog::Log(LOGNOTICE, "Starting OpenPHT (%s), Platform: Darwin OSX (%s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(TARGET_DARWIN_IOS)
-  CLog::Log(LOGNOTICE, "Starting OpenPHT (%s), Platform: Darwin iOS (%s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(__FreeBSD__)
-  CLog::Log(LOGNOTICE, "Starting OpenPHT (%s), Platform: FreeBSD (%s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(_LINUX)
-  CLog::Log(LOGNOTICE, "Starting OpenPHT (%s), Platform: Linux (%s, %s). Built on %s", g_infoManager.GetVersion().c_str(), g_sysinfo.GetLinuxDistro().c_str(), g_sysinfo.GetUnameVersion().c_str(), __DATE__);
-#elif defined(_WIN32)
-  CLog::Log(LOGNOTICE, "Starting OpenPHT (%s), Platform: %s. Built on %s (compiler %i)", g_infoManager.GetVersion().c_str(), g_sysinfo.GetKernelVersion().c_str(), __DATE__, _MSC_VER);
+  buildType = "Unknown";
+#endif
+  CStdString specialVersion;
+#if defined(TARGET_DARWIN_IOS_ATV2)
+  specialVersion = " (version for AppleTV2)";
+#elif defined(TARGET_RASPBERRY_PI)
+  specialVersion = " (version for Raspberry Pi)";
+//#elif defined(some_ID) // uncomment for special version/fork
+//  specialVersion = " (version for XXXX)";
+#endif
+  CLog::Log(LOGNOTICE, "Using %s %s x%d build%s", buildType.c_str(), g_sysinfo.GetAppName().c_str(), g_sysinfo.GetXbmcBitness(), specialVersion.c_str());
+  CLog::Log(LOGNOTICE, "%s compiled " __DATE__ " by %s for %s %s %d-bit %s (%s)", g_sysinfo.GetAppName().c_str(), g_sysinfo.GetUsedCompilerNameAndVer().c_str(), g_sysinfo.GetBuildTargetPlatformName().c_str(),
+            g_sysinfo.GetBuildTargetCpuFamily().c_str(), g_sysinfo.GetXbmcBitness(), g_sysinfo.GetBuildTargetPlatformVersionDecoded().c_str(),
+            g_sysinfo.GetBuildTargetPlatformVersion().c_str());
+
+  CStdString deviceModel(g_sysinfo.GetModelName());
+  if (!g_sysinfo.GetManufacturerName().empty())
+    deviceModel = g_sysinfo.GetManufacturerName() + " " + (deviceModel.empty() ? CStdString("device") : deviceModel);
+  if (!deviceModel.empty())
+    CLog::Log(LOGNOTICE, "Running on %s with %s, kernel: %s %s %d-bit version %s", deviceModel.c_str(), g_sysinfo.GetOsPrettyNameWithVersion().c_str(),
+              g_sysinfo.GetKernelName().c_str(), g_sysinfo.GetKernelCpuFamily().c_str(), g_sysinfo.GetKernelBitness(), g_sysinfo.GetKernelVersionFull().c_str());
+  else
+    CLog::Log(LOGNOTICE, "Running on %s, kernel: %s %s %d-bit version %s", g_sysinfo.GetOsPrettyNameWithVersion().c_str(),
+              g_sysinfo.GetKernelName().c_str(), g_sysinfo.GetKernelCpuFamily().c_str(), g_sysinfo.GetKernelBitness(), g_sysinfo.GetKernelVersionFull().c_str());
+  
+  CStdString cpuModel(g_cpuInfo.getCPUModel());
+  if (!cpuModel.empty())
+    CLog::Log(LOGNOTICE, "Host CPU: %s, %d core%s available", cpuModel.c_str(), g_cpuInfo.getCPUCount(), (g_cpuInfo.getCPUCount() == 1) ? "" : "s");
+  else
+    CLog::Log(LOGNOTICE, "%d CPU core%s available", g_cpuInfo.getCPUCount(), (g_cpuInfo.getCPUCount() == 1) ? "" : "s");
+#if defined(TARGET_WINDOWS)
+  CLog::Log(LOGNOTICE, "%s", CWIN32Util::GetResInfoString().c_str());
+  CLog::Log(LOGNOTICE, "Running with %s rights", (CWIN32Util::IsCurrentUserLocalAdministrator() == TRUE) ? "administrator" : "restricted");
+  CLog::Log(LOGNOTICE, "Aero is %s", (g_sysinfo.IsAeroDisabled() == true) ? "disabled" : "enabled");
+#endif
+
 #if defined(__arm__)
   if (g_cpuInfo.GetCPUFeatures() & CPU_FEATURE_NEON)
     CLog::Log(LOGNOTICE, "ARM Features: Neon enabled");
   else
     CLog::Log(LOGNOTICE, "ARM Features: Neon disabled");
-#endif
-  CLog::Log(LOGNOTICE, g_cpuInfo.getCPUModel().c_str());
-  CLog::Log(LOGNOTICE, CWIN32Util::GetResInfoString());
-  CLog::Log(LOGNOTICE, "Running with %s rights", (CWIN32Util::IsCurrentUserLocalAdministrator() == TRUE) ? "administrator" : "restricted");
-  CLog::Log(LOGNOTICE, "Aero is %s", (g_sysinfo.IsAeroDisabled() == true) ? "disabled" : "enabled");
-#endif
 #endif
   CSpecialProtocol::LogPaths();
 
@@ -890,6 +899,9 @@ bool CApplication::Create()
   m_lastRenderTime = m_lastFrameTime;
   
   /* PLEX */
+#ifdef TARGET_RASPBERRY_PI
+  if (g_application.getNetwork().IsAvailable(true))
+#endif
   g_plexApplication.Start();
   /* END PLEX */
   
@@ -1595,8 +1607,21 @@ bool CApplication::Initialize()
 #else
       if (g_SkinInfo->HasSkinFile("PlexStartupHelper.xml") && !g_guiSettings.GetBool("system.firstrunwizard"))
       {
+#ifdef TARGET_RASPBERRY_PI
+        g_guiSettings.SetInt("audiooutput.mode", AUDIO_HDMI);
+        g_guiSettings.SetInt("audiooutput.channels", AE_CH_LAYOUT_2_0); // this is why sound is stereo FIXME
+        g_guiSettings.SetBool("audiooutput.ac3passthrough", false);
+        g_guiSettings.SetBool("audiooutput.eac3passthrough", false);
+        g_guiSettings.SetBool("audiooutput.dtspassthrough", false);
+        g_guiSettings.SetBool("system.firstrunwizard", true);
+        int setting = g_settings.TranslateSkinBool("DisableWindowFade");
+        g_settings.SetSkinBool(setting, true);
+        g_settings.Save();
+        g_windowManager.ActivateWindow(g_SkinInfo->GetFirstWindow());
+#else
         g_windowManager.ActivateWindow(WINDOW_PLEX_STARTUP_HELPER);
         g_guiSettings.SetBool("system.firstrunwizard", true);
+#endif
       }
       else
       {
@@ -1674,7 +1699,7 @@ bool CApplication::StartServer(enum ESERVERS eServer, bool bStart, bool bWait/* 
       }
       break;
     case ES_AIRPLAYSERVER:
-      oldSetting = g_guiSettings.GetBool("services.esenabled");
+      oldSetting = g_guiSettings.GetBool("services.airplay");
       g_guiSettings.SetBool("services.airplay", bStart);
 
       if (bStart)
@@ -1684,7 +1709,7 @@ bool CApplication::StartServer(enum ESERVERS eServer, bool bStart, bool bWait/* 
 
       if (!ret)
       {
-        g_guiSettings.SetBool("services.esenabled", oldSetting);
+        g_guiSettings.SetBool("services.airplay", oldSetting);
       }
       break;
     case ES_JSONRPCSERVER:
@@ -2513,7 +2538,11 @@ void CApplication::Render()
   bool decrement = false;
   bool hasRendered = false;
   bool limitFrames = false;
+  #if defined(TARGET_RASPBERRY_PI_1)
+  unsigned int singleFrameTime = 66; // default limit 15 fps
+  #else
   unsigned int singleFrameTime = 10; // default limit 100 fps
+  #endif
 
   {
     // Less fps in DPMS
@@ -2605,7 +2634,11 @@ void CApplication::Render()
   if (limitFrames || !flip)
   {
     if (!limitFrames)
+  #if defined(TARGET_RASPBERRY_PI_1)
+      singleFrameTime = 100; //if not flipping, loop at 10 fps
+  #else
       singleFrameTime = 40; //if not flipping, loop at 25 fps
+  #endif
 
     unsigned int frameTime = now - m_lastFrameTime;
     if (frameTime < singleFrameTime)
@@ -5803,18 +5836,11 @@ void CApplication::ProcessSlow()
   /* PLEX */
   if (g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO && IsPlayingVideo())
   {
-    CGUIDialogPlexVideoOSD *osd = (CGUIDialogPlexVideoOSD*)g_windowManager.GetWindow(WINDOW_DIALOG_VIDEO_OSD);
-    if (IsPaused() && !IsBuffering())
+    CGUIDialog *osd = dynamic_cast<CGUIDialog*>(g_windowManager.GetWindow(WINDOW_DIALOG_VIDEO_OSD));
+    if (osd && IsPaused() && !IsBuffering() && !osd->IsDialogRunning())
     {
-      if (osd && !osd->IsDialogRunning())
-      {
-        ThreadMessage tmsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_VIDEO_OSD, WINDOW_FULLSCREEN_VIDEO, "pauseOpen"};
-        CApplicationMessenger::Get().SendMessage(tmsg, false);
-      }
-    }
-    else if (IsPlaying() && osd && osd->IsDialogRunning() && osd->IsOpenedFromPause())
-    {
-      CApplicationMessenger::Get().Close(osd, false, false);
+      ThreadMessage tmsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_VIDEO_OSD, WINDOW_FULLSCREEN_VIDEO, "pauseOpen"};
+      CApplicationMessenger::Get().SendMessage(tmsg, false);
     }
   }
   /* END PLEX */
@@ -6249,7 +6275,9 @@ bool CApplication::SwitchToFullScreen()
 
 void CApplication::Minimize()
 {
+#ifndef TARGET_OPENELEC
   g_Windowing.Minimize();
+#endif
 }
 
 PLAYERCOREID CApplication::GetCurrentPlayer()

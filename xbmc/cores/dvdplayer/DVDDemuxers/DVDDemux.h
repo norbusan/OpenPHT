@@ -34,22 +34,8 @@ class CDVDInputStream;
 #if (defined HAVE_CONFIG_H) && (!defined WIN32)
   #include "config.h"
 #endif
-#ifndef _LINUX
-enum CodecID;
-#include <libavcodec/avcodec.h>
-#else
-extern "C" {
-#if (defined USE_EXTERNAL_FFMPEG)
-  #if (defined HAVE_LIBAVCODEC_AVCODEC_H)
-    #include <libavcodec/avcodec.h>
-  #elif (defined HAVE_FFMPEG_AVCODEC_H)
-    #include <ffmpeg/avcodec.h>
-  #endif
-#else
-  #include "libavcodec/avcodec.h"
-#endif
-}
-#endif
+
+#include "DllAvCodec.h"
 
 #ifndef __GNUC__
 #pragma warning(pop)
@@ -149,6 +135,9 @@ public:
   , FLAG_LYRICS   = 0x0010
   , FLAG_KARAOKE  = 0x0020
   , FLAG_FORCED   = 0x0040
+  /* PLEX */
+  , FLAG_SELECTED = 0x0080
+  /* END PLEX */
   } flags;
 
   /* PLEX */

@@ -5,6 +5,8 @@
 	<controls>
 		<!-- bg's -->
 		<include>SlideshowSettings</include>
+		<control type="group">
+			<posx>45</posx>
 		<include>SettingsBG</include>
 		<!-- categories menu (top) -->
 		<include>SettingsCategoryMenu</include>
@@ -26,7 +28,7 @@
 						<posy>0</posy>
 						<width>300</width>
 						<height>50</height>
-						<texture border="5">border-bottom-grey.png</texture>
+						<texture>border-bottom-grey.png</texture>
 					</control>
 					<control type="label">
 						<posx>20</posx>
@@ -125,7 +127,7 @@
 				<posy>0</posy>
 				<posx>105</posx>
 				<width>625</width>
-				<height>450</height>
+				<height>500</height>
 				<onup>201</onup>
 				<onleft>101</onleft>
 				<itemgap>0</itemgap>
@@ -209,20 +211,29 @@
 					<onclick>Skin.ToggleSetting(ShowRestrictedPowerOptions)</onclick>
 					<selected>Skin.HasSetting(ShowRestrictedPowerOptions)</selected>
 				</control>
+				<control type="radiobutton" id="222">
+					<description>Disable window and dialog fade animation</description>
+					<width>625</width>
+					<label>$LOCALIZE[32123]</label>
+					<onclick>Skin.ToggleSetting(DisableWindowFade)</onclick>
+					<selected>Skin.HasSetting(DisableWindowFade)</selected>
+				</control>
 			</control>
 			<!-- Scrollbar -->
 			<control type="scrollbar" id="61">
-				<description>Scroll Bar</description>
-				<posx>735</posx>
-				<posy>60</posy>
+				<posy>-7</posy>
+				<posx>732</posx>
+				<height>510</height>
+				<onup>61</onup>
+				<ondown>61</ondown>
 			</control>
+		</control>
 		</control>
 		<!-- top-level ui (LeftSidemenu.xml & IncludesGlobals.xml & Debug.xml) -->
 		<include>LeftSideMenuSettings</include>
 		<!--<include>TopBar</include>-->
 		<include>debugInfos</include>
 		<include>Grid</include>
-		<include>WindowFade</include>
 		<include>Non16x9Cache</include>
 	</controls>
 </window>

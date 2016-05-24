@@ -9,7 +9,10 @@ set(ENV{LIBS} "$ENV{LIBS};${dependdir}/lib")
 # C4800 = 'unsigned int' : forcing value to bool 'true' or 'false' (performance warning)
 # C4996 = 'strcmpi': The POSIX name for this item is deprecated. Instead, use the ISO C++ conformant name: _strcmpi. See online help for details
 # C4244 = 'initializing' : conversion from 'int64_t' to 'int', possible loss of data
-set(IGNOREERRS "/wd4800 /wd4996 /wd4244 /wd4804")
+# C4018 = '<comparison operator>' : signed/unsigned mismatch
+# C4146 = unary minus operator applied to unsigned type, result still unsigned
+# C4996:= '<function>': The POSIX name for this item is deprecated. Instead, use the ISO C++ conformant name: <conformant name>
+set(IGNOREERRS "/wd4800 /wd4996 /wd4244 /wd4804 /wd4018 /wd4146 /wd4996")
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MDd ${IGNOREERRS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd ${IGNOREERRS}")
@@ -109,5 +112,6 @@ add_definitions(
   -D_WIN32_WINNT=0x0600
   -DBOOST_NO_0X_HDR_INITIALIZER_LIST
   -D_VARIADIC_MAX=10
+  -D_CRT_SECURE_NO_WARNINGS
 )
 

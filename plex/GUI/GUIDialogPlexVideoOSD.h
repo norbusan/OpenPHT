@@ -2,17 +2,13 @@
 #define GUIDIALOGPLEXVIDEOOSD_H
 
 #include "video/dialogs/GUIDialogVideoOSD.h"
-#include "PlexGlobalTimer.h"
 
-class CGUIDialogPlexVideoOSD : public CGUIDialogVideoOSD, public IPlexGlobalTimeout
+class CGUIDialogPlexVideoOSD : public CGUIDialogVideoOSD
 {
 public:
   CGUIDialogPlexVideoOSD();
-  bool OnAction(const CAction &action);
-  bool OnMessage(CGUIMessage &message);
-
-  void OnTimeout();
-  CStdString TimerName() const { return "videoosd"; }
+  virtual bool OnAction(const CAction &action);
+  virtual bool OnMessage(CGUIMessage& message);
 
   bool IsOpenedFromPause() const { return m_openedFromPause; }
   void SetOpenedFromPause(bool onOff) { m_openedFromPause = onOff; }

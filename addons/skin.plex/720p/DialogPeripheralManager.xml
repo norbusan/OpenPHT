@@ -67,7 +67,7 @@
 					<control type="image">
 						<width>555</width>
 						<height>85</height>
-						<texture border="5">border-bottom-grey.png</texture>
+						<texture>border-bottom-grey.png</texture>
 					</control>
 					<control type="label">
 						<description>Name</description>

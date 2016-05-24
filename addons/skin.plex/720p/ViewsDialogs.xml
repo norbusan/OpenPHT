@@ -88,7 +88,7 @@
 		<animation effect="slide" end="0,200" time="300">WindowClose</animation>
 	</include>
 	<include name="FadeDialog">
-		<animation effect="fade" start="100" end="40" time="300" condition="Window.IsActive(selectdialog) | Window.IsActive(contextmenu) | Window.IsActive(okdialog) | Window.IsActive(addonsettings) | Window.IsActive(progressdialog) | Window.IsActive(10079) | Window.IsActive(10080) | Window.IsActive(2000) | Window.IsActive(10204) | Window.IsActive(10205) | Window.IsActive(200) | Window.IsActive(playercontrols) | Window.IsActive(10211)">Conditional</animation>
+		<animation effect="fade" start="100" end="40" time="300"  condition="!Skin.HasSetting(DisableWindowFade) + [Window.IsActive(selectdialog) | Window.IsActive(contextmenu) | Window.IsActive(okdialog) | Window.IsActive(addonsettings) | Window.IsActive(progressdialog) | Window.IsActive(10079) | Window.IsActive(10080) | Window.IsActive(2000) | Window.IsActive(10204) | Window.IsActive(10205) | Window.IsActive(200) | Window.IsActive(playercontrols) | Window.IsActive(10211)]">Conditional</animation>
 	</include>
 	<!-- -->
 	<!-- DIALOG WINDOWS -->
@@ -171,7 +171,7 @@
 								<posy>0</posy>
 								<width>560</width>
 								<height>50</height>
-								<texture border="5">border-bottom-grey.png</texture>
+								<texture>border-bottom-grey.png</texture>
 							</control>
 							<control type="label">
 								<width>560</width>
@@ -204,6 +204,18 @@
 						<posx>563</posx>
 						<width>20</width>
 						<height>300</height>
+					</control>
+					<control type="button" id="5">
+						<description>Manual button</description>
+						<posy>280</posy>
+						<posx>410</posx>
+						<width>120</width>
+						<label>186</label>
+						<onleft>3</onleft>
+						<onright>3</onright>
+						<onup>3</onup>
+						<ondown>3</ondown>
+						<include>DialogPressButton</include>
 					</control>
 				</control>
 			</control>
@@ -282,7 +294,7 @@
 								<posy>0</posy>
 								<width>460</width>
 								<height>50</height>
-								<texture border="5">border-bottom-grey.png</texture>
+								<texture>border-bottom-grey.png</texture>
 							</control>
 							<control type="label">
 								<width>460</width>

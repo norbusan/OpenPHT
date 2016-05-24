@@ -29,6 +29,7 @@
 #include "EGLWrapper.h"
 #include "EGLQuirks.h"
 #include <vector>
+#include <float.h>
 ////////////////////////////////////////////////////////////////////////////////////////////
 CWinSystemEGL::CWinSystemEGL() : CWinSystemBase()
 {
@@ -43,7 +44,7 @@ CWinSystemEGL::CWinSystemEGL() : CWinSystemBase()
   m_config            = NULL;
 
   m_egl               = NULL;
-  m_iVSyncMode        = false;
+  m_iVSyncMode        = 0;
 }
 
 CWinSystemEGL::~CWinSystemEGL()
@@ -235,7 +236,8 @@ bool CWinSystemEGL::CreateNewWindow(const CStdString& name, bool fullScreen, RES
   if ((m_bWindowCreated && m_egl && m_egl->GetNativeResolution(&current_resolution)) &&
     current_resolution.iWidth == res.iWidth && current_resolution.iHeight == res.iHeight &&
     current_resolution.iScreenWidth == res.iScreenWidth && current_resolution.iScreenHeight == res.iScreenHeight &&
-    m_bFullScreen == fullScreen && current_resolution.fRefreshRate == res.fRefreshRate)
+    m_bFullScreen == fullScreen && current_resolution.fRefreshRate == res.fRefreshRate &&
+    (current_resolution.dwFlags & D3DPRESENTFLAG_MODEMASK) == (res.dwFlags & D3DPRESENTFLAG_MODEMASK))
   {
     CLog::Log(LOGDEBUG, "CWinSystemEGL::CreateNewWindow: No need to create a new window");
     return true;
@@ -280,7 +282,9 @@ bool CWinSystemEGL::DestroyWindow()
 bool CWinSystemEGL::ResizeWindow(int newWidth, int newHeight, int newLeft, int newTop)
 {
   CRenderSystemGLES::ResetRenderSystem(newWidth, newHeight, true, 0);
-  SetVSyncImpl(m_iVSyncMode);
+  int vsync_mode = g_guiSettings.GetInt("videoscreen.vsync");
+  if (vsync_mode != VSYNC_DRIVER)
+    SetVSyncImpl(m_iVSyncMode);
   return true;
 }
 
@@ -288,7 +292,9 @@ bool CWinSystemEGL::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool bl
 {
   CreateNewWindow("", fullScreen, res, NULL);
   CRenderSystemGLES::ResetRenderSystem(res.iWidth, res.iHeight, fullScreen, res.fRefreshRate);
-  SetVSyncImpl(m_iVSyncMode);
+  int vsync_mode = g_guiSettings.GetInt("videoscreen.vsync");
+  if (vsync_mode != VSYNC_DRIVER)
+    SetVSyncImpl(m_iVSyncMode);
   return true;
 }
 
@@ -299,10 +305,20 @@ void CWinSystemEGL::UpdateResolutions()
   RESOLUTION_INFO resDesktop, curDisplay;
   std::vector<RESOLUTION_INFO> resolutions;
 
-  if (!m_egl->ProbeResolutions(resolutions) || !resolutions.size())
+  if (!m_egl->ProbeResolutions(resolutions) || resolutions.empty())
   {
-    CLog::Log(LOGERROR, "%s: Could not find any possible resolutions",__FUNCTION__);
-    return;
+    CLog::Log(LOGWARNING, "%s: ProbeResolutions failed. Trying safe default.",__FUNCTION__);
+
+    RESOLUTION_INFO fallback;
+    if (m_egl->GetPreferredResolution(&fallback))
+    {
+      resolutions.push_back(fallback);
+    }
+    else
+    {
+      CLog::Log(LOGERROR, "%s: Fatal Error, GetPreferredResolution failed",__FUNCTION__);
+      return;
+    }
   }
 
   /* ProbeResolutions includes already all resolutions.
@@ -342,7 +358,8 @@ void CWinSystemEGL::UpdateResolutions()
        resDesktop.iHeight == resolutions[i].iHeight &&
        resDesktop.iScreenWidth == resolutions[i].iScreenWidth &&
        resDesktop.iScreenHeight == resolutions[i].iScreenHeight &&
-       resDesktop.fRefreshRate == resolutions[i].fRefreshRate)
+       (resDesktop.dwFlags & D3DPRESENTFLAG_MODEMASK) == (resolutions[i].dwFlags & D3DPRESENTFLAG_MODEMASK) &&
+       fabs(resDesktop.fRefreshRate - resolutions[i].fRefreshRate) < FLT_EPSILON)
     {
       ResDesktop = res_index;
     }
@@ -384,9 +401,12 @@ bool CWinSystemEGL::PresentRenderImpl(const CDirtyRegionList &dirty)
 
 void CWinSystemEGL::SetVSyncImpl(bool enable)
 {
-  m_iVSyncMode = enable;
-  if (!m_egl->SetVSync(m_display, m_iVSyncMode))
+  m_iVSyncMode = enable ? 10:0;
+  if (!m_egl->SetVSync(m_display, enable))
+  {
+    m_iVSyncMode = 0;
     CLog::Log(LOGERROR, "%s,Could not set egl vsync", __FUNCTION__);
+  }
 }
 
 void CWinSystemEGL::ShowOSMouse(bool show)
@@ -449,24 +469,6 @@ bool CWinSystemEGL::Support3D(int width, int height, uint32_t mode) const
     int searchWidth = curr.iScreenWidth;
     int searchHeight = curr.iScreenHeight;
 
-    // work out current non-3D resolution (in case we are currently in 3D mode)
-    if (curr.dwFlags & D3DPRESENTFLAG_MODE3DSBS)
-    {
-      searchWidth *= 2;
-    }
-    else if (curr.dwFlags & D3DPRESENTFLAG_MODE3DTB)
-    {
-      searchHeight *= 2;
-    }
-    // work out resolution if we switch to 3D mode
-    if (mode & D3DPRESENTFLAG_MODE3DSBS)
-    {
-      searchWidth /= 2;
-    }
-    else if (mode & D3DPRESENTFLAG_MODE3DTB)
-    {
-      searchHeight /= 2;
-    }
     // only search the custom resolutions
     for (unsigned int i = (int)RES_DESKTOP; i < g_settings.m_ResInfo.size(); i++)
     {

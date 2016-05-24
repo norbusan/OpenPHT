@@ -238,6 +238,7 @@ public:
   virtual bool CanOpenAsync() { return false; };
   virtual void Abort() {};
   virtual void FadeOut(int milliseconds) {};
+  virtual bool IsTranscoded() { return false; };
   /* END PLEX */
 
 protected:

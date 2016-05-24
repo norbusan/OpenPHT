@@ -68,6 +68,7 @@ public:
     m_ioService.stop();
     StopThread(true);
 
+    m_plexAdvertiser.reset();
     m_pmsBrowser.reset();
   }
 
@@ -77,7 +78,6 @@ public:
     {
       dprintf("NetworkService: shutting down player advertisement");
       m_plexAdvertiser->stop();
-      m_plexAdvertiser.reset();
     }
   }
 

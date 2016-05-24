@@ -1,7 +1,7 @@
 <!-- Windows Media Center registration file for Plex on Windows Vista -->
 <application title="OpenPHT"
              id="{58c81b86-8d46-4cf3-9623-b9825d6b4bb8}"
-             companyname="Team OpenPHT"
+             companyname="Team RasPlex"
              description="The solution for your local and online media"
              StartMenuStripTitle="OpenPHT"
              StartMenuStripCategory="Custom Start Menu\OpenPHT">

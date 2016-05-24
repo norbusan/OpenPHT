@@ -1,8 +1,10 @@
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "OpenPHT")
-set(CPACK_PACKAGE_VENDOR "Team OpenPHT")
+set(CPACK_PACKAGE_VENDOR "Team RasPlex")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PLEX_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PLEX_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PLEX_VERSION_PATCH})
+set(CPACK_PLEX_VERSION_STRING ${PLEX_VERSION_STRING})
+set(CPACK_PLEX_VERSION_STRING_SHORT_BUILD ${PLEX_VERSION_STRING_SHORT_BUILD})
 if(TARGET_OSX)
   set(CPACK_SYSTEM_NAME "macosx-${OSX_ARCH}")
 elseif(TARGET_WIN32)
@@ -24,11 +26,13 @@ set(CPACK_COMPONENT_RUNTIME_REQUIRED 1)
 set(CPACK_STRIP_FILES 1)
 
 # Windows installer stuff
+set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
 set(CPACK_NSIS_MUI_UNIICON ${plexdir}\\\\Resources\\\\Plex.ico)
 set(CPACK_NSIS_MUI_ICON ${plexdir}\\\\Resources\\\\Plex.ico)
 #set(CPACK_PACKAGE_ICON ${plexdir}\\\\Resources\\\\PlexBanner.bmp)
-set(CPACK_NSIS_HELP_LINK "http://www.openpht.tv")
-set(CPACK_NSIS_URL_INFO_ABOUT ${CPACK_NSIS_HELP_LINK})
+set(CPACK_NSIS_INSTALLED_ICON_NAME ${EXECUTABLE_NAME}.exe)
+set(CPACK_NSIS_HELP_LINK "http://forums.openpht.tv/")
+set(CPACK_NSIS_URL_INFO_ABOUT "http://www.openpht.tv/")
 set(CPACK_PACKAGE_EXECUTABLES ${EXECUTABLE_NAME} "OpenPHT" ${CPACK_PACKAGE_EXECUTABLES})
 set(CPACK_RESOURCE_FILE_LICENSE ${root}/LICENSE.GPL)
 set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
@@ -36,6 +40,8 @@ set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
   "IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2012_x86.exe\\\" 0 +2
    ExecWait \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2012_x86.exe /q /norestart\\\"
+   IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2013_x86.exe\\\" 0 +2
+   ExecWait \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2013_x86.exe /q /norestart\\\"
    IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\dxsetup\\\\dxsetup.exe\\\" 0 +2
    ExecWait \\\"$INSTDIR\\\\Dependencies\\\\dxsetup\\\\dxsetup.exe /silent\\\"
    RMDir /r \\\"$INSTDIR\\\\Dependencies\\\"")

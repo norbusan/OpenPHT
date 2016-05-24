@@ -182,6 +182,7 @@ const char *GetDarwinOSReleaseString(void)
 
 const char *GetDarwinVersionString(void)
 {
+  CCocoaAutoPool pool;
   return [[[NSProcessInfo processInfo] operatingSystemVersionString] UTF8String];
 }
 
@@ -196,6 +197,23 @@ float GetIOSVersion(void)
 #endif
 
   return(version);
+}
+
+const char *GetOSXVersionString(void)
+{
+#if defined(TARGET_DARWIN_OSX)
+  static std::string OSXVersionString;
+  if (OSXVersionString.empty())
+  {
+    CCocoaAutoPool pool;
+    OSXVersionString.assign((const char*)[[[NSDictionary dictionaryWithContentsOfFile:
+                         @"/System/Library/CoreServices/SystemVersion.plist"] objectForKey:@"ProductVersion"] UTF8String]);
+  }
+  
+  return OSXVersionString.c_str();
+#else
+  return "0.0";
+#endif
 }
 
 int  GetDarwinFrameworkPath(bool forPython, char* path, uint32_t *pathsize)
@@ -446,6 +464,43 @@ bool DarwinCFStringRefToString(CFStringRef source, std::string &destination)
 bool DarwinCFStringRefToUTF8String(CFStringRef source, std::string &destination)
 {
   return DarwinCFStringRefToStringWithEncoding(source, destination, kCFStringEncodingUTF8);
+}
+
+const char *GetDarwinManufacturer(void)
+{
+  static std::string manufName;
+  if (manufName.empty())
+  {
+#ifdef TARGET_DARWIN_IOS
+    // to avoid dlloading of IOIKit, hardcode return value
+	// until other than Apple devices with iOS will be released
+    manufName = "Apple Inc.";
+#elif defined(TARGET_DARWIN_OSX)
+    const CFMutableDictionaryRef matchExpDev = IOServiceMatching("IOPlatformExpertDevice");
+    if (matchExpDev)
+    {
+      const io_service_t servExpDev = IOServiceGetMatchingService(kIOMasterPortDefault, matchExpDev);
+      if (servExpDev)
+      {
+        CFTypeRef manufacturer = IORegistryEntryCreateCFProperty(servExpDev, CFSTR("manufacturer"), kCFAllocatorDefault, 0);
+        if (manufacturer)
+        {
+          if (CFGetTypeID(manufacturer) == CFStringGetTypeID())
+            manufName = (const char*)[[NSString stringWithString:(NSString *)manufacturer] UTF8String];
+          else if (CFGetTypeID(manufacturer) == CFDataGetTypeID())
+          {
+            manufName.assign((const char*)CFDataGetBytePtr((CFDataRef)manufacturer), CFDataGetLength((CFDataRef)manufacturer));
+            if (!manufName.empty() && manufName[manufName.length() - 1] == 0)
+              manufName.erase(manufName.length() - 1); // remove extra null at the end if any
+          }
+          CFRelease(manufacturer);
+        }
+      }
+      IOObjectRelease(servExpDev);
+    }
+#endif // TARGET_DARWIN_OSX
+  }
+  return manufName.c_str();
 }
 
 /* PLEX */

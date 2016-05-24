@@ -69,4 +69,5 @@ add_definitions(
   -D_LARGEFILE64_SOURCE
   -D_LINUX
   -D__STDC_LIMIT_MACROS
+  -D__STDC_FORMAT_MACROS
 )

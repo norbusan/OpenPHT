@@ -1,0 +1,397 @@
+From 2c4100e68fe028a0366e469bd1efd6dd183bc11d Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Mon, 22 Feb 2016 20:46:17 +0100
+Subject: [PATCH] CMake from plexinc
+
+---
+ CMakeLists.txt                            | 69 +++++++++++++++++++++++++
+ src/client/CMakeLists.txt                 | 83 +++++++++++++++++++++++++++++++
+ src/common/CMakeLists.txt                 | 71 ++++++++++++++++++++++++++
+ src/config.h.cmake.in                     | 49 ++++++++++++++++++
+ src/google_breakpad/common/CMakeLists.txt | 20 ++++++++
+ src/third_party/CMakeLists.txt            |  2 +
+ src/tools/linux/CMakeLists.txt            |  4 ++
+ src/tools/mac/CMakeLists.txt              |  6 +++
+ src/tools/windows/CMakeLists.txt          | 12 +++++
+ 9 files changed, 316 insertions(+)
+ create mode 100644 CMakeLists.txt
+ create mode 100644 src/client/CMakeLists.txt
+ create mode 100644 src/common/CMakeLists.txt
+ create mode 100644 src/config.h.cmake.in
+ create mode 100644 src/google_breakpad/common/CMakeLists.txt
+ create mode 100644 src/third_party/CMakeLists.txt
+ create mode 100644 src/tools/linux/CMakeLists.txt
+ create mode 100644 src/tools/mac/CMakeLists.txt
+ create mode 100644 src/tools/windows/CMakeLists.txt
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+new file mode 100644
+index 0000000..4bf335d
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,69 @@
++Project(breakpad)
++cmake_minimum_required(VERSION 2.8)
++
++# find some include files
++if(UNIX)
++	include(CheckIncludeFiles)
++	check_include_files(a.out.h HAVE_A_OUT_H)
++	check_include_files(inttypes.h HAVE_INTTYPES_H)
++	check_include_files(memory.h HAVE_MEMORY_H)
++	check_include_files(stdint.h HAVE_STDINT_H)
++	check_include_files(stdlib.h HAVE_STDLIB_H)
++	check_include_files(strings.h HAVE_STRINGS_H)
++	check_include_files(string.h HAVE_STRING_H)
++	check_include_files(sys/stat.h HAVE_SYS_STAT_H)
++	check_include_files(sys/types.h HAVE_SYS_TYPES_H)
++	check_include_files(unistd.h HAVE_UNISTD_H)
++	check_include_files(cpuid.h HAVE_CPUID_H)
++
++	# check for threads
++	find_package(Threads)
++
++	configure_file(src/config.h.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
++
++	include(CheckSymbolExists)
++	check_symbol_exists(ULLONG_MAX "limits.h" HAVE_ULLONG_MAX)
++	if(NOT HAVE_ULLONG_MAX)
++	add_definitions(-DULLONG_MAX=18446744073709551615ULL)
++	endif(NOT HAVE_ULLONG_MAX)
++
++	add_definitions(-DHAVE_CONFIG_H)
++endif(UNIX)
++
++include_directories(src ${CMAKE_CURRENT_BINARY_DIR})
++
++if(WIN32)
++	add_definitions(/DUNICODE /D_UNICODE /D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS)
++	include_directories("$ENV{VSInstallDir}/DIA SDK/include")
++endif(WIN32)
++
++if(APPLE)
++	add_definitions(-DHAVE_MACH_O_NLIST_H)
++	include_directories(src/common/mac src/client/apple/Framework)
++endif(APPLE)
++
++add_subdirectory(src/client)
++add_subdirectory(src/common)
++add_subdirectory(src/third_party)
++add_subdirectory(src/google_breakpad/common)
++
++if(APPLE)
++	add_subdirectory(src/tools/mac)
++elseif(UNIX)
++	add_subdirectory(src/tools/linux)
++elseif(WIN32)
++	add_subdirectory(src/tools/windows)
++endif(APPLE)
++
++set(PACKAGE_NAME breakpad)
++set(PACKAGE_VERSION 1.0)
++set(prefix ${CMAKE_INSTALL_PREFIX})
++set(exec_prefix "\${prefix}/bin")
++set(libdir "\${prefix}/lib")
++set(includedir "\${prefix}/include")
++set(PTHREAD_LIBS ${CMAKE_THREAD_LIBS_INIT})
++set(PTHREAD_CFLAGS "")
++
++configure_file(breakpad-client.pc.in breakpad-client.pc)
++configure_file(breakpad.pc.in breakpad.pc)
++install(FILES ${CMAKE_CURRENT_BINARY_DIR}/breakpad-client.pc ${CMAKE_CURRENT_BINARY_DIR}/breakpad.pc DESTINATION lib/pkgconfig)
+\ No newline at end of file
+diff --git a/src/client/CMakeLists.txt b/src/client/CMakeLists.txt
+new file mode 100644
+index 0000000..229a7d8
+--- /dev/null
++++ b/src/client/CMakeLists.txt
+@@ -0,0 +1,83 @@
++
++set(COMMON_SRC minidump_file_writer.cc)
++
++if(APPLE)
++  add_library(breakpad_client STATIC
++    ${COMMON_SRC}
++    $<TARGET_OBJECTS:common>
++    mac/handler/breakpad_nlist_64.cc
++    mac/handler/dynamic_images.cc
++    mac/handler/exception_handler.cc
++    mac/handler/minidump_generator.cc
++    mac/crash_generation/crash_generation_client.cc
++    mac/crash_generation/crash_generation_server.cc
++  )
++  file(GLOB HEADERS mac/handler/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/mac/handler)
++
++  file(GLOB HEADERS mac/crash_generation/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/mac/crash_generation)
++
++  file(GLOB HEADERS mac/crash_generation/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/mac/crash_generation)
++elseif(WIN32)
++  add_library(breakpad_client STATIC
++    $<TARGET_OBJECTS:common>
++    windows/crash_generation/client_info.cc
++    windows/crash_generation/crash_generation_client.cc
++    windows/crash_generation/crash_generation_server.cc
++    windows/crash_generation/minidump_generator.cc
++    windows/handler/exception_handler.cc
++  )
++  set_target_properties(breakpad_client PROPERTIES COMPILE_PDB_NAME "breakpad_client")
++  install(FILES "${PROJECT_BINARY_DIR}/src/client/breakpad_client.pdb" DESTINATION lib)
++
++  file(GLOB HEADERS windows/handler/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/windows/handler)
++
++  file(GLOB HEADERS windows/crash_generation/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/windows/crash_generation)
++
++  file(GLOB HEADERS windows/common/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/windows/common)
++
++  file(GLOB HEADERS windows/sender/*h)
++  install(FILES ${HEADERS} DESTINATION include/breakpad/client/windows/sender)
++elseif(UNIX)
++  add_library(breakpad_client STATIC
++    linux/crash_generation/crash_generation_client.cc
++    linux/crash_generation/crash_generation_server.cc
++    linux/handler/exception_handler.cc
++    linux/handler/minidump_descriptor.cc
++    linux/log/log.cc
++    linux/minidump_writer/linux_dumper.cc
++    linux/minidump_writer/linux_ptrace_dumper.cc
++    linux/minidump_writer/minidump_writer.cc
++    ${COMMON_SRC}
++
++    ${PROJECT_SOURCE_DIR}/src/common/convert_UTF.c
++    ${PROJECT_SOURCE_DIR}/src/common/md5.cc
++    ${PROJECT_SOURCE_DIR}/src/common/string_conversion.cc
++    ${PROJECT_SOURCE_DIR}/src/common/linux/elfutils.cc
++    ${PROJECT_SOURCE_DIR}/src/common/linux/file_id.cc
++    ${PROJECT_SOURCE_DIR}/src/common/linux/guid_creator.cc
++    ${PROJECT_SOURCE_DIR}/src/common/linux/linux_libc_support.cc
++    ${PROJECT_SOURCE_DIR}/src/common/linux/memory_mapped_file.cc
++    ${PROJECT_SOURCE_DIR}/src/common/linux/safe_readlink.cc
++  )
++  file(GLOB HEADERS linux/handler/*h)
++  install(FILES ${HEADERS}
++          DESTINATION include/breakpad/client/linux/handler)
++
++  file(GLOB HEADERS linux/crash_generation/*h)
++  install(FILES ${HEADERS}
++          DESTINATION include/breakpad/client/linux/crash_generation)
++
++  file(GLOB HEADERS linux/minidump_writer/*h)
++  install(FILES ${HEADERS}
++          DESTINATION include/breakpad/client/linux/minidump_writer)
++
++endif(APPLE)
++
++install(TARGETS breakpad_client DESTINATION lib)
++
+diff --git a/src/common/CMakeLists.txt b/src/common/CMakeLists.txt
+new file mode 100644
+index 0000000..c69f5b0
+--- /dev/null
++++ b/src/common/CMakeLists.txt
+@@ -0,0 +1,71 @@
++if(UNIX)
++  set(common_SRC
++    dwarf_cfi_to_module.cc
++    dwarf_cu_to_module.cc
++    dwarf_line_to_module.cc
++    language.cc
++    module.cc
++    stabs_reader.cc
++    stabs_to_module.cc
++    dwarf/bytereader.cc
++    dwarf/dwarf2diehandler.cc
++    dwarf/dwarf2reader.cc
++  )
++
++  file(GLOB DWARF_HEADERS dwarf/*.h)
++  install(FILES ${DWARF_HEADERS} DESTINATION include/breakpad/common/dwarf)
++endif(UNIX)
++
++if(APPLE)
++  list(APPEND common_SRC
++    convert_UTF.c
++    md5.cc
++    string_conversion.cc
++    mac/arch_utilities.cc
++    mac/GTMLogger.m
++    mac/file_id.cc
++    mac/HTTPMultipartUpload.m
++    mac/MachIPC.mm
++    mac/bootstrap_compat.cc
++    mac/macho_id.cc
++    mac/macho_utilities.cc
++    mac/macho_walker.cc
++    mac/macho_reader.cc
++    mac/string_utilities.cc
++    mac/dump_syms.cc
++  )
++
++  file(GLOB MAC_HEADERS mac/*.h)
++  install(FILES ${MAC_HEADERS} DESTINATION include/breakpad/common/mac)
++
++elseif(UNIX)
++  list(APPEND common_SRC
++    linux/crc32.cc
++    linux/dump_symbols.cc
++    linux/elf_symbols_to_module.cc
++    linux/elfutils.cc
++    linux/file_id.cc
++    linux/linux_libc_support.cc
++    linux/memory_mapped_file.cc
++    linux/safe_readlink.cc
++  )
++  file(GLOB LINUX_HEADERS linux/*.h)
++  install(FILES ${LINUX_HEADERS} DESTINATION include/breakpad/common/linux)
++elseif(WIN32)
++  list(APPEND common_SRC
++    windows/dia_util.cc
++    windows/guid_string.cc
++    windows/omap.cc
++    windows/pdb_source_line_writer.cc
++    windows/string_utils.cc
++    windows/http_upload.cc
++  )
++  file(GLOB WIN_HEADERS windows/*.h)
++  install(FILES ${WIN_HEADERS} DESTINATION include/breakpad/common/windows)
++endif(APPLE)
++
++add_library(common OBJECT ${common_SRC})
++
++file(GLOB HEADERS *.h)
++install(FILES ${HEADERS} DESTINATION include/breakpad/common)
++
+diff --git a/src/config.h.cmake.in b/src/config.h.cmake.in
+new file mode 100644
+index 0000000..122325d
+--- /dev/null
++++ b/src/config.h.cmake.in
+@@ -0,0 +1,49 @@
++/* src/config.h.in.  Generated from configure.ac by autoheader.  */
++
++/* Define to 1 if you have the <a.out.h> header file. */
++#cmakedefine HAVE_A_OUT_H @HAVE_A_OUT_H@
++
++/* Define to 1 if you have the <inttypes.h> header file. */
++#cmakedefine HAVE_INTTYPES_H @HAVE_INTTYPES_H@
++
++/* Define to 1 if you have the <memory.h> header file. */
++#cmakedefine HAVE_MEMORY_H @HAVE_MEMORY_H@
++
++/* Define if you have POSIX threads libraries and header files. */
++#cmakedefine HAVE_PTHREAD @HAVE_PTHREAD@
++
++/* Define to 1 if you have the <stdint.h> header file. */
++#cmakedefine HAVE_STDINT_H @HAVE_STDINT_H@
++
++/* Define to 1 if you have the <stdlib.h> header file. */
++#cmakedefine HAVE_STDLIB_H @HAVE_STDLIB_H@
++
++/* Define to 1 if you have the <strings.h> header file. */
++#cmakedefine HAVE_STRINGS_H @HAVE_STRINGS_H@
++
++/* Define to 1 if you have the <string.h> header file. */
++#cmakedefine HAVE_STRING_H @HAVE_STRING_H@
++
++/* Define to 1 if you have the <sys/stat.h> header file. */
++#cmakedefine HAVE_SYS_STAT_H @HAVE_SYS_STAT_H@
++
++/* Define to 1 if you have the <sys/types.h> header file. */
++#cmakedefine HAVE_SYS_TYPES_H @HAVE_SYS_TYPES_H@
++
++/* Define to 1 if you have the <unistd.h> header file. */
++#cmakedefine HAVE_UNISTD_H @HAVE_UNISTD_H@
++
++#cmakedefine HAVE_CPUID_H @HAVE_CPUID_H@
++
++/* Define to 1 if your C compiler doesn't accept -c and -o together. */
++#cmakedefine NO_MINUS_C_MINUS_O
++
++/* Define to necessary symbol if this constant uses a non-standard name on
++   your system. */
++#cmakedefine PTHREAD_CREATE_JOINABLE @PTHREAD_CREATE_JOINABLE@
++
++/* Define to 1 if you have the ANSI C header files. */
++#cmakedefine STDC_HEADERS @STDC_HEADERS@
++
++/* Version number of package */
++#cmakedefine VERSION @VERSION@
+diff --git a/src/google_breakpad/common/CMakeLists.txt b/src/google_breakpad/common/CMakeLists.txt
+new file mode 100644
+index 0000000..76005e8
+--- /dev/null
++++ b/src/google_breakpad/common/CMakeLists.txt
+@@ -0,0 +1,20 @@
++set(HEADERS
++  breakpad_types.h
++  minidump_cpu_ppc64.h
++  minidump_cpu_x86.h
++  minidump_exception_solaris.h
++  minidump_size.h
++  minidump_cpu_amd64.h
++  minidump_cpu_ppc.h
++  minidump_exception_linux.h
++  minidump_exception_win32.h
++  minidump_exception_ps3.h
++  minidump_cpu_arm.h
++  minidump_cpu_sparc.h
++  minidump_cpu_arm64.h
++  minidump_cpu_mips.h
++  minidump_exception_mac.h
++  minidump_format.h
++)
++
++install(FILES ${HEADERS} DESTINATION include/breakpad/google_breakpad/common)
+diff --git a/src/third_party/CMakeLists.txt b/src/third_party/CMakeLists.txt
+new file mode 100644
+index 0000000..f9da895
+--- /dev/null
++++ b/src/third_party/CMakeLists.txt
+@@ -0,0 +1,2 @@
++file(GLOB H lss/*h)
++install(FILES ${H} DESTINATION include/breakpad/third_party/lss)
+diff --git a/src/tools/linux/CMakeLists.txt b/src/tools/linux/CMakeLists.txt
+new file mode 100644
+index 0000000..f1c8b18
+--- /dev/null
++++ b/src/tools/linux/CMakeLists.txt
+@@ -0,0 +1,4 @@
++add_executable(dump_syms dump_syms/dump_syms.cc $<TARGET_OBJECTS:common>)
++target_link_libraries(dump_syms)
++
++install(TARGETS dump_syms DESTINATION bin)
+diff --git a/src/tools/mac/CMakeLists.txt b/src/tools/mac/CMakeLists.txt
+new file mode 100644
+index 0000000..c317ccf
+--- /dev/null
++++ b/src/tools/mac/CMakeLists.txt
+@@ -0,0 +1,6 @@
++find_library(FOUNDATION_LIB Foundation)
++
++add_executable(dump_syms dump_syms/dump_syms_tool.cc $<TARGET_OBJECTS:common>)
++target_link_libraries(dump_syms ${FOUNDATION_LIB})
++
++install(TARGETS dump_syms DESTINATION bin)
+diff --git a/src/tools/windows/CMakeLists.txt b/src/tools/windows/CMakeLists.txt
+new file mode 100644
+index 0000000..e63f814
+--- /dev/null
++++ b/src/tools/windows/CMakeLists.txt
+@@ -0,0 +1,12 @@
++set(MSVC_DIA_SDK_DIR "$ENV{VSINSTALLDIR}DIA SDK")
++find_library(DIAGUIDS NAME diaguids.lib HINTS ${MSVC_DIA_SDK_DIR}/lib)
++
++add_executable(dump_syms
++	dump_syms/dump_syms.cc
++	../../common/windows/guid_string.cc
++	../../common/windows/pdb_source_line_writer.cc
++	../../common/windows/string_utils.cc)
++
++target_link_libraries(dump_syms ${DIAGUIDS} imagehlp.lib breakpad_client)
++
++install(TARGETS dump_syms DESTINATION bin)

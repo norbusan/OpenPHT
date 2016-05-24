@@ -19,14 +19,14 @@ msgstr ""
 
 msgctxt "#6"
 msgid "XBMC SVN"
-msgstr "Plex/HT SVN"
+msgstr "OpenPHT SVN"
 
 
 #empty strings from id 7 to 8
 
 msgctxt "#9"
 msgid "xbmc media center"
-msgstr "Plex for Home Theater"
+msgstr "OpenPHT"
 
 
 msgctxt "#10"
@@ -38,45 +38,45 @@ msgstr ""
 
 msgctxt "#263"
 msgid "Allow control of XBMC via HTTP"
-msgstr "Permettre le contrôle de Plex/HT via HTTP"
+msgstr "Permettre le contrôle de OpenPHT via HTTP"
 
 
 msgctxt "#482"
 msgid "About XBMC"
-msgstr "A propos de Plex/HT"
+msgstr "A propos de OpenPHT"
 
 
 #empty strings from id 747 to 790
 
 msgctxt "#791"
 msgid "Allow programs on this system to control XBMC"
-msgstr "Permettre le contrôle de Plex/HT par des logiciels installés sur cet ordinateur"
+msgstr "Permettre le contrôle de OpenPHT par des logiciels installés sur cet ordinateur"
 
 
 #empty strings from id 792 to 793
 
 msgctxt "#794"
 msgid "Allow programs on other systems to control XBMC"
-msgstr "Permettre le contrôle à distance de Plex/HT"
+msgstr "Permettre le contrôle à distance de OpenPHT"
 
 
 #empty strings from id 795 to 1001
 
 msgctxt "#1002"
 msgid "XBMC was unable to connect to the network location."
-msgstr "Plex/HT n'a pas pu se connecter à l'emplacement réseau."
+msgstr "OpenPHT n'a pas pu se connecter à l'emplacement réseau."
 
 
 #empty strings from id 1003 to 1269
 
 msgctxt "#1270"
 msgid "Allow XBMC to receive AirPlay content"
-msgstr "Permettre à Plex/HT de recevoir du contenu AirPlay"
+msgstr "Permettre à OpenPHT de recevoir du contenu AirPlay"
 
 
 msgctxt "#13134"
 msgid "H.264 Speed Boost"
-msgstr "Augmentation de la vitesse H.264"
+msgstr "Augmenter la vitesse en H264"
 
 
 msgctxt "#13135"
@@ -108,7 +108,7 @@ msgstr "Sélection automatique des sous-titres"
 
 msgctxt "#13141"
 msgid "If you proceed, you might not be able to control XBMC"
-msgstr "Si vous continuez, vous pourriez ne pas être en mesure de contrôler Plex/HT"
+msgstr "Si vous continuez, vous pourriez ne pas être en mesure de contrôler OpenPHT"
 
 
 #empty string with id 13142
@@ -122,7 +122,7 @@ msgstr "Recherchez des bibliothèques distantes"
 
 msgctxt "#13146"
 msgid "XBMC, changing this setting might affect your ability"
-msgstr " Plex/HT, la modification de ce paramètre peut affecter votre capacité"
+msgstr "OpenPHT, la modification de ce paramètre peut affecter votre capacité"
 
 
 #empty string with id 13147
@@ -178,14 +178,14 @@ msgstr ""
 
 msgctxt "#13309"
 msgid "instead of just XBMC?"
-msgstr "au lieu de Plex/HT seulement ?"
+msgstr "au lieu de OpenPHT seulement ?"
 
 
 #empty strings from id 13310 to 13601
 
 msgctxt "#13602"
 msgid "Allow start of XBMC using the remote"
-msgstr "Permettre le démarrage de Plex/HT en utilisant la télécommande"
+msgstr "Permettre le démarrage de OpenPHT en utilisant la télécommande"
 
 
 #empty strings from id 13603 to 13621
@@ -261,7 +261,7 @@ msgstr "Apparence"
 
 msgctxt "#14039"
 msgid "Plex/HT requires a restart to change your"
-msgstr "Plex/HT nécessite un redémarrage pour changer votre"
+msgstr "OpenPHT nécessite un redémarrage pour changer votre"
 
 
 #empty strings from id 14040 to 15149
@@ -275,7 +275,7 @@ msgstr "Utiliser la bibliothèque d'illustrations"
 
 msgctxt "#15205"
 msgid "Please update Plex/HT"
-msgstr "Merci de mettre à jour Plex/HT"
+msgstr "Merci de mettre à jour OpenPHT"
 
 
 #empty strings from id 15206 to 16000
@@ -405,7 +405,7 @@ msgstr "Méthode de rendu vidéo"
 
 msgctxt "#18110"
 msgid "Audio output channels"
-msgstr ""
+msgstr "Canaux de sortie audio"
 
 
 msgctxt "#18111"
@@ -445,7 +445,7 @@ msgstr "Les \"dirty régions\" modifiées sans réponse (ms)"
 
 msgctxt "#20009"
 msgid "Use Plex/HT"
-msgstr "Utiliser Plex/HT"
+msgstr "Utiliser OpenPHT"
 
 
 #empty strings from id 20010 to 20249
@@ -459,14 +459,14 @@ msgstr "Musique jouée récemment"
 
 msgctxt "#20341"
 msgid "this path from the Plex/HT library?"
-msgstr "ce chemin pour la bibliothèque de Plex/HT ?"
+msgstr "ce chemin pour la bibliothèque de OpenPHT ?"
 
 
 #empty strings from id 20342 to 21880
 
 msgctxt "#21881"
 msgid "Allow control of XBMC via UPnP"
-msgstr "Permettre le contrôle de Plex/HT via UPnP"
+msgstr "Permettre le contrôle de OpenPHT via UPnP"
 
 
 msgctxt "#22003"
@@ -486,31 +486,31 @@ msgstr "Avancé de: %d"
 
 msgctxt "#33075"
 msgid "Plex/HT revision of %s or greater to run."
-msgstr "La version %s ou plus de Plex/HT est nécessaire pour fonctionner."
+msgstr "La version %s ou plus de OpenPHT est nécessaire pour fonctionner."
 
 
 msgctxt "#33076"
 msgid "Please update Plex/HT."
-msgstr "Merci de mettre à jour Plex/HT."
+msgstr "Merci de mettre à jour OpenPHT"
 
 
 #empty strings from id 33077 to 36006
 
 msgctxt "#36007"
 msgid "Power on the TV when starting Plex/HT"
-msgstr "Allumer le téléviseur lors du démarrage de Plex/HT"
+msgstr "Allumer le téléviseur lors du démarrage de OpenPHT"
 
 
 msgctxt "#36008"
 msgid "Power off devices when stopping Plex/HT"
-msgstr "Eteindre les appareils lors de l'arrêt de Plex/HT"
+msgstr "Eteindre les appareils lors de l'arrêt de OpenPHT"
 
 
 #empty strings from id 36009 to 36012
 
 msgctxt "#36013"
 msgid "Unsupported libcec interface version. %d is greater than the version Plex/HT supports (%d)"
-msgstr "Cette version de l'interface libcec (%d) est plus récente que celle compatible avec cette version de Plex/HT (%d)."
+msgstr "Cette version de l'interface libcec (%d) est plus récente que celle compatible avec cette version de OpenPHT (%d)."
 
 
 #empty strings from id 36014 to 39999
@@ -572,12 +572,12 @@ msgstr "Version actuelle"
 
 msgctxt "#40028"
 msgid "Update Available!"
-msgstr "Mise à jour disponible!"
+msgstr "Mise à jour disponible !"
 
 
 msgctxt "#40030"
 msgid "Downloading update %d%%..."
-msgstr ""
+msgstr "Téléchargement de la mise à jour %d%%..."
 
 
 #empty strings from id 40029 to 40099
@@ -599,7 +599,7 @@ msgstr "Supprimer l'application"
 
 msgctxt "#40103"
 msgid "Browse for Application"
-msgstr "Rechercher une Application"
+msgstr "Rechercher une application"
 
 
 msgctxt "#40104"
@@ -741,7 +741,7 @@ msgstr "Changer le minuteur d'écran de veille"
 
 msgctxt "#40310"
 msgid "Plex/HT will quit at"
-msgstr "Plex/HT se fermera automatiquement à"
+msgstr "OpenPHT se fermera automatiquement à"
 
 
 msgctxt "#40311"
@@ -967,7 +967,7 @@ msgstr "Contenu partagé"
 
 msgctxt "#44021"
 msgid "Watch Later"
-msgstr ""
+msgstr "À regarder plus tard"
 
 
 msgctxt "#44022"
@@ -997,7 +997,7 @@ msgstr "Se connecter à Plex"
 
 msgctxt "#44101"
 msgid "From your computer go to http://plex.tv/pin"
-msgstr ""
+msgstr "Depuis votre ordinateur, allez sur http://plex.tv/pin"
 
 
 msgctxt "#44102"
@@ -1017,7 +1017,7 @@ msgstr "Félicitation! Vous êtes maintenant connecté."
 
 msgctxt "#44105"
 msgid "Signed in to Plex"
-msgstr ""
+msgstr "Connecté à Plex"
 
 
 msgctxt "#44200"
@@ -1027,7 +1027,7 @@ msgstr "Abonnement PlexPass Nécessaire"
 
 msgctxt "#44201"
 msgid "For this preview release, you must be signed into Plex and have a PlexPass"
-msgstr ""
+msgstr "Pour cette pré-version, vous devez être connecté à Plex et avoir un PlexPass"
 
 
 msgctxt "#44202"
@@ -1047,37 +1047,37 @@ msgstr "Appuyez sur OK pour quitter"
 
 msgctxt "#44300"
 msgid "Allow control of Plex/HT from Plex Clients"
-msgstr "Autoriser le contrôle de Plex/HT à partir de clients Plex"
+msgstr "Autoriser le contrôle de OpenPHT à partir de clients Plex"
 
 
 msgctxt "#44400"
 msgid "Pre-Caching - Select Servers"
-msgstr ""
+msgstr "Mise en cache : Choisissez des serveurs"
 
 
 msgctxt "#44401"
 msgid "Processing"
-msgstr ""
+msgstr "En cours"
 
 
 msgctxt "#44402"
 msgid "Retrieving Section"
-msgstr ""
+msgstr "Récupération"
 
 
 msgctxt "#44403"
 msgid "Precaching Section"
-msgstr ""
+msgstr "Mise en cache"
 
 
 msgctxt "#44404"
 msgid "Precaching item"
-msgstr ""
+msgstr "Element en cache"
 
 
 msgctxt "#44405"
 msgid "Progress"
-msgstr ""
+msgstr "En cours"
 
 
 msgctxt "#44406"
@@ -1087,7 +1087,7 @@ msgstr "Utiliser FFMPEG AVIO pour le transport en réseau"
 
 msgctxt "#44407"
 msgid "Number of cinema trailers before movies"
-msgstr ""
+msgstr "Nombre de bandes-annonces avant le film"
 
 
 msgctxt "#44408"
@@ -1100,12 +1100,12 @@ msgstr ""
 ### Extra Types
 msgctxt "#44501"
 msgid "Trailer"
-msgstr ""
+msgstr "Bande-annonce"
 
 
 msgctxt "#44502"
 msgid "Deleted Scene"
-msgstr ""
+msgstr "Scènes coupées"
 
 
 msgctxt "#44503"
@@ -1115,23 +1115,23 @@ msgstr ""
 
 msgctxt "#44504"
 msgid "Music Video"
-msgstr ""
+msgstr "Clip vidéo"
 
 
 msgctxt "#44505"
 msgid "Behind the Scenes"
-msgstr ""
+msgstr "Coulisses"
 
 
 msgctxt "#44506"
 msgid "Scene"
-msgstr ""
+msgstr "Scène"
 
 
 ### other Extras related strings
 msgctxt "#44550"
 msgid "Play Trailer"
-msgstr ""
+msgstr "Regarder la bande-annonce"
 
 
 #### These are error strings shown from channels
@@ -1143,7 +1143,7 @@ msgstr "Lecture impossible"
 
 msgctxt "#52001"
 msgid "This media is not currently available"
-msgstr "Ce contenu n'est  pas disponible actuellement"
+msgstr "Ce contenu n'est pas disponible actuellement"
 
 
 msgctxt "#52002"
@@ -1214,17 +1214,17 @@ msgstr "Qualité de la vidéo en ligne"
 
 msgctxt "#52210"
 msgid "Show queue and recommendations"
-msgstr ""
+msgstr "Afficher la liste de lecture et les recommandations"
 
 
 msgctxt "#52300"
 msgid "Media Server went away"
-msgstr "Le Serveur Multimédia ne répond plus"
+msgstr "Le serveur ne répond plus"
 
 
 msgctxt "#52301"
 msgid "The Server you where browsing went away..."
-msgstr "Le Serveur Multimédia que vous parcouriez ne répond plus	"
+msgstr "Le serveur que vous parcouriez ne répond plus..."
 
 
 msgctxt "#52400"
@@ -1234,7 +1234,7 @@ msgstr "Pas de comptes sociaux liés"
 
 msgctxt "#52401"
 msgid "Go to http://plex.tv to link your account"
-msgstr ""
+msgstr "Rendez-vous sur http://plex.tv pour lier votre compte"
 
 
 msgctxt "#52402"
@@ -1254,67 +1254,67 @@ msgstr "Activer la journalisation du réseau"
 
 msgctxt "#52500"
 msgid "Remote connected"
-msgstr ""
+msgstr "Télécommande connectée"
 
 
 msgctxt "#52501"
 msgid "Remote disconnected"
-msgstr ""
+msgstr "Télécommande déconnectée"
 
 
 msgctxt "#52502"
 msgid "Always transcode subtitles"
-msgstr ""
+msgstr "Toujours transcoder les sous-titres"
 
 
 msgctxt "#52503"
 msgid "Forced"
-msgstr ""
+msgstr "Forcé"
 
 
 msgctxt "#52504"
 msgid "Allow Plex collect anonymous data to improve your experience"
-msgstr ""
+msgstr "Autoriser Plex à collecter anonymement des données pour améliorer votre expérience"
 
 
 msgctxt "#52505"
 msgid "Hide CloudSync sections"
-msgstr ""
+msgstr "Masquer les sections synchronisées"
 
 
 msgctxt "#52600"
 msgid "Shuffle all"
-msgstr ""
+msgstr "Mélanger tous"
 
 
 msgctxt "#52601"
 msgid "Play all"
-msgstr ""
+msgstr "Lire tous"
 
 
 msgctxt "#52602"
 msgid "Play Next"
-msgstr ""
+msgstr "Lire le suivant"
 
 
 msgctxt "#52603"
 msgid "Add to Up Next"
-msgstr ""
+msgstr "Lire après"
 
 
 msgctxt "#52604"
 msgid "Play Now?"
-msgstr ""
+msgstr "Lire maintenant ?"
 
 
 msgctxt "#52605"
 msgid "This will clear the contents of Up Next"
-msgstr ""
+msgstr "Celà effacera la playlist actuelle"
 
 
 msgctxt "#52606"
 msgid "and play the selection instead"
-msgstr ""
+msgstr "et jouera cette selection à la place"
 
 
 msgctxt "#52607"
@@ -1324,56 +1324,56 @@ msgstr "File d'attente"
 
 msgctxt "#52608"
 msgid "Toggle Edit Mode"
-msgstr ""
+msgstr "Basculer en mode édition"
 
 
 msgctxt "#52609"
 msgid "Force Transcode"
-msgstr ""
+msgstr "Forcer le transcodage"
 
 
 msgctxt "#52610"
 msgid "Cannot open Playlist"
-msgstr ""
+msgstr "Impossible d'ouvrir la playlist"
 
 
 msgctxt "#52611"
 msgid "Playlist is empty"
-msgstr ""
+msgstr "La playlist est vide"
 
 
 msgctxt "#52612"
 msgid "Add to Playlist"
-msgstr ""
+msgstr "Ajouter à la playlist"
 
 
 msgctxt "#52613"
 msgid "Create Playlist"
-msgstr ""
+msgstr "Créer une playlist"
 
 
 msgctxt "#52614"
 msgid "Enter playlist name"
-msgstr ""
+msgstr "Entrez un nom de playlist"
 
 
 msgctxt "#52615"
 msgid "Playlist could not be created."
-msgstr ""
+msgstr "La playlist ne peut pas être créée"
 
 
 msgctxt "#52620"
 msgid "MyPlex provides a number of features which requires a login"
-msgstr ""
+msgstr "MyPlex fournit un certain nombre de caractéristiques qui nécessite une connexion"
 
 
 msgctxt "#52621"
 msgid "Improved server discovery, config-free remote access,"
-msgstr ""
+msgstr "Amélioration de la détection de serveurs distants"
 
 
 msgctxt "#52622"
 msgid "Queueing and recommending video, Sharing your media"
-msgstr ""
+msgstr "Vidéos en attente et recommandées"
 
 

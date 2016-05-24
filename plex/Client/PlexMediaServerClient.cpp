@@ -243,16 +243,19 @@ void CPlexMediaServerClient::SendSubscriberTimeline(const CURL &url, const CStdS
 ////////////////////////////////////////////////////////////////////////////////////////
 void CPlexMediaServerClient::SetViewMode(CFileItemPtr item, int viewMode, int sortMode, int sortAsc)
 {
-  CURL u = GetItemURL(item);
-  u.SetFileName("/:/viewChange");
-  u.SetOption("identifier", item->GetProperty("identifier").asString());
-  u.SetOption("viewGroup", item->GetProperty("viewGroup").asString());
+  if (viewMode)
+  {
+    CURL u = GetItemURL(item);
+    u.SetFileName("/:/viewChange");
+    u.SetOption("identifier", item->GetProperty("identifier").asString());
+    u.SetOption("viewGroup", item->GetProperty("viewGroup").asString());
 
-  u.SetOption("viewMode", boost::lexical_cast<CStdString>(viewMode));
-  u.SetOption("sortMode", boost::lexical_cast<CStdString>(sortMode));
-  u.SetOption("sortAsc", boost::lexical_cast<CStdString>(sortAsc));
+    u.SetOption("viewMode", boost::lexical_cast<CStdString>(viewMode));
+    u.SetOption("sortMode", boost::lexical_cast<CStdString>(sortMode));
+    u.SetOption("sortAsc", boost::lexical_cast<CStdString>(sortAsc));
 
-  AddJob(new CPlexMediaServerClientJob(u));
+    AddJob(new CPlexMediaServerClientJob(u));
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

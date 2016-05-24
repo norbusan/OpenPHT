@@ -56,11 +56,14 @@ bool CGUIWindowPlexPreplayVideo::OnMessage(CGUIMessage &message)
     CFileItemPtr item = g_plexApplication.m_preplayItem;
     g_plexApplication.m_preplayItem.reset();
 
-    CPlexServerPtr server = g_plexApplication.serverManager->FindFromItem(item);
-    if (server && server->GetActiveConnection() && server->GetActiveConnection()->IsLocal())
+    if (g_plexApplication.serverManager)
     {
-      CLog::Log(LOGDEBUG, "CGUIWindowPlexPreplayVideo::OnMessage(deinit) killing local item out of directory cache");
-      g_directoryCache.ClearDirectory(item->GetPath());
+      CPlexServerPtr server = g_plexApplication.serverManager->FindFromItem(item);
+      if (server && server->GetActiveConnection() && server->GetActiveConnection()->IsLocal())
+      {
+        CLog::Log(LOGDEBUG, "CGUIWindowPlexPreplayVideo::OnMessage(deinit) killing local item out of directory cache");
+        g_directoryCache.ClearDirectory(item->GetPath());
+      }
     }
   }
   else if (message.GetMessage() == GUI_MSG_CLICKED)
@@ -106,7 +109,9 @@ bool CGUIWindowPlexPreplayVideo::OnMessage(CGUIMessage &message)
   }
   else if (message.GetMessage() == GUI_MSG_UPDATE && IsActive())
   {
-     Refresh(false);
+    m_rootDir.SetFlags(XFILE::DIR_FLAG_READ_CACHE);
+    Refresh(false);
+    m_rootDir.SetFlags(XFILE::DIR_FLAG_DEFAULTS);
   }
 
   return ret;
@@ -337,6 +342,15 @@ bool CGUIWindowPlexPreplayVideo::Update(const CStdString &strDirectory, bool upd
     CPlexDirectoryFetchJob *job = new CPlexDirectoryFetchJob(currentURL, CPlexDirectoryCache::CACHE_STRATEGY_ALWAYS);
     CJobManager::GetInstance().AddJob(job, this);
   }
+  else
+  {
+    CURL url(m_vecItems->GetPath());
+    if (url.HasOption("checkFiles"))
+    {
+      url.RemoveOption("checkFiles");
+      m_vecItems->SetPath(url.Get());
+    }
+  }
 
   return ret;
 }
@@ -380,6 +394,7 @@ void CGUIWindowPlexPreplayVideo::OnJobComplete(unsigned int jobID, bool success,
     if (fjob->m_url.HasOption("checkFiles"))
     {
       m_vecItems->SetPath(fjob->m_url.Get());
+      g_directoryCache.SetDirectory(fjob->m_url.Get(), fjob->m_items, XFILE::DIR_CACHE_ONCE);
       CGUIMessage msg(GUI_MSG_UPDATE, GetID(), g_windowManager.GetActiveWindow(), 0, 0);
       g_windowManager.SendThreadMessage(msg, GetID());
     }

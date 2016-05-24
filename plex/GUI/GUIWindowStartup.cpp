@@ -28,6 +28,7 @@
 #include "Application.h"
 #include "GUI/GUIDialogPlexUserSelect.h"
 #include "GUISettings.h"
+#include "settings/Settings.h"
 #include "PlexTypes.h"
 #include "log.h"
 #include "PlexDirectory.h"
@@ -110,6 +111,9 @@ bool CGUIWindowStartup::OnMessage(CGUIMessage& message)
               CJobManager::GetInstance().AddJob(job, this);
             }
           }
+
+          // ensure settings is saved once we are logged in
+          g_settings.Save();
         }
         break;
 

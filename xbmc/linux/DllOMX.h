@@ -90,13 +90,7 @@ public:
 #else
 class DllOMX : public DllDynamic, DllOMXInterface
 {
-/* PLEX */
-#if defined (TARGET_RASPBERRY_PI)
-  DECLARE_DLL_WRAPPER(DllOMX, "/usr/lib/libopenmaxil.so")
-#else
   DECLARE_DLL_WRAPPER(DllOMX, "libopenmaxil.so")
-#endif
-/* END PLEX */
 
   DEFINE_METHOD0(OMX_ERRORTYPE, OMX_Init)
   DEFINE_METHOD0(OMX_ERRORTYPE, OMX_Deinit)

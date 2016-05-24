@@ -1663,7 +1663,7 @@ int CBuiltins::Execute(const CStdString& execString)
     g_application.StopPVRManager();
   }
   /* PLEX */
-#if defined(TARGET_DARWIN_OSX) || defined(TARGET_WINDOWS) || defined(OPENELEC)
+#if defined(TARGET_DARWIN_OSX) || defined(TARGET_WINDOWS) || defined(TARGET_OPENELEC)
   else if (execute.Equals("toggledisplayblanking"))
   {
     g_guiSettings.SetBool("videoscreen.blankdisplays", !g_guiSettings.GetBool("videoscreen.blankdisplays"));
@@ -1699,7 +1699,7 @@ int CBuiltins::Execute(const CStdString& execString)
 
 bool ScriptJob::DoWork()
 {
-#if TARGET_DARWIN_OSX
+#ifdef TARGET_DARWIN_OSX
   if (m_type == SCRIPT_JOB_APPLE_SCRIPT)
     Cocoa_DoAppleScript(m_scriptData.c_str());
   else if (m_type == SCRIPT_JOB_APPLE_SCRIPT_FILE)

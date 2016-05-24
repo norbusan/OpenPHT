@@ -10,7 +10,7 @@
 // Generated from the TEXTINCLUDE 2 resource.
 //
 #include "windows.h"
-#include "version.h"
+#include "git_revision.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -36,7 +36,7 @@ END
 2 TEXTINCLUDE 
 BEGIN
     "#include ""windows.h""\r\n"
-    "#include ""version.h""\r\n"
+    "#include ""git_revision.h""\r\n"
     "\0"
 END
 
@@ -71,7 +71,7 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "Team OpenPHT"
+            VALUE "CompanyName", "Team RasPlex"
             VALUE "FileDescription", "OpenPHT"
             VALUE "FileVersion", PLEX_VERSION
             VALUE "InternalName", "OpenPHT.exe"

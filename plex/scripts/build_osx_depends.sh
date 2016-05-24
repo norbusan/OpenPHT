@@ -6,6 +6,7 @@ DEPEND_HASH=$(git rev-list -1 HEAD -- $DEPENDDIR | cut -c1-8)
 FFMPEG_HASH=$(git rev-list -1 HEAD -- $ROOT/lib/ffmpeg | cut -c1-8)
 
 target_os=$1
+sdkversion=$2
 
 if [ -z $target_os ]; then
   target_os="osx"
@@ -27,7 +28,9 @@ echo "Building for $darwin-$arch"
 xcodepath=$(xcode-select -print-path)
 xcodebuild=$xcodepath/usr/bin/xcodebuild
 if [ $darwin = "osx" ]; then
-  sdkversion=10.9
+  if [ -z $sdkversion ]; then
+    sdkversion=10.9
+  fi
 else
   sdkversion=$($xcodebuild -showsdks | grep iphoneos | sort | tail -n 1 | awk '{ print $2}')
 fi

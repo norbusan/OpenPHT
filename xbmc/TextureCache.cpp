@@ -40,7 +40,7 @@ using namespace XFILE;
 CTextureCache &CTextureCache::Get()
 {
   /* PLEX */
-#ifdef OPENELEC
+#ifdef TARGET_OPENELEC
   static CPlexTextureCache s_cache;
 #else
   static CTextureCache s_cache;
@@ -51,7 +51,7 @@ CTextureCache &CTextureCache::Get()
 
 CTextureCache::CTextureCache()
 /* PLEX */
-#ifndef TARGET_RPI
+#ifndef TARGET_RASPBERRY_PI
   : CJobQueue(false, 2)
 #endif
 /* END PLEX */

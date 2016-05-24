@@ -968,6 +968,7 @@ int CButtonTranslator::GetActionCode(int window, const CKey &key, CStdString &st
     it2 = (*it).second.end();
   }
 #ifdef _LINUX
+#ifndef TARGET_RASPBERRY_PI
   // Some buttoncodes changed in Hardy
   if (action == 0 && (code & KEY_VKEY) == KEY_VKEY && (code & 0x0F00))
   {
@@ -981,6 +982,7 @@ int CButtonTranslator::GetActionCode(int window, const CKey &key, CStdString &st
       it2 = (*it).second.end();
     }
   }
+#endif
 #endif
   return action;
 }

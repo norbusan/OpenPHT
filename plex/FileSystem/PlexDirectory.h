@@ -111,6 +111,11 @@ namespace XFILE
       return m_file.IsTokenInvalid();
     }
 
+    void SetUserAgent(const CStdString &userAgent)
+    {
+      m_file.SetUserAgent(userAgent);
+    }
+
     virtual DIR_CACHE_TYPE GetCacheType(const CStdString& strPath) const;
 
     virtual bool IsAllowed(const CStdString& strFile) const

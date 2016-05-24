@@ -8,12 +8,11 @@ if(UNIX)
   set(CMAKE_REQUIRED_FLAGS "-D__LINUX_USER__")
 endif()
 
-option(USE_INTERNAL_FFMPEG "" ON)
+option(USE_INTERNAL_FFMPEG "Use internal FFmpeg?" ON)
 
 set(LINK_PKG
   Freetype
   SDL
-  SDL_image
   OpenGL
   ZLIB
   JPEG
@@ -38,6 +37,10 @@ set(LINK_PKG
   DBUS
 )
 
+if(NOT OPENELEC)
+  list(APPEND LINK_PKG SDL_image)
+endif()
+
 if(NOT USE_INTERNAL_FFMPEG)
   list(APPEND LINK_PKG FFmpeg)
 else()
@@ -51,7 +54,7 @@ endif(ENABLE_PYTHON)
 foreach(l ${LINK_PKG})
   plex_find_package(${l} 1 1)
 endforeach()
-  
+
 find_package(Boost COMPONENTS thread system REQUIRED)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
@@ -70,17 +73,35 @@ set(INSTALL_LIB
   Ass
   RTMP
   PLIST
-  ShairPort
-  VAAPI
-  VDPAU
 )
 
 foreach(l ${INSTALL_LIB})
   plex_find_package(${l} 1 0)
 endforeach()
 
-if(NOT DISABLE_CEC)
-  plex_find_package(CEC 0 0)
+option(ENABLE_SHAIRPLAY "Enable ShairPlay?" ON)
+if(ENABLE_SHAIRPLAY)
+  plex_find_package(ShairPlay 1 0)
+endif()
+
+option(ENABLE_SHAIRPORT "Enable ShairPort?" OFF)
+if(ENABLE_SHAIRPORT AND NOT ENABLE_SHAIRPLAY)
+  plex_find_package(ShairPort 1 0)
+endif()
+
+option(ENABLE_VAAPI "Enable VAAPI?" ON)
+if(ENABLE_VAAPI)
+  plex_find_package(VAAPI 1 0)
+endif()
+
+option(ENABLE_VDPAU "Enable VDPAU?" ON)
+if(ENABLE_VDPAU)
+  plex_find_package(VDPAU 1 0)
+endif()
+
+option(ENABLE_CEC "Enable CEC?" ON)
+if(ENABLE_CEC)
+  plex_find_package(CEC 1 0)
 endif()
 
 plex_find_package(Threads 1 0)
@@ -126,8 +147,15 @@ if(DEFINED OPENGL_FOUND)
   set(HAVE_LIBGL 1)
 endif()
 
+if(DEFINED DBUS_FOUND)
+  include_directories(${DBUS_INCLUDE_DIR} ${DBUS_ARCH_INCLUDE_DIR})
+  set(HAVE_DBUS 1)
+endif()
+
 #### default lircdevice
-set(LIRC_DEVICE "/var/run/lirc/lircd")
+if(NOT DEFINED LIRC_DEVICE)
+  set(LIRC_DEVICE "/var/run/lirc/lircd")
+endif()
 
 #### on linux we want to use a "easy" name
 set(EXECUTABLE_NAME "plexhometheater")
@@ -174,8 +202,8 @@ set(PLEX_LINK_NOWHOLEARCHIVE -Wl,--no-whole-archive)
 
 option(OPENELEC "Are we building OpenELEC dist?" OFF)
 if(OPENELEC)
-  add_definitions(-DOPENELEC)
+  add_definitions(-DTARGET_OPENELEC)
 endif(OPENELEC)
 
 ############ Add our definitions
-add_definitions(-DTARGET_LINUX -D_LINUX)
+add_definitions(-DTARGET_LINUX)

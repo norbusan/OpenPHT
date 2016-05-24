@@ -39,6 +39,7 @@
     <keyboard>
       <p>Play</p>
       <q>Queue</q>
+      <f>FastForward</f>
       <r>Rewind</r>
       <left>Left</left>
       <right>Right</right>
@@ -116,7 +117,10 @@
       <next_track>SkipNext</next_track>
       <prev_track>SkipPrevious</prev_track>
       <stop>Stop</stop>
-      <play_pause>Pause</play_pause>
+      <play_pause>PlayPause</play_pause>
+      <fastforward>FastForward</fastforward>
+      <rewind>Rewind</rewind>
+      <record/>
       <launch_mail></launch_mail>
       <launch_media_select>XBMC.ActivateWindow(MyMusic)</launch_media_select>
       <launch_app1_pc_icon>ActivateWindow(MyPrograms)</launch_app1_pc_icon>
@@ -137,15 +141,15 @@
       <f10>VolumeUp</f10>                 <!-- MCE Vol up -->
       <f9>VolumeDown</f9>                 <!-- MCE Vol down -->
       <f8>Mute</f8>                       <!-- MCE mute -->
-      <!-- <g mod="ctrl">ActivateWindowAndFocus(MyPVR, 31,0, 10,0)</g>  <!-- MCE Guide --> -->
+      <!-- <g mod="ctrl">ActivateWindowAndFocus(MyPVR, 31,0, 10,0)</g>  # MCE Guide -->
       <m mod="ctrl">ActivateWindow(music)</m>    <!-- MCE My music -->
       <i mod="ctrl">ActivateWindow(pictures)</i> <!-- MCE My pictures -->
       <e mod="ctrl">ActivateWindow(video)</e>    <!-- MCE videos -->
       <m mod="ctrl,shift">PlayerControl(ShowVideoMenu)</m>         <!-- MCE DVD menu -->
-      <!-- <o mod="ctrl">ActivateWindowAndFocus(MyPVR, 34,0, 13,0)</o>  <!-- MCE Recorded TV -->
-      <!-- <t mod="ctrl">ActivateWindowAndFocus(MyPVR, 32,0, 11,0)</t>  <!-- MCE Live TV  --> -->
-      <!-- <t mod="ctrl,shift">ActivateWindow(MyPVR)</t>                <!-- MCE My TV --> -->
-      <!-- <a mod="ctrl">ActivateWindowAndFocus(MyPVR, 33,0, 12,0)</a>  <!-- MCE My Radio --> --> -->
+      <!-- <o mod="ctrl">ActivateWindowAndFocus(MyPVR, 34,0, 13,0)</o>  # MCE Recorded TV -->
+      <!-- <t mod="ctrl">ActivateWindowAndFocus(MyPVR, 32,0, 11,0)</t>  # MCE Live TV  -->
+      <!-- <t mod="ctrl,shift">ActivateWindow(MyPVR)</t>                # MCE My TV -->
+      <!-- <a mod="ctrl">ActivateWindowAndFocus(MyPVR, 33,0, 12,0)</a>  # MCE My Radio -->
       <!-- MCE keypresses without an obvious use in XBMC -->
       <u mod="ctrl">Notification(MCEKeypress, DVD subtitle, 3)</u>
       <a mod="ctrl,shift">Notification(MCEKeypress, DVD audio, 3)</a>
@@ -160,7 +164,7 @@
   </LoginScreen>
   <Home>
     <keyboard>
-      <i>info</i>
+      <o>Info</o>
       <end mod="ctrl">XBMC.ShutDown()</end>
       <space>PlayPause</space>
     </keyboard>
@@ -238,8 +242,8 @@
       <enter>OSD</enter>
       <m>OSD</m>
       <!--
-      <i>Info</i>
-      <o>CodecInfo</o>
+      <o>Info</o>
+      <i>CodecInfo</i>
       -->
       <z>AspectRatio</z>
       <!--
@@ -296,8 +300,8 @@
       <f>FastForward</f>
       <r>Rewind</r>
       <period>StepForward</period>
-      <o>CodecInfo</o>
-      <i>Back</i>
+      <i>CodecInfo</i>
+      <o>Back</o>
       <d mod="ctrl">Back</d>
       <m>OSD</m>
       <escape>Close</escape>
@@ -421,8 +425,8 @@
     <keyboard>
       <m>Back</m>
       <g mod="ctrl">Back</g> <!-- MCE Guide button -->
-      <i>Info</i>
-      <o>CodecInfo</o>
+      <o>Info</o>
+      <i>CodecInfo</i>
     </keyboard>
   </VideoOSD>
   <VideoMenu>
@@ -436,8 +440,8 @@
       <closesquarebracket>BigStepForward</closesquarebracket>
       
       <m>OSD</m>
-      <i>Info</i>
-      <o>CodecInfo</o>
+      <o>Info</o>
+      <i>CodecInfo</i>
       <z>AspectRatio</z>
       <t>ShowSubtitles</t>
       <l>NextSubtitle</l>
@@ -451,14 +455,14 @@
   </VideoMenu>
   <OSDVideoSettings>
     <keyboard>
-      <i>Info</i>
-      <o>CodecInfo</o>
+      <o>Info</o>
+      <i>CodecInfo</i>
     </keyboard>
   </OSDVideoSettings>
   <OSDAudioSettings>
     <keyboard>
-      <i>Info</i>
-      <o>CodecInfo</o>
+      <o>Info</o>
+      <i>CodecInfo</i>
     </keyboard>
   </OSDAudioSettings>
   <VideoBookmarks>

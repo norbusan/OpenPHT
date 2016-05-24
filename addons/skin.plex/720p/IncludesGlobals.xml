@@ -587,6 +587,7 @@
 	</include>
 	<include name="WindowFade">
 		<control type="group">
+			<visible>!Skin.HasSetting(DisableWindowFade)</visible>
 			<control type="image">
 				<include>Black</include>
 				<include>FullScreenStretched</include>

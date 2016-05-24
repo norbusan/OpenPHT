@@ -1020,6 +1020,18 @@ msgctxt "#52213"
 msgid "Hide channels in menu"
 msgstr "Hide channels in menu"
 
+msgctxt "#52214"
+msgid "Disable preplay screen"
+msgstr "Disable preplay screen"
+
+msgctxt "#52215"
+msgid "Disable server side scaling of fanart"
+msgstr "Disable server side scaling of fanart"
+
+msgctxt "#52216"
+msgid "Disable server side scaling of photos"
+msgstr "Disable server side scaling of photos"
+
 msgctxt "#52300"
 msgid "Media Server went away"
 msgstr "Media Server went away"
@@ -1071,6 +1083,10 @@ msgstr "Allow Plex collect anonymous data to improve your experience"
 msgctxt "#52505"
 msgid "Hide CloudSync sections"
 msgstr "Hide CloudSync sections"
+
+msgctxt "#52506"
+msgid "External"
+msgstr "External"
 
 msgctxt "#52600"
 msgid "Shuffle all"

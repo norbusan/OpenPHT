@@ -1,9 +1,23 @@
 # vim: setlocal syntax=cmake:
 
+if(NOT DEFINED RPI_PROJECT)
+  set(RPI_PROJECT "RPi")
+endif()
+
+add_definitions(-DTARGET_RASPBERRY_PI)
+if(RPI_PROJECT STREQUAL "RPi")
+  add_definitions(-DTARGET_RASPBERRY_PI_1)
+elseif(RPI_PROJECT STREQUAL "RPi2")
+  add_definitions(-DTARGET_RASPBERRY_PI_2)
+endif()
+
+message(STATUS "Building for Raspberry Pi version " ${RPI_PROJECT})
+
+######################### Compiler CFLAGS
 set(EXTRA_CFLAGS "-fPIC -DPIC")
 
-
-option(USE_INTERNAL_FFMPEG "" OFF)
+######################### CHECK LIBRARIES / FRAMEWORKS
+option(USE_INTERNAL_FFMPEG "Use internal FFmpeg?" OFF)
 
 set(LINK_PKG
   Freetype
@@ -23,37 +37,24 @@ set(LINK_PKG
   Avahi
   LibDl
   LibRt
+  FLAC
+  DBUS
 )
 
 if(NOT USE_INTERNAL_FFMPEG)
   list(APPEND LINK_PKG FFmpeg)
-  add_definitions(
-    -DUSE_EXTERNAL_FFMPEG
-    )
 else()
   set(FFMPEG_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/lib/ffmpeg ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/src/ffmpeg-build)
 endif()
-
 
 if(ENABLE_PYTHON)
    list(APPEND LINK_PKG Python)
 endif(ENABLE_PYTHON)
 
-
-#        --disable-optical-drive 
-#  --disable-debug \
-#   \
-# --with-platform=raspberry-pi --enable-optimizations \
-#                    --enable-libcec --enable-player=omxplayer
-
 foreach(l ${LINK_PKG})
   plex_find_package(${l} 1 1)
 endforeach()
 
-#find_package(OpenGLES2 REQUIRED)
-#include_directories(${OpenGLES2_INCLUDE_DIRS})
-#set(CONFIG_PLEX_LINK_LIBRARIES ${CONFIG_PLEX_LINK_LIBRARIES} ${OpenGLES2_LIBRARIES})
-#  
 find_package(Boost COMPONENTS thread system REQUIRED)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
@@ -72,13 +73,26 @@ set(INSTALL_LIB
   Ass
   RTMP
   PLIST
-  ShairPort
-  CEC
 )
 
 foreach(l ${INSTALL_LIB})
   plex_find_package(${l} 1 0)
 endforeach()
+
+option(ENABLE_SHAIRPLAY "Enable ShairPlay?" ON)
+if(ENABLE_SHAIRPLAY)
+  plex_find_package(ShairPlay 1 0)
+endif()
+
+option(ENABLE_SHAIRPORT "Enable ShairPort?" OFF)
+if(ENABLE_SHAIRPORT AND NOT ENABLE_SHAIRPLAY)
+  plex_find_package(ShairPort 1 0)
+endif()
+
+option(ENABLE_CEC "Enable CEC?" ON)
+if(ENABLE_CEC)
+  plex_find_package(CEC 1 0)
+endif()
 
 plex_find_package(Threads 1 0)
 if(CMAKE_USE_PTHREADS_INIT)
@@ -87,6 +101,11 @@ if(CMAKE_USE_PTHREADS_INIT)
   set(HAVE_LIBPTHREAD 1)
 endif()
 
+plex_find_package(PulseAudio 0 1)
+if(HAVE_LIBPULSEAUDIO)
+  set(HAVE_LIBPULSE 1)
+endif()
+plex_find_package(Alsa 0 1)
 
 plex_find_package(LibUSB 0 1)
 plex_find_package(LibUDEV 0 1)
@@ -100,10 +119,16 @@ plex_get_soname(CURL_SONAME ${CURL_LIBRARY})
 
 list(APPEND CONFIG_INTERNAL_LIBS lib_dllsymbols)
 
-
+####
+if(DEFINED DBUS_FOUND)
+  include_directories(${DBUS_INCLUDE_DIR} ${DBUS_ARCH_INCLUDE_DIR})
+  set(HAVE_DBUS 1)
+endif()
 
 #### default lircdevice
-set(LIRC_DEVICE "/var/run/lirc/lircd")
+if(NOT DEFINED LIRC_DEVICE)
+  set(LIRC_DEVICE "/run/lirc/lircd")
+endif()
 
 #### on linux we want to use a "easy" name
 set(EXECUTABLE_NAME "plexhometheater")
@@ -117,43 +142,9 @@ set(USE_PULSE 0)
 set(DISABLE_PROJECTM 1)
 set(USE_TEXTUREPACKER_NATIVE_ROOT 0)
 
-
-
-#### Use breakpad
-OPTION(ENABLE_DUMP_SYMBOLS "Create breakpad symbols" ON)
-
-
 set(BUILD_DVDCSS 0)
 set(SKIP_CONFIG_DVDCSS 1)
 set(DVDREAD_CFLAGS "-D_XBMC -UHAVE_DVDCSS_DVDCSS_H")
-
-add_definitions(
-    -DTARGET_LINUX 
-    -D_LINUX 
-    -D_ARMEL 
-    -DTARGET_RASPBERRY_PI
-    -DTARGET_RPI
-	-DTARGET_LINUX
-    -DHAS_GLES=2
-    -DHAVE_LIBGLESV2
-    -DHAVE_OMXLIB
-    -DOMX_SKIP64BIT
-    -DHAS_BUILTIN_SYNC_ADD_AND_FETCH
-    -DHAS_BUILTIN_SYNC_SUB_AND_FETCH
-    -DHAS_BUILTIN_SYNC_VAL_COMPARE_AND_SWAP
-    -DHAS_OMXPLAYER
-    -DHAVE_CEC_RPI_API
-    -DHAVE_LIBCEC
-    -DPIC 
-    -D_REENTRANT 
-    -D_LARGEFILE64_SOURCE 
-    -D_FILE_OFFSET_BITS=64 
-    -DNDEBUG=1 
-    -DDEBUG
-    -DUSE_RAPIDXML
-    -DOPENELEC
-    -DUSE_PAGING
-)
 
 ## remove annying useless warnings
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-reorder")
@@ -180,35 +171,16 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-array-bounds")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function")
 
-#set(CMAKE_EXE_LINKER_FLAGS_DEBUG  "${CMAKE_EXE_FLAGS} -Wno-clobbered")
-
-plex_find_library(GLESv2 0  0 system/usr/lib 1)
 plex_find_library(EGL 0 0  system/usr/lib 1)
-plex_find_library(vcos 0 0  system/usr/lib 1)
+plex_find_library(GLESv2 0  0 system/usr/lib 1)
 plex_find_library(bcm_host 0 0  system/usr/lib 1)
+plex_find_library(vcos 0 0  system/usr/lib 1)
 plex_find_library(vchiq_arm 0 0  system/usr/lib 1)
-plex_find_library(dbus-1 0 0  system/usr/lib 1)
-
-
-#plex_find_library(python2.7 0 1 ${RPI_EXTERNAL_PYTHON_HOME}/lib 1)
 
 #needed for the commandline flag CMAKE_INCLUDE_PATH
 foreach(path ${CMAKE_INCLUDE_PATH})
     include_directories(${path})
 endforeach()
-
-
-#set(CMAKE_C_FLAGS " -isystem/usr/include -isystem/opt/vc/include -isystem/opt/vc/include/interface/vcos/pthreads -isystem/opt/vc -isystem/opt/vc/include/interface/vmcs_host/linux/ -isystem/opt/vc/include/EGL -isystem/opt/vc/include/GLES -isystem/opt/vc/include/GLES2 -isystem/opt/vc/include/KHR -isystem/opt/vc/include/VG -L/lib -L/usr/lib -L/opt/vc/lib -Wl,-rpath-link,/lib -Wl,-rpath-link,/lib -Wl,-rpath-link,/usr/lib -Wl,-rpath-link,/opt/vc/ -fPIC -pipe -mcpu=arm1176jzf-s -mtune=arm1176jzf-s -mfloat-abi=hard -mfpu=vfp -mabi=aapcs-linux -Wno-psabi -Wa,-mno-warn-deprecated -Wno-deprecated-declarations -g -pg")
-
-#set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -rdynamic ")
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -rdynamic")
-#set(CMAKE_EXE_FLAGS_DEBUG  "${CMAKE_EXE_FLAGS} -rdynamic")
-#set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS} -rdynamic")
-#message (STATUS "Enabling profiling with gprof")
-#set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -pg")
-#set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -pg")
-#set(CMAKE_SHAREDBoost_USE_MULTITHREADED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} -pg")
-#set(CMAKE_EXE_FLAGS  "${CMAKE_EXE_FLAGS} -pg")
 
 set(LIBPATH bin)
 set(BINPATH bin)
@@ -218,9 +190,25 @@ set(PLEX_LINK_WRAPPED "-Wl,--unresolved-symbols=ignore-all -Wl,-wrap,_IO_getc -W
 
 set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} system/usr/lib )
 
-
 set(PLEX_LINK_WHOLEARCHIVE -Wl,--whole-archive)
 set(PLEX_LINK_NOWHOLEARCHIVE -Wl,--no-whole-archive)
 
+option(OPENELEC "Are we building OpenELEC dist?" ON)
+if(OPENELEC)
+  add_definitions(-DTARGET_OPENELEC)
+endif(OPENELEC)
 
-message(STATUS "CONFIG_PLEX_LINK_LIBRARIES=${CONFIG_PLEX_LINK_LIBRARIES}")
+############ Add our definitions
+add_definitions(
+  -DTARGET_LINUX
+  -D_ARMEL
+  -DTARGET_RPI
+  -DHAS_GLES=2
+  -DHAVE_OMXLIB
+  -DOMX_SKIP64BIT
+  -DHAS_BUILTIN_SYNC_ADD_AND_FETCH
+  -DHAS_BUILTIN_SYNC_SUB_AND_FETCH
+  -DHAS_BUILTIN_SYNC_VAL_COMPARE_AND_SWAP
+  -DHAS_OMXPLAYER
+  -DHAVE_CEC_RPI_API
+)

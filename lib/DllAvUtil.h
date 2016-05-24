@@ -27,12 +27,21 @@
 #include "DynamicDll.h"
 #include "utils/log.h"
 
+extern "C" {
+#ifndef HAVE_MMX
+#define HAVE_MMX
+#endif
+#ifndef __STDC_CONSTANT_MACROS
+#define __STDC_CONSTANT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+
 #ifndef __GNUC__
-#pragma warning(push)
 #pragma warning(disable:4244)
 #endif
 
-extern "C" {
 #if (defined USE_EXTERNAL_FFMPEG)
   #if (defined HAVE_LIBAVUTIL_AVUTIL_H)
     #include <libavutil/avutil.h>
@@ -83,9 +92,6 @@ extern "C" {
 #endif
 }
 
-#ifndef __GNUC__
-#pragma warning(pop)
-#endif
 
 // calback used for logging
 void ff_avutil_log(void* ptr, int level, const char* format, va_list va);

@@ -1,9 +1,11 @@
 <?xml version="1.0"?>
 <window id="12">
-	<defaultcontrol>997</defaultcontrol>
+	<defaultcontrol>3</defaultcontrol>
 	<allowoverlay>no</allowoverlay>
-	<onload>SkinSetString(SettingsCategory,appearance)</onload>
-	<onunload>Skin.Reset(SettingsCategory)</onunload>
+	<onload condition="Window.IsActive(19)">Skin.SetString(SettingsCategory,appearance)</onload>
+	<onload condition="Window.IsActive(17)">Skin.SetString(SettingsCategory,playback)</onload>
+	<onload condition="Window.IsActive(16)">Skin.SetString(SettingsCategory,system)</onload>
+	<onload condition="Window.IsActive(18)">Skin.SetString(SettingsCategory,network)</onload>
 	<onunload condition="Window.Next(0)">Dialog.Close(all,true)</onunload>
 	<controls>
 		<!-- bg's -->

@@ -3,6 +3,7 @@
 #include "PlexMediaServerClient.h"
 #include "Network/NetworkInterface.h"
 #include "StringUtils.h"
+#include "Application.h"
 
 #include <vector>
 
@@ -100,16 +101,35 @@ void CPlexNetworkServiceBrowser::handleServiceDeparture(NetworkServicePtr& servi
 /////////////////////////////////////////////////////////////////////////////////////////
 void CPlexNetworkServiceBrowser::handleNetworkChange(const vector<NetworkInterface>& interfaces)
 {
+  if (g_application.m_bStop) return;
+
   NetworkServiceBrowser::handleNetworkChange(interfaces);
 
-  // update all our reachability states
-  g_plexApplication.serverManager->UpdateReachability(true);
+  bool validInterface = false;
+  BOOST_FOREACH(const NetworkInterface& xface, interfaces)
+  {
+    if (!xface.loopback() && !boost::starts_with(xface.address(), "169.254."))
+    {
+      validInterface = true;
+      break;
+    }
+  }
 
-  // and refresh myPlex
-  g_plexApplication.myPlexManager->Refresh();
+  if (validInterface)
+  {
+    // update all our reachability states
+    g_plexApplication.serverManager->UpdateReachability(true);
 
-  // publish our device to plex
-  g_plexApplication.mediaServerClient->publishDevice();
+    // and refresh myPlex
+    g_plexApplication.myPlexManager->Refresh();
+
+    // publish our device to plex
+    g_plexApplication.mediaServerClient->publishDevice();
+  }
+  else
+  {
+    // TODO: Clear all active connections and best server
+  }
 
   g_plexApplication.timer->RestartTimeout(5000, this);
 }

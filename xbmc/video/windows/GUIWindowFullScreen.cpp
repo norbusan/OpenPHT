@@ -226,21 +226,18 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_SHOW_SUBTITLES:
     {
-      if (g_application.m_pPlayer->GetSubtitleCount() == 0)
+      if (!g_application.m_pPlayer || g_application.m_pPlayer->GetSubtitleCount() == 0)
         return true;
 
       g_settings.m_currentVideoSettings.m_SubtitleOn = !g_settings.m_currentVideoSettings.m_SubtitleOn;
       g_application.m_pPlayer->SetSubtitleVisible(g_settings.m_currentVideoSettings.m_SubtitleOn);
-      CStdString sub, lang;
+      CStdString sub;
       if (g_settings.m_currentVideoSettings.m_SubtitleOn)
       {
-        g_application.m_pPlayer->GetSubtitleName(g_application.m_pPlayer->GetSubtitle(),sub);
-        g_application.m_pPlayer->GetSubtitleLanguage(g_application.m_pPlayer->GetSubtitle(),lang);
-        if (sub != lang)
-          sub.Format("%s [%s]", sub.c_str(), lang.c_str());
+        g_application.m_pPlayer->GetSubtitleName(g_application.m_pPlayer->GetSubtitle(), sub);
       }
       else
-        sub = g_localizeStrings.Get(1223);
+        sub = g_localizeStrings.Get(231);
       CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
                                             g_localizeStrings.Get(287), sub, DisplTime, false, MsgTime);
     }
@@ -261,7 +258,7 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_NEXT_SUBTITLE:
     {
-      if (g_application.m_pPlayer->GetSubtitleCount() == 0)
+      if (!g_application.m_pPlayer || g_application.m_pPlayer->GetSubtitleCount() == 0)
         return true;
 
       if(g_settings.m_currentVideoSettings.m_SubtitleStream < 0)
@@ -284,16 +281,13 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
         g_application.m_pPlayer->SetSubtitleVisible(true);
       }
 
-      CStdString sub, lang;
+      CStdString sub;
       if (g_settings.m_currentVideoSettings.m_SubtitleOn)
       {
         g_application.m_pPlayer->GetSubtitleName(g_settings.m_currentVideoSettings.m_SubtitleStream,sub);
-        g_application.m_pPlayer->GetSubtitleLanguage(g_settings.m_currentVideoSettings.m_SubtitleStream,lang);
-        if (sub != lang)
-          sub.Format("%s [%s]", sub.c_str(), lang.c_str());
       }
       else
-        sub = g_localizeStrings.Get(1223);
+        sub = g_localizeStrings.Get(231);
       CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(287), sub, DisplTime, false, MsgTime);
     }
     return true;
@@ -379,7 +373,7 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
     break;
   case ACTION_AUDIO_NEXT_LANGUAGE:
     {
-      if (g_application.m_pPlayer->GetAudioStreamCount() == 1)
+      if (!g_application.m_pPlayer || g_application.m_pPlayer->GetAudioStreamCount() == 1)
         return true;
 
       if(g_settings.m_currentVideoSettings.m_AudioStream < 0)
@@ -753,14 +747,16 @@ void CGUIWindowFullScreen::createOverlays()
 void CGUIWindowFullScreen::deleteOverlays()
 {
   // remove all the overlays controls
-  if (g_application.CurrentFileItemPtr() && g_application.CurrentFileItemPtr()->m_overlayItems.size())
+  for (int i = 0; i < 100; i++)
   {
-    for (int i=0; i<g_application.CurrentFileItemPtr()->m_overlayItems.size(); i++)
+    CGUIControl *overlayControl = (CGUIControl*)GetControl(CONTROL_OVERLAY_START + i);
+    if (overlayControl)
     {
-      CGUIControl *overlayControl = (CGUIControl*)GetControl(CONTROL_OVERLAY_START + i);
-      if (overlayControl)
-        RemoveControl(overlayControl);
+      RemoveControl(overlayControl);
+      overlayControl->FreeResources();
     }
+    else
+      break;
   }
 }
 

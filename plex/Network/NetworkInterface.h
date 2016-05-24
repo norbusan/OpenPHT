@@ -98,6 +98,15 @@ class NetworkInterface
     observer(g_interfaces);
     g_mutex.unlock();
   }
+
+  /// Removes all observers.
+  static void ClearObservers()
+  {
+    // Clear the observer vector.
+    g_mutex.lock();
+    g_observers.clear();
+    g_mutex.unlock();
+  }
   
   /// Called when a network change occurs.
   static void NotifyOfNetworkChange(bool forceNotify=false)

@@ -412,6 +412,7 @@ lib/cmyth/Makefile
 /system/libcmyth.dll
 /system/libcurl.dll
 /system/libeay32.dll
+/system/ssleay32.dll
 /system/librtmp.dll
 /system/libexif.dll
 /system/libexpat.dll
@@ -429,8 +430,8 @@ lib/cmyth/Makefile
 
 # /system/cdrip
 /system/cdrip/lame_enc.dll
-/system/cdrip/ogg.dll
-/system/cdrip/vorbis.dll
+/system/cdrip/libogg.dll
+/system/cdrip/libvorbis.dll
 /system/cdrip/vorbisenc.dll
 
 # /system/players/dvdplayer
@@ -451,11 +452,17 @@ lib/cmyth/Makefile
 /system/players/dvdplayer/libbluray.dll
 /system/players/dvdplayer/libmpeg2-0.dll
 /system/players/dvdplayer/libmad.dll
+/system/players/dvdplayer/libgcc_s_sjlj-1.dll
+/system/players/dvdplayer/libgmp-10.dll
+/system/players/dvdplayer/libgnutls-30.dll
+/system/players/dvdplayer/libhogweed-4-0.dll
+/system/players/dvdplayer/libnettle-6-0.dll
+/system/players/dvdplayer/libp11-kit-0.dll
 
 # /system/players/paplayer
 /system/players/paplayer/libmodplug.dll
 /system/players/paplayer/StSoundLibrary.dll
-/system/players/paplayer/vorbisfile.dll
+/system/players/paplayer/libvorbisfile.dll
 /system/players/paplayer/vgmstream.dll
 /system/players/paplayer/NoseFart.dll
 /system/players/paplayer/libsidplay2.dll
@@ -1242,9 +1249,11 @@ plex/Dependencies/ffmpeg-*
 plex/Dependencies/macosx*
 plex/Dependencies/iphoneos*
 plex/Dependencies/*darwin-i686
+plex/Dependencies/windows-i386-*
 plex/build
 plex/build_xc
 plex/Dependencies/built-depends/*
+project/BuildDependencies/bin/dump_syms.exe
 .idea
 
 *.autosave

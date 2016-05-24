@@ -88,6 +88,8 @@ public:
 
   static bool IsUsbDevice(const CStdStringW &strWdrive);
 
+  static bool GetInstallerDependenciesVersion(const CStdString &strGuid, CStdString &strVersion);
+
 private:
 #if _MSC_VER > 1400
   static DEVINST GetDrivesDevInstByDiskNumber(long DiskNumber);

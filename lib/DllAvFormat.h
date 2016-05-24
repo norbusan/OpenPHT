@@ -25,6 +25,7 @@
 #endif
 #include "DynamicDll.h"
 #include "DllAvCodec.h"
+#include "utils/log.h"
 
 extern "C" {
 #ifndef HAVE_MMX
@@ -33,6 +34,10 @@ extern "C" {
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
 #endif
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+
 #ifndef __GNUC__
 #pragma warning(disable:4244)
 #endif
@@ -259,9 +264,8 @@ class DllAvFormat : public DllDynamic, DllAvFormatInterface
     /* END PLEX */
   END_METHOD_RESOLVE()
 
-  /* dependencies of libavformat */
+  /* dependency of libavformat */
   DllAvCodec m_dllAvCodec;
-  // DllAvUtil loaded implicitely by m_dllAvCodec
 
 public:
   void av_register_all()
@@ -280,6 +284,11 @@ public:
     if (!m_dllAvCodec.Load())
       return false;
     return DllDynamic::Load();
+  }
+  virtual void Unload()
+  {
+    DllDynamic::Unload();
+    m_dllAvCodec.Unload();
   }
 };
 

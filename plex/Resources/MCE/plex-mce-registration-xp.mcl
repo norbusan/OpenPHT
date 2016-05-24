@@ -2,5 +2,5 @@
              run="C:\Program Files\OpenPHT\OpenPHT.exe"
              nowPlayingDirective="stop"
              startImage="C:\Program Files\OpenPHT\plex-mce-icon-square.png"
-             companyname="Team OpenPHT"
+             companyname="Team RasPlex"
              description="OpenPHT for Windows" />

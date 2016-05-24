@@ -43,6 +43,12 @@ set(SRCS ${xbmc_SRCS} ${ALL_SRCS})
 ADD_MSVC_PRECOMPILED_HEADER("pch.h" "win32/pch.cpp" SRCS)
 #ADD_MSVC_PRECOMPILED_HEADER("${root}/xbmc/win32/pch.h" "${root}/xbmc/win32/pch.cpp" ALL_SRCS)
 
+if(TARGET_RPI)
+  enable_language(ASM)
+  set_property(SOURCE ./cores/VideoRenderers/yuv2rgb.neon.S PROPERTY LANGUAGE ASM)
+  list(APPEND SRCS ./cores/VideoRenderers/yuv2rgb.neon.S)
+endif()
+
 add_library(xbmc STATIC ${SRCS})
 set_target_properties(xbmc PROPERTIES
   XCODE_ATTRIBUTE_GCC_PREFIX_HEADER ${plexdir}/pch_plex.h
@@ -51,7 +57,11 @@ set_target_properties(xbmc PROPERTIES
   XCODE_ATTRIBUTE_WARNING_CFLAGS ""
 )
 
-add_dependencies(xbmc cpluff-${ARCH} cximage)
+if(TARGET_WIN32)
+  add_dependencies(xbmc cpluff cximage)
+else(TARGET_WIN32)
+  add_dependencies(xbmc cpluff-${ARCH} cximage)
+endif(TARGET_WIN32)
 if(USE_INTERNAL_FFMPEG)
   add_dependencies(xbmc ffmpeg)
 endif(USE_INTERNAL_FFMPEG)

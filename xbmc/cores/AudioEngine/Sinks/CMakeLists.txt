@@ -4,6 +4,10 @@ if(DEFINED HAS_ALSA)
   set(ae_SRCS ${ae_SRCS} AESinkALSA.cpp AESinkALSA.h)
 endif()
 
+if(TARGET_RPI)
+  set(ae_SRCS ${ae_SRCS} AESinkPi.cpp AESinkPi.h)
+endif(TARGET_RPI)
+
 if(TARGET_WIN32)
   set(ae_SRCS ${ae_SRCS} AESinkWASAPI.cpp AESinkWASAPI.h AESinkDirectSound.cpp AESinkDirectSound.h)
 endif(TARGET_WIN32)

@@ -9,7 +9,11 @@
 #include "threads/CriticalSection.h"
 
 // maximum number of caching threads
-#define MAX_CACHE_WORKERS 6
+#ifdef TARGET_RASPBERRY_PI_1
+#define MAX_CACHE_WORKERS 1
+#else
+#define MAX_CACHE_WORKERS 4
+#endif
 
 class CPlexGlobalCacherWorker;
 

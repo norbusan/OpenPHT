@@ -50,6 +50,7 @@ CShoutcastFile::CShoutcastFile() :
   m_buffer = NULL;
   m_cacheReader = NULL;
   m_tagPos = 0;
+  m_metaint = 0;
 }
 
 CShoutcastFile::~CShoutcastFile()
@@ -71,8 +72,9 @@ int64_t CShoutcastFile::GetLength()
 bool CShoutcastFile::Open(const CURL& url)
 {
   CURL url2(url);
-  url2.SetProtocolOptions("noshout=true&Icy-MetaData=1");
-  url2.SetProtocol("http");
+  url2.SetProtocolOptions(url2.GetProtocolOptions()+"&noshout=true&Icy-MetaData=1");
+  if (url2.GetProtocol() != "http" && url2.GetProtocol() != "https")
+    url2.SetProtocol("http");
 
   bool result=false;
   if ((result=m_file.Open(url2.Get())))

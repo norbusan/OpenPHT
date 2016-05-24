@@ -89,6 +89,7 @@ CGUIPlexDefaultActionHandler::CGUIPlexDefaultActionHandler()
   m_ActionSettings.push_back(*action);
 
   action = new ACTION_SETTING(ACTION_PLEX_PQ_PLAYFROMHERE);
+  action->WindowSettings[WINDOW_HOME].contextMenuVisisble = true;
   action->WindowSettings[WINDOW_VIDEO_NAV].contextMenuVisisble = true;
   m_ActionSettings.push_back(*action);
 
@@ -308,25 +309,31 @@ bool CGUIPlexDefaultActionHandler::OnAction(int windowID, CAction action, CFileI
       {
         CPlexPlayQueueOptions options;
         CStdString uri;
-
-        switch(container->GetPlexDirectoryType())
+        if (container)
         {
+          switch (container->GetPlexDirectoryType())
+          {
           case PLEX_DIR_TYPE_MOVIE:
           case PLEX_DIR_TYPE_EPISODE:
           case PLEX_DIR_TYPE_TRACK:
 
-            options.resumeOffset = 0;
             options.startItemKey = item->GetProperty("key").asString();
-            options.startPlaying = true;
-
             uri = g_plexApplication.playQueueManager->getURIFromItem(*container);
             g_plexApplication.playQueueManager->create(*container, uri, options);
             break;
 
           default:
             break;
+          }
         }
-
+        else if (dirType == PLEX_DIR_TYPE_EPISODE && item->HasProperty("librarySectionUUID") && item->HasProperty("unprocessed_parentKey"))
+        {
+          options.startItemKey = item->GetProperty("key").asString();
+          CStdString parentKey(item->GetProperty("unprocessed_parentKey").asString());
+          CURL::Encode(parentKey);
+          uri.Format("library://%s/directory/%s", item->GetProperty("librarySectionUUID").asString().c_str(), parentKey.c_str());
+          g_plexApplication.playQueueManager->create(*item, uri, options);
+        }
         break;
       }
         
@@ -539,8 +546,10 @@ void CGUIPlexDefaultActionHandler::GetContextButtonsForAction(int actionID, CFil
       break;
 
     case ACTION_PLEX_PQ_PLAYFROMHERE:
-      switch(container->GetPlexDirectoryType())
+      if (container)
       {
+        switch (container->GetPlexDirectoryType())
+        {
         case PLEX_DIR_TYPE_MOVIE:
         case PLEX_DIR_TYPE_EPISODE:
         case PLEX_DIR_TYPE_TRACK:
@@ -549,6 +558,11 @@ void CGUIPlexDefaultActionHandler::GetContextButtonsForAction(int actionID, CFil
 
         default:
           break;
+        }
+      }
+      else if (dirType == PLEX_DIR_TYPE_EPISODE && item->HasProperty("librarySectionUUID") && item->HasProperty("unprocessed_parentKey"))
+      {
+        buttons.Add(actionID, 52634);
       }
       break;
 
@@ -768,7 +782,7 @@ bool CGUIPlexDefaultActionHandler::IsPhotoContainer(CFileItemListPtr container)
   if (dirType == PLEX_DIR_TYPE_CHANNEL && container->Get(0))
     dirType = container->Get(0)->GetPlexDirectoryType();
 
-  return (dirType == PLEX_DIR_TYPE_PHOTOALBUM | dirType == PLEX_DIR_TYPE_PHOTO);
+  return (dirType == PLEX_DIR_TYPE_PHOTOALBUM || dirType == PLEX_DIR_TYPE_PHOTO);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

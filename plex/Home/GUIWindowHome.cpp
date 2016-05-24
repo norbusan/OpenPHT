@@ -662,7 +662,7 @@ void CGUIWindowHome::OnWatchStateChanged(const CGUIMessage& message)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void CGUIWindowHome::OpenItem(CFileItemPtr item)
 {
-  if (item->GetProperty("sectionpath").asString().empty())
+  if (item->GetProperty("sectionPath").asString().empty())
   {
     if ((item->GetPlexDirectoryType() == PLEX_DIR_TYPE_PLAYLIST) && item->GetProperty("leafCount").asInteger() == 0)
     {

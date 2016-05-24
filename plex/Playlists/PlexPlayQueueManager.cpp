@@ -212,7 +212,8 @@ CStdString CPlexPlayQueueManager::getURIFromItem(const CFileItem& item, const CS
   }
   else
   {
-    realURI = uri;
+    realURI = CURL::Decode(uri);
+    CURL::Encode(realURI);
   }
 
   CStdString ret;

@@ -30,13 +30,23 @@
 
 #include "guilib/Geometry.h"
 #include "DVDDemuxers/DVDDemux.h"
+#include "xbmc/settings/VideoSettings.h"
+#include "threads/CriticalSection.h"
 #include <string>
 
 #define VIDEO_BUFFERS 60
 
 #define CLASSNAME "COMXVideo"
 
-typedef void (*ResolutionUpdateCallBackFn)(void *ctx, uint32_t width, uint32_t height);
+typedef void (*ResolutionUpdateCallBackFn)(void *ctx, uint32_t width, uint32_t height, float framerate, float display_aspect);
+
+struct ResolutionUpdateInfo {
+  uint32_t width;
+  uint32_t height;
+  float framerate;
+  float display_aspect;
+  bool changed;
+};
 
 class COMXVideo
 {
@@ -46,7 +56,8 @@ public:
 
   // Required overrides
   bool SendDecoderConfig();
-  bool Open(CDVDStreamInfo &hints, OMXClock *clock, bool deinterlace = false, bool hdmi_clock_sync = false);
+  bool Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE deinterlace = VS_DEINTERLACEMODE_OFF, bool hdmi_clock_sync = false);
+  bool PortSettingsChanged(ResolutionUpdateInfo &resinfo);
   void RegisterResolutionUpdateCallBack(void *ctx, ResolutionUpdateCallBackFn callback) { m_res_ctx = ctx; m_res_callback = callback; }
   void Close(void);
   unsigned int GetFreeSpace();
@@ -54,14 +65,13 @@ public:
   int  Decode(uint8_t *pData, int iSize, double dts, double pts);
   void Reset(void);
   void SetDropState(bool bDrop);
-  bool Pause();
-  bool Resume();
   std::string GetDecoderName() { return m_video_codec_name; };
   void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
   int GetInputBufferSize();
+  bool GetPlayerInfo(double &match, double &phase, double &pll);
   void SubmitEOS();
   bool IsEOS();
-  bool SubmittedEOS() { return m_submitted_eos; }
+  bool SubmittedEOS() const { return m_submitted_eos; }
   bool BadState() { return m_omx_decoder.BadState(); };
 protected:
   // Video format
@@ -83,22 +93,24 @@ protected:
   COMXCoreTunel     m_omx_tunnel_sched;
   COMXCoreTunel     m_omx_tunnel_image_fx;
   bool              m_is_open;
-
-  bool              m_Pause;
+  bool              m_setStartTime;
 
   uint8_t           *m_extradata;
   int               m_extrasize;
 
-  bool              m_video_convert;
   std::string       m_video_codec_name;
 
   bool              m_deinterlace;
+  EDEINTERLACEMODE  m_deinterlace_request;
   bool              m_hdmi_clock_sync;
-  uint32_t          m_history_valid_pts;
   ResolutionUpdateCallBackFn m_res_callback;
   void              *m_res_ctx;
   bool              m_submitted_eos;
-  bool NaluFormatStartCodes(enum CodecID codec, uint8_t *in_extradata, int in_extrasize);
+  bool              m_failed_eos;
+  OMX_DISPLAYTRANSFORMTYPE m_transform;
+  bool              m_settings_changed;
+  static bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *in_extradata, int in_extrasize);
+  CCriticalSection m_critSection;
 };
 
 #endif

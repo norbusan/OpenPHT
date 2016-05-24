@@ -28,7 +28,7 @@ function(GENERATE_BREAKPAD_SYMBOLS APP)
     endif(TARGET_OSX)
     add_custom_command(
       OUTPUT ${CMAKE_BINARY_DIR}/${APP}-${PLEX_VERSION_STRING}${ARCH}.symbols.bz2
-      COMMAND ${PROJECT_SOURCE_DIR}/plex/scripts/dump_syms.sh "${DUMP_SYMS}" "${BZIP2}" "${TARGETFILE}" "${DSYMTARGET}" "${CMAKE_BINARY_DIR}/${APP}-${PLEX_VERSION_STRING}${ARCH}.symbols.bz2"
+      COMMAND ${PROJECT_SOURCE_DIR}/plex/scripts/dump_syms.sh "${DUMP_SYMS}" "${BZIP2}" "${TARGETFILE}" "${CMAKE_BINARY_DIR}/${APP}-${PLEX_VERSION_STRING}${ARCH}.symbols.bz2" "${DSYMTARGET}"
       DEPENDS ${DEPENDENCY}
     )
 	  add_custom_target(${APP}_symbols DEPENDS ${CMAKE_BINARY_DIR}/${APP}-${PLEX_VERSION_STRING}${ARCH}.symbols.bz2)

@@ -193,6 +193,7 @@ namespace INFO
 #define SYSTEM_ISINHIBIT            184
 #define SYSTEM_HAS_SHUTDOWN         185
 #define SYSTEM_HAS_PVR              186
+#define SYSTEM_BUILD_VERSION_SHORT  189
 
 #define NETWORK_IP_ADDRESS          190
 #define NETWORK_MAC_ADDRESS         191
@@ -402,7 +403,7 @@ namespace INFO
 #define SYSTEM_CPUFREQUENCY         656
 #define SYSTEM_SCREEN_RESOLUTION    659
 #define SYSTEM_VIDEO_ENCODER_INFO   660
-#define SYSTEM_KERNEL_VERSION       667
+#define SYSTEM_OS_VERSION_INFO      667
 #define SYSTEM_FREE_SPACE           679
 #define SYSTEM_USED_SPACE           680
 #define SYSTEM_TOTAL_SPACE          681
@@ -803,6 +804,7 @@ public:
   int GetPlayTimeRemaining() const;
   int GetTotalPlayTime() const;
   CStdString GetCurrentPlayTimeRemaining(TIME_FORMAT format) const;
+  CStdString GetVersionShort(void);
   CStdString GetVersion();
   CStdString GetBuild();
 

@@ -24,6 +24,20 @@
 
 #include "Variant.h"
 
+#ifndef strtoll
+#ifdef TARGET_WINDOWS
+#define strtoll  _strtoi64
+#define strtoull _strtoui64
+#define wcstoll  _wcstoi64
+#define wcstoull _wcstoui64
+#else // TARGET_WINDOWS
+#define strtoll(str, endptr, base)  (int64_t)strtod(str, endptr)
+#define strtoull(str, endptr, base) (uint64_t)strtod(str, endptr)
+#define wcstoll(str, endptr, base)  (int64_t)wcstod(str, endptr)
+#define wcstoull(str, endptr, base) (uint64_t)wcstod(str, endptr)
+#endif // TARGET_WINDOWS
+#endif // strtoll
+
 using namespace std;
 
 string trimRight(const string &str)
@@ -51,7 +65,8 @@ wstring trimRight(const wstring &str)
 int64_t str2int64(const string &str, int64_t fallback /* = 0 */)
 {
   char *end = NULL;
-  int64_t result = strtol(trimRight(str).c_str(), &end, 0);
+  string tmp = trimRight(str);
+  int64_t result = strtoll(tmp.c_str(), &end, 0);
   if (end == NULL || *end == '\0')
     return result;
 
@@ -61,7 +76,8 @@ int64_t str2int64(const string &str, int64_t fallback /* = 0 */)
 int64_t str2int64(const wstring &str, int64_t fallback /* = 0 */)
 {
   wchar_t *end = NULL;
-  int64_t result = wcstol(trimRight(str).c_str(), &end, 0);
+  wstring tmp = trimRight(str);
+  int64_t result = wcstoll(tmp.c_str(), &end, 0);
   if (end == NULL || *end == '\0')
     return result;
 
@@ -71,7 +87,8 @@ int64_t str2int64(const wstring &str, int64_t fallback /* = 0 */)
 uint64_t str2uint64(const string &str, uint64_t fallback /* = 0 */)
 {
   char *end = NULL;
-  uint64_t result = strtoul(trimRight(str).c_str(), &end, 0);
+  string tmp = trimRight(str);
+  uint64_t result = strtoull(tmp.c_str(), &end, 0);
   if (end == NULL || *end == '\0')
     return result;
 
@@ -81,7 +98,8 @@ uint64_t str2uint64(const string &str, uint64_t fallback /* = 0 */)
 uint64_t str2uint64(const wstring &str, uint64_t fallback /* = 0 */)
 {
   wchar_t *end = NULL;
-  uint64_t result = wcstoul(trimRight(str).c_str(), &end, 0);
+  wstring tmp = trimRight(str);
+  uint64_t result = wcstoull(tmp.c_str(), &end, 0);
   if (end == NULL || *end == '\0')
     return result;
 
@@ -91,7 +109,8 @@ uint64_t str2uint64(const wstring &str, uint64_t fallback /* = 0 */)
 double str2double(const string &str, double fallback /* = 0.0 */)
 {
   char *end = NULL;
-  double result = strtod(trimRight(str).c_str(), &end);
+  string tmp = trimRight(str);
+  double result = strtod(tmp.c_str(), &end);
   if (end == NULL || *end == '\0')
     return result;
 
@@ -101,7 +120,8 @@ double str2double(const string &str, double fallback /* = 0.0 */)
 double str2double(const wstring &str, double fallback /* = 0.0 */)
 {
   wchar_t *end = NULL;
-  double result = wcstod(trimRight(str).c_str(), &end);
+  wstring tmp = trimRight(str);
+  double result = wcstod(tmp.c_str(), &end);
   if (end == NULL || *end == '\0')
     return result;
 
@@ -480,7 +500,6 @@ std::wstring CVariant::asWideString(const std::wstring &fallback /* = L"" */) co
       else
         strStream << m_data.dvalue;
       return strStream.str();
-      break;
     }
     default:
       return fallback;

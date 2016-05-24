@@ -171,7 +171,7 @@ void CGUIDialogTimer::Render()
   if (m_lastDateTime != dateTime)
   {
 #ifdef _MSC_VER
-#pragma message(__WARNING__"do we need to support the short time format here? TIME_FORMAT_SHORT")
+#pragma message("do we need to support the short time format here? TIME_FORMAT_SHORT")
 #else
 #pragma warning do we need to support the short time format here? TIME_FORMAT_SHORT
 #endif

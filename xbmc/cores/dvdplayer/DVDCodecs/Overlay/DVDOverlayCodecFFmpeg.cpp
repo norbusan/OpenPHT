@@ -171,6 +171,7 @@ int CDVDOverlayCodecFFmpeg::Decode(DemuxPacket *pPacket)
   if (len < 0)
   {
     CLog::Log(LOGERROR, "%s - avcodec_decode_subtitle returned failure", __FUNCTION__);
+    Flush();
     return OC_ERROR;
   }
 
@@ -187,7 +188,8 @@ int CDVDOverlayCodecFFmpeg::Decode(DemuxPacket *pPacket)
     // for pgs subtitles the packet pts of the end_segments are wrong
     // instead use the subtitle pts to calc the offset here
     // see http://git.videolan.org/?p=ffmpeg.git;a=commit;h=2939e258f9d1fff89b3b68536beb931b54611585
-    if (m_Subtitle.pts != DVD_NOPTS_VALUE)
+
+    if (m_Subtitle.pts != AV_NOPTS_VALUE && pPacket->pts != DVD_NOPTS_VALUE)
     {
       pts_offset = m_Subtitle.pts - pPacket->pts ;
     }
@@ -241,7 +243,10 @@ CDVDOverlay* CDVDOverlayCodecFFmpeg::GetOverlay()
 #if LIBAVCODEC_VERSION_INT >= (52<<10)
     if(m_Subtitle.rects[m_SubtitleIndex] == NULL)
       return NULL;
+
     AVSubtitleRect& rect = *m_Subtitle.rects[m_SubtitleIndex];
+    if (rect.pict.data[0] == NULL)
+      return NULL;
 #else
     AVSubtitleRect& rect = m_Subtitle.rects[m_SubtitleIndex];
 #endif

@@ -22,6 +22,7 @@
 
 #include "md5.h"
 #include "InfoLoader.h"
+#include <string>
 
 #define KB  (1024)          // 1 KiloByte (1KB)   1024 Byte (2^10 Byte)
 #define MB  (1024*KB)       // 1 MegaByte (1MB)   1024 KB (2^10 KB)
@@ -50,7 +51,7 @@ public:
   INTERNET_STATE internetState;
   CStdString videoEncoder;
   CStdString cpuFrequency;
-  CStdString kernelVersion;
+  CStdString osVersionInfo;
   CStdString macAddress;
   CStdString batteryLevel;
 };
@@ -86,6 +87,8 @@ public:
     WindowsVersionVista,        // Windows Vista, Windows Server 2008
     WindowsVersionWin7,         // Windows 7, Windows Server 2008 R2
     WindowsVersionWin8,         // Windows 8, Windows Server 2012
+    WindowsVersionWin8_1,       // Windows 8.1
+    WindowsVersionWin10,        // windows 10
     /* Insert new Windows versions here, when they'll be known */
     WindowsVersionFuture = 100  // Future Windows version, not known to code
   };
@@ -95,20 +98,15 @@ public:
 
   char MD5_Sign[32 + 1];
 
-  bool GetDVDInfo(CStdString& strDVDModel, CStdString& strDVDFirmware);
-  bool GetHDDInfo(CStdString& strHDDModel, CStdString& strHDDSerial,CStdString& strHDDFirmware,CStdString& strHDDpw,CStdString& strHDDLockState);
-  bool GetRefurbInfo(CStdString& rfi_FirstBootTime, CStdString& rfi_PowerCycleCount);
+  static const CStdString& GetAppName(void);
 
-#if defined(_LINUX) && !defined(TARGET_DARWIN) && !defined(__FreeBSD__)
-  CStdString GetLinuxDistro();
-#endif
-#ifdef _LINUX
-  CStdString GetUnameVersion();
-#endif
-#if defined(TARGET_WINDOWS)
-  CStdString CSysInfo::GetUAWindowsVersion();
-#endif
-  CStdString GetUserAgent();
+  static CStdString GetKernelName(bool emptyIfUnknown = false);
+  static CStdString GetKernelVersionFull(void); // full version string, including "-generic", "-RELEASE" etc.
+  static CStdString GetKernelVersion(void); // only digits with dots
+  static CStdString GetOsName(bool emptyIfUnknown = false);
+  static CStdString GetOsVersion(void);
+  static CStdString GetOsPrettyNameWithVersion(void);
+  static CStdString GetUserAgent();
   bool HasInternet();
   bool IsAppleTV2();
   bool HasVDADecoder();
@@ -118,16 +116,26 @@ public:
   static bool IsWindowsVersion(WindowsVersion ver);
   static bool IsWindowsVersionAtLeast(WindowsVersion ver);
   static WindowsVersion GetWindowsVersion();
-  static bool IsOS64bit();
-  static CStdString GetKernelVersion();
+  static int GetKernelBitness(void);
+  static int GetXbmcBitness(void);
+  static const CStdString& GetKernelCpuFamily(void);
   CStdString GetCPUModel();
   CStdString GetCPUBogoMips();
   CStdString GetCPUHardware();
   CStdString GetCPURevision();
   CStdString GetCPUSerial();
-  bool GetDiskSpace(const CStdString drive,int& iTotal, int& iTotalFree, int& iTotalUsed, int& iPercentFree, int& iPercentUsed);
+  static CStdString GetManufacturerName(void);
+  static CStdString GetModelName(void);
+  bool GetDiskSpace(const CStdString& drive,int& iTotal, int& iTotalFree, int& iTotalUsed, int& iPercentFree, int& iPercentUsed);
   CStdString GetHddSpaceInfo(int& percent, int drive, bool shortText=false);
   CStdString GetHddSpaceInfo(int drive, bool shortText=false);
+
+  static std::string GetBuildTargetPlatformName(void);
+  static std::string GetBuildTargetPlatformVersion(void);
+  static std::string GetBuildTargetPlatformVersionDecoded(void);
+  static std::string GetBuildTargetCpuFamily(void);
+
+  static std::string GetUsedCompilerNameAndVer(void);
 
 protected:
   virtual CJob *GetJob() const;

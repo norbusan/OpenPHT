@@ -14,7 +14,8 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include "AdvancedSettings.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/GUISettings.h"
 
 #include "Client/PlexServer.h"
 #include "Client/PlexServerManager.h"
@@ -33,7 +34,7 @@ int64_t CPlexAttributeParserInt::GetInt(const CStdString &value)
 {
   int64_t intval;
   try { intval = boost::lexical_cast<int64_t>(value); }
-  catch (boost::bad_lexical_cast &e){ return -1; }
+  catch (boost::bad_lexical_cast){ return -1; }
   return intval;
 }
 
@@ -94,7 +95,7 @@ void CPlexAttributeParserKey::Process(const CURL& url, const CStdString &key, co
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-CStdString CPlexAttributeParserMediaUrl::GetImageURL(const CURL &url, const CStdString &source, int height, int width)
+CStdString CPlexAttributeParserMediaUrl::GetImageURL(const CURL &url, const CStdString &source, int height, int width, bool transcode /* = true */)
 {
   CURL mediaUrl(url);
   CURL imageURL;
@@ -123,6 +124,8 @@ CStdString CPlexAttributeParserMediaUrl::GetImageURL(const CURL &url, const CStd
   if (boost::starts_with(source, "http://") || boost::starts_with(source, "https://"))
   {
     imageURL = CURL(source);
+    if (!transcode)
+      return source;
   }
   else if (boost::starts_with(source, "/sync/exchange"))
   {
@@ -134,6 +137,14 @@ CStdString CPlexAttributeParserMediaUrl::GetImageURL(const CURL &url, const CStd
 
     BOOST_FOREACH(const PlexStringPair& values, options)
       imageURL.SetOption(values.first, values.second);
+  }
+  else if (!transcode)
+  {
+    if (boost::starts_with(source, "/"))
+      mediaUrl.SetFileName(source.substr(1, std::string::npos));
+    else
+      mediaUrl.SetFileName(source);
+    return mediaUrl.Get();
   }
   else
   {
@@ -217,9 +228,9 @@ void CPlexAttributeParserMediaUrl::Process(const CURL &url, const CStdString &ke
   else if (key == "banner")
     item->SetArt("banner", GetImageURL(url, value, 200, 800));
   else if (key == "art")
-    item->SetArt(PLEX_ART_FANART, GetImageURL(url, value, LARGE_SIZE, LARGE_SIZE));
+    item->SetArt(PLEX_ART_FANART, GetImageURL(url, value, LARGE_SIZE, LARGE_SIZE, !g_guiSettings.GetBool("myplex.disablefanarttranscode")));
   else if (key == "picture")
-    item->SetArt("picture", GetImageURL(url, value, LARGE_SIZE, LARGE_SIZE));
+    item->SetArt("picture", GetImageURL(url, value, LARGE_SIZE, LARGE_SIZE, !g_guiSettings.GetBool("myplex.disablepicturetranscode")));
   else
     item->SetArt(key, GetImageURL(url, value, 320, 320));
 }

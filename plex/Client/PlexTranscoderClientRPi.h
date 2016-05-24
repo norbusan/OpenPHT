@@ -25,7 +25,6 @@ class CPlexTranscoderClientRPi : public CPlexTranscoderClient
     CPlexTranscoderClientRPi();
     virtual bool ShouldTranscode(CPlexServerPtr server, const CFileItem &item);
     virtual std::string GetCurrentBitrate(bool local);
-    bool CheckCodec(std::string codec);
 };
 
 #endif // PLEXTRANSCODERCLIENTRPI_H

@@ -35,6 +35,7 @@ CPlexRemoteResponse CPlexRemoteApplicationHandler::sendString(const ArgMap &argu
       newString = arguments.find(g_plexApplication.timelineManager->GetCurrentFocusedTextField())->second;
   }
 
+  g_application.ResetScreenSaver();
   g_application.WakeUpScreenSaverAndDPMS();
 
   int currentWindow = g_windowManager.GetActiveWindow();
@@ -90,6 +91,7 @@ CPlexRemoteResponse CPlexRemoteApplicationHandler::sendVKey(const ArgMap &argume
 
   if (action != ACTION_NONE)
   {
+    g_application.ResetScreenSaver();
     g_application.WakeUpScreenSaverAndDPMS();
     CApplicationMessenger::Get().SendAction(CAction(action), g_windowManager.GetFocusedWindow(), false);
   }

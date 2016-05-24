@@ -67,15 +67,15 @@
       <mymusic>XBMC.ActivateWindow(MyMusic)</mymusic>
       <mypictures>XBMC.ActivateWindow(MyPictures)</mypictures>
       <mytv>XBMC.ActivateWindow(MyPVR)</mytv>
-      <guide>XBMC.ActivateWindowAndFocus(MyPVR, 31,0, 10,0)</guide>
+      <guide>ContextMenu</guide>
       <livetv>XBMC.ActivateWindowAndFocus(MyPVR, 32,0, 11,0)</livetv>
       <liveradio>XBMC.ActivateWindowAndFocus(MyPVR, 33,0, 12,0)</liveradio>
       <recordedtv>XBMC.ActivateWindowAndFocus(MyPVR, 34,0, 13,0)</recordedtv>
       <epgsearch>XBMC.ActivateWindowAndFocus(MyPVR, 35,0, 14,0)</epgsearch>
-      <red>XBMC.ActivateWindow(MyPVR)</red>
-      <green>XBMC.ActivateWindow(MyVideos)</green>
-      <yellow>XBMC.ActivateWindow(MyMusic)</yellow>
-      <blue>XBMC.ActivateWindow(MyPictures)</blue>
+      <red>FullScreen</red>
+      <green>OSD</green>
+      <yellow>Info</yellow>
+      <blue>ContextMenu</blue>
       <zero>Number0</zero>
       <one>Number1</one>
       <two>JumpSMS2</two>
@@ -153,7 +153,7 @@
       <select>OSD</select>
       <title>CodecInfo</title>
       <info>Info</info>
-      <guide>XBMC.ActivateWindow(PVROSDGuide)</guide>
+      <guide>Info</guide>
       <teletext>XBMC.ActivateWindow(Teletext)</teletext>
       <subtitle>NextSubtitle</subtitle>
       <star>NextSubtitle</star>
@@ -162,6 +162,7 @@
       <hash>AudioNextLanguage</hash>
       <pageplus>SkipNext</pageplus>
       <pageminus>SkipPrevious</pageminus>
+      <blue>CodecInfo</blue>
     </remote>
   </FullscreenVideo>
   <VideoTimeSeek>
@@ -175,6 +176,7 @@
       <title>CodecInfo</title>
       <info>Back</info>
       <menu>OSD</menu>
+      <blue>CodecInfo</blue>
     </remote>
   </FullscreenInfo>
   <PlayerControls>
@@ -252,6 +254,7 @@
     <remote>
       <menu>Back</menu>
       <start>Back</start>
+      <blue>CodecInfo</blue>
     </remote>
   </VideoOSD>
   <VideoMenu>

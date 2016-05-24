@@ -31,7 +31,7 @@ else(APPLE)
   set(PLAT "windows")
 endif(APPLE)
 
-find_path(BREAKPAD_INCLUDES exception_handler.h HINTS ${dependdir}/include/breakpad ${BREAKPAD_PATH}/include PATH_SUFFIXES client/${PLAT}/handler)
+find_path(BREAKPAD_INCLUDES client/${PLAT}/handler/exception_handler.h HINTS ${dependdir}/include ${BREAKPAD_PATH}/include PATH_SUFFIXES breakpad)
 if(BREAKPAD_INCLUDES MATCHES "-NOTFOUND")
   message(STATUS "Can't find exception_handler.h")
 else(BREAKPAD_INCLUDES MATCHES "-NOTFOUND")

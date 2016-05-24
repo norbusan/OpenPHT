@@ -59,11 +59,15 @@ set(PYTHON_EXEC "${PYTHON_EXEC_}" CACHE FILEPATH "Path to Python interpreter")
 string(REGEX REPLACE "/bin/python.*" "" PYTHON_PREFIX "${PYTHON_EXEC_}")
 string(REGEX REPLACE "/bin/python.*" "" PYTHON_PREFIX2 "${PYTHON_EXEC}")
 
-execute_process(COMMAND "${PYTHON_EXEC}" "-c"
-    "import sys; print('%d.%d' % (sys.version_info[0],sys.version_info[1]))"
-    OUTPUT_VARIABLE PYTHON_VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-string(REPLACE "." "" PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
+if (TARGET_RPI)
+    string(REGEX REPLACE ".*/bin/python" "" PYTHON_VERSION "${PYTHON_EXEC}") # grab version from executable name
+else()
+    execute_process(COMMAND "${PYTHON_EXEC}" "-c"
+        "import sys; print('%d.%d' % (sys.version_info[0],sys.version_info[1]))"
+        OUTPUT_VARIABLE PYTHON_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REPLACE "." "" PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
+endif()
 
 find_library(PYTHON_LIBRARIES 
     NAMES "python${PYTHON_VERSION_NO_DOTS}" "python${PYTHON_VERSION}"
@@ -80,11 +84,15 @@ find_path(PYTHON_INCLUDE_DIRS "Python.h"
     PATH_SUFFIXES python${PYTHON_VERSION} python${PYTHON_VERSION}m
     DOC "Python include directories" NO_DEFAULT_PATH)
 
-execute_process(COMMAND "${PYTHON_EXEC}" "-c"
-    "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
-    OUTPUT_VARIABLE PYTHON_SITE_MODULES_
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-string(REGEX REPLACE "^${PYTHON_PREFIX2}/" "" PYTHON_SITE_MODULES "${PYTHON_SITE_MODULES_}")
+if (TARGET_RPI)
+    set(PYTHON_SITE_MODULES "${PYTHON_PREFIX}/lib/site-packages" CACHE FILEPATH "Path to Python site modules")
+else()
+    execute_process(COMMAND "${PYTHON_EXEC}" "-c"
+        "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
+        OUTPUT_VARIABLE PYTHON_SITE_MODULES_
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX REPLACE "^${PYTHON_PREFIX2}/" "" PYTHON_SITE_MODULES "${PYTHON_SITE_MODULES_}")
+endif()
 
 function(find_python_module module)
     string(TOUPPER ${module} module_upper)
@@ -100,11 +108,13 @@ function(find_python_module module)
     if(NOT PY_${module_upper})
         # A module's location is usually a directory, but for binary modules
         # it's a .so file.
-        execute_process(COMMAND "${PYTHON_EXEC}" "-c"
-            "import re, ${module}; print(re.compile('/__init__.py.*').sub('',${module}.__file__))"
-            RESULT_VARIABLE _${module}_status
-            OUTPUT_VARIABLE _${module}_location
-            ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if (NOT TARGET_RPI)
+            execute_process(COMMAND "${PYTHON_EXEC}" "-c"
+                "import re, ${module}; print(re.compile('/__init__.py.*').sub('',${module}.__file__))"
+                RESULT_VARIABLE _${module}_status
+                OUTPUT_VARIABLE _${module}_location
+                ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+        endif()
         if(NOT _${module}_status)
             set(PY_${module_upper} ${_${module}_location} CACHE STRING
                 "Location of Python module ${module}")

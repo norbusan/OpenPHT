@@ -10,6 +10,7 @@ cd %TMP_PATH%
 xcopy plex-depends\include\* "%CUR_PATH%\include" /E /Q /I /Y
 xcopy plex-depends\lib\*.* "%CUR_PATH%\lib" /E /Q /I /Y
 xcopy plex-depends\bin\*.pdb "%CUR_PATH%\lib" /E /Q /I /Y
+copy plex-depends\bin\dump_syms.exe "%CUR_PATH%\bin\" /Y
 copy plex-depends\bin\libcec.dll "%XBMC_PATH%\system\" /Y
 copy plex-depends\bin\libcurl.dll "%XBMC_PATH%\system\" /Y
 copy plex-depends\bin\libeay32.dll "%XBMC_PATH%\system\" /Y

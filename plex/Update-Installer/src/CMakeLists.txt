@@ -138,7 +138,7 @@ target_link_libraries(updater
   updatershared
 )
 
-if (SIGN_UPDATER)
+if (SIGN_UPDATER AND WIN32)
 	add_custom_command(TARGET updater POST_BUILD COMMAND ${BINARY_SIGNING_TOOL} $<TARGET_FILE:updater>)
 endif()
 

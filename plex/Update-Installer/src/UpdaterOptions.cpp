@@ -9,7 +9,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_WINDOWS) && _MSC_VER < 1800
 long long atoll(const char* string)
 {
   return _atoi64(string);

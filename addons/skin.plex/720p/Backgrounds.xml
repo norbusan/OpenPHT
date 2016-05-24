@@ -4,8 +4,8 @@
 		<control type="image">
 			<include>FullScreenScaled</include>
 			<texture>bg-overlay-grainy.png</texture>
-			<animation effect="fade" start="0" end="100" time="600">WindowOpen</animation>
-			<animation effect="fade" start="100" end="0" time="600">WindowClose</animation>
+			<animation effect="fade" start="0" end="100" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowOpen</animation>
+			<animation effect="fade" start="100" end="0" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowClose</animation>
 		</control>
 	</include>
 	<include name="BGFanart">
@@ -19,7 +19,7 @@
 				<loop>yes</loop>
 				<imagepath background="true">plexserver://best:32400/library/arts?sort=random&X-Plex-Container-Start=0&X-Plex-Container-Size=50</imagepath>
 				<animation effect="fade" end="50" time="400" condition="true">Conditional</animation>
-				<animation type="WindowClose">
+				<animation type="WindowClose" condition="!Skin.HasSetting(DisableWindowFade)">
 					<effect type="fade" start="100" end="0" time="800"/>
 				</animation>
 				<visible>Container.Content(empty)</visible>
@@ -34,8 +34,8 @@
 			<control type="image">
 				<include>FullScreenScaled</include>
 				<texture>bg-overlay-grainy.png</texture>
-				<animation effect="fade" start="0" end="100" time="600">WindowOpen</animation>
-				<animation effect="fade" start="100" end="0" time="600">WindowClose</animation>
+				<animation effect="fade" start="0" end="100" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowOpen</animation>
+				<animation effect="fade" start="100" end="0" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowClose</animation>
 				<visible>!IsEmpty(Container.Property(primaryFilterActivated))</visible>
 			</control>
 		</control>
@@ -52,8 +52,8 @@
 			<control type="image">
 				<include>FullScreenScaled</include>
 				<texture>bg-overlay-grainy.png</texture>
-				<animation effect="fade" start="0" end="80" time="600">WindowOpen</animation>
-				<animation effect="fade" start="80" end="0" time="600">WindowClose</animation>
+				<animation effect="fade" start="0" end="80" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowOpen</animation>
+				<animation effect="fade" start="80" end="0" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowClose</animation>
 			</control>
 		</control>
 	</include>
@@ -79,7 +79,7 @@
 			<height>720</height>
 			<aspectratio aligny="top">stretch</aspectratio>
 			<texture>bg-overlay-grainy.png</texture>
-			<animation effect="fade" start="0" end="100" time="600">WindowOpen</animation>
+			<animation effect="fade" start="0" end="100" time="600" condition="!Skin.HasSetting(DisableWindowFade)">WindowOpen</animation>
 			<visible>true</visible>
 			<animation effect="fade" start="90" end="90" time="500" condition="!ControlGroup(1300).HasFocus()">Conditional</animation>
 			<animation effect="fade" start="90" end="90" time="300" condition="ControlGroup(1300).HasFocus()">Conditional</animation>
@@ -135,7 +135,7 @@
 				<randomize>true</randomize>
 				<loop>yes</loop>
 				<animation effect="fade" start="100" end="0" time="400" condition="ControlGroup(5000).HasFocus">Conditional</animation>
-				<animation type="WindowClose">
+				<animation type="WindowClose" condition="!Skin.HasSetting(DisableWindowFade)">
 					<effect type="fade" start="100" end="0" time="800"/>
 				</animation>
 			</control>

@@ -8,6 +8,9 @@ NOPROMPT=0
 MAKECLEAN=""
 MAKEFLAGS=""
 
+export _WIN32_WINNT=0x0600
+export NTDDI_VERSION=0x06000000
+
 function throwerror ()
 {
   $TOUCH $ERRORFILE
@@ -47,10 +50,12 @@ fi
 if [ -f $MAKECLEANFILE ]; then
   $RM $MAKECLEANFILE
   MAKECLEAN="clean"
+else
+  MAKECLEAN="noclean"
 fi
 
 if [ $NUMBER_OF_PROCESSORS > 1 ]; then
-  MAKEFLAGS=-j$NUMBER_OF_PROCESSORS
+  MAKEFLAGS=-j`expr $NUMBER_OF_PROCESSORS + $NUMBER_OF_PROCESSORS / 2`
 fi
 
 # compile our mingw dlls

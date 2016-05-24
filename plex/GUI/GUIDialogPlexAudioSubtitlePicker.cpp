@@ -15,6 +15,7 @@
 #include "PlexApplication.h"
 #include "Application.h"
 #include "Settings.h"
+#include "settings/GUISettings.h"
 
 CGUIDialogPlexPicker::CGUIDialogPlexPicker(int id, const CStdString& xml, bool audio)
   : CGUIDialogSelect(id, xml)
@@ -50,6 +51,9 @@ CGUIDialogPlexPicker::OnMessage(CGUIMessage &msg)
 void
 CGUIDialogPlexPicker::SetFileItem(CFileItemPtr& fileItem)
 {
+  if (!fileItem || fileItem->m_mediaItems.empty())
+    return;
+
   m_fileItem = fileItem;
   
   if (!m_audio)
@@ -65,11 +69,16 @@ CGUIDialogPlexPicker::SetFileItem(CFileItemPtr& fileItem)
     Add(noneItem);
   }
   
-  if (!fileItem || fileItem->m_mediaItems.size() < 1 ||
-      fileItem->m_mediaItems[0]->m_mediaParts.size() < 1)
+  CFileItemPtr part;
+  for (int i = 0; !part && i < fileItem->m_mediaItems.size(); i++)
+    for (int j = 0; !part && j < fileItem->m_mediaItems[i]->m_mediaParts.size(); j++)
+      if (fileItem->GetPath() == fileItem->m_mediaItems[i]->m_mediaParts[j]->GetPath())
+        part = fileItem->m_mediaItems[i]->m_mediaParts[j];
+  if (!part && !fileItem->m_mediaItems.empty() && !fileItem->m_mediaItems[0]->m_mediaParts.empty())
+    part = fileItem->m_mediaItems[0]->m_mediaParts[0];
+  if (!part)
     return;
 
-  CFileItemPtr part = fileItem->m_mediaItems[0]->m_mediaParts[0];
   int index = 0;
   bool hasSelection = false;
   for (int y = 0; y < part->m_mediaPartStreams.size(); y ++)
@@ -109,6 +118,7 @@ void CGUIDialogPlexPicker::UpdateStreamSelection()
   {
     IPlayer *player = g_application.m_pPlayer;
     int64_t streamId = selectedStream->GetProperty("id").asInteger();
+    bool audioStreamChanged = false;
 
     if (m_audio)
     {
@@ -116,6 +126,7 @@ void CGUIDialogPlexPicker::UpdateStreamSelection()
       {
         player->SetAudioStreamPlexID(streamId);
         g_settings.m_currentVideoSettings.m_AudioStream = player->GetAudioStream();
+        audioStreamChanged = true;
       }
     }
     else
@@ -130,7 +141,7 @@ void CGUIDialogPlexPicker::UpdateStreamSelection()
       }
     }
 
-    if (m_fileItem->GetProperty("plexDidTranscode").asBoolean())
+    if (m_fileItem->GetProperty("plexDidTranscode").asBoolean() && (audioStreamChanged || g_guiSettings.GetBool("plexmediaserver.transcodesubtitles")))
       /* since we are transcoding, we need to stop the current session and restart it on the server */
       CApplicationMessenger::Get().MediaRestart(false);
   }

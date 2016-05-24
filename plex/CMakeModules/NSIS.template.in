@@ -35,12 +35,22 @@
   ;Name and file
   Name "@CPACK_NSIS_PACKAGE_NAME@"
   OutFile "@CPACK_TOPLEVEL_DIRECTORY@/@CPACK_OUTPUT_FILE_NAME@"
-  
-  ;Plex, we install in %PROGRAMFILES% by default, which means that we need admin access.
-  RequestExecutionLevel admin
+
+  VIProductVersion "@CPACK_PLEX_VERSION_STRING_SHORT_BUILD@"
+  VIAddVersionKey CompanyName "@CPACK_PACKAGE_VENDOR@"
+  VIAddVersionKey FileDescription "@CPACK_NSIS_PACKAGE_NAME@ @CPACK_PLEX_VERSION_STRING@"
+  VIAddVersionKey FileVersion "@CPACK_PLEX_VERSION_STRING_SHORT_BUILD@"
+  VIAddVersionKey LegalCopyright "Copyright (c) Plex, Inc.  All rights reserved."
+  VIAddVersionKey InternalName "@CPACK_PACKAGE_INSTALL_DIRECTORY@"
+  VIAddVersionKey OriginalFilename "@CPACK_OUTPUT_FILE_NAME@"
+  VIAddVersionKey ProductName "@CPACK_NSIS_PACKAGE_NAME@"
+  VIAddVersionKey ProductVersion "@CPACK_PLEX_VERSION_STRING@"
 
   ;Set compression
   SetCompressor @CPACK_NSIS_COMPRESSOR@
+
+  ;Require administrator access
+  RequestExecutionLevel admin
 
 @CPACK_NSIS_DEFINES@
 
@@ -127,7 +137,7 @@ Var AR_RegFlags
  "exit_${SecName}:"
 !macroend
 
-!macro RemoveSection SecName
+!macro RemoveSection_CPack SecName
   ;  This macro is used to call section's Remove_... macro
   ;from the uninstaller.
   ;Input: section index constant name specified in Section command.
@@ -770,7 +780,6 @@ Function un.onInit
 
   done:
 
-  
 FunctionEnd
 
 ;--- Add/Remove callback functions: ---
@@ -850,7 +859,7 @@ Section "Uninstall"
   DeleteRegKey SHCTX "Software\@CPACK_PACKAGE_VENDOR@\@CPACK_PACKAGE_INSTALL_REGISTRY_KEY@"
 
   ; Removes all optional components
-  !insertmacro SectionList "RemoveSection"
+  !insertmacro SectionList "RemoveSection_CPack"
 
   !insertmacro MUI_STARTMENU_GETFOLDER Application $MUI_TEMP
 
@@ -928,7 +937,9 @@ Function .onInit
 ;Run the uninstaller
 uninst:
   ClearErrors
-  ExecWait '$0 _?=$INSTDIR' ;Do not copy the uninstaller to a temp file
+  StrLen $2 "\Uninstall.exe"
+  StrCpy $3 $0 -$2 # remove "\Uninstall.exe" from UninstallString to get path
+  ExecWait '$0 _?=$3' ;Do not copy the uninstaller to a temp file
 
   IfErrors uninst_failed inst
 uninst_failed:
@@ -936,7 +947,7 @@ uninst_failed:
   Abort
 
 
-inst:  
+inst:
   ; Detect Media Center
   ; 4.0 - Media Center 2005 with Update Rollup 2
   ; 5.0 - Media Center on Windows Vista

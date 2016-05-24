@@ -41,12 +41,13 @@
 
 #include "threads/CriticalSection.h"
 
-#define AUDIO_BUFFER_SECONDS 2
+#define AUDIO_BUFFER_SECONDS 3
 #define VIS_PACKET_SIZE 512
 
 #define OMX_IS_RAW(x)       \
 (                           \
   (x) == AE_FMT_AC3   ||    \
+  (x) == AE_FMT_EAC3  ||    \
   (x) == AE_FMT_DTS         \
 )
 
@@ -60,21 +61,20 @@ public:
   float GetCacheTime();
   float GetCacheTotal();
   COMXAudio();
-  bool Initialize(AEAudioFormat format, std::string& device, OMXClock *clock, CDVDStreamInfo &hints, bool bUsePassthrough, bool bUseHWDecode);
+  bool Initialize(AEAudioFormat format, OMXClock *clock, CDVDStreamInfo &hints, CAEChannelInfo channelMap, bool bUsePassthrough, bool bUseHWDecode);
+  bool PortSettingsChanged();
   ~COMXAudio();
 
   unsigned int AddPackets(const void* data, unsigned int len);
-  unsigned int AddPackets(const void* data, unsigned int len, double dts, double pts);
+  unsigned int AddPackets(const void* data, unsigned int len, double dts, double pts, unsigned int frame_size);
   unsigned int GetSpace();
   bool Deinitialize();
-  bool Pause();
-  bool Stop();
-  bool Resume();
 
-  long GetCurrentVolume() const;
-  void Mute(bool bMute);
-  bool SetCurrentVolume(float fVolume);
-  void SetDynamicRangeCompression(long drc) { m_drc = drc; }
+  void SetVolume(float nVolume);
+  void SetMute(bool bOnOff);
+  void SetDynamicRangeCompression(long drc);
+  float GetDynamicRangeAmplification() const { return 20.0f * log10f(m_amplification * m_attenuation); }
+  bool ApplyVolume();
   int SetPlaySpeed(int iSpeed);
   void SubmitEOS();
   bool IsEOS();
@@ -85,71 +85,78 @@ public:
   void Process();
 
   void SetCodingType(AEDataFormat dataFormat);
-  static bool CanHWDecode(CodecID codec);
+  static bool CanHWDecode(AVCodecID codec);
 
-  void PrintChannels(OMX_AUDIO_CHANNELTYPE eChannelMapping[]);
+  static void PrintChannels(OMX_AUDIO_CHANNELTYPE eChannelMapping[]);
   void PrintPCM(OMX_AUDIO_PARAM_PCMMODETYPE *pcm, std::string direction);
-  void PrintDDP(OMX_AUDIO_PARAM_DDPTYPE *ddparm);
-  void PrintDTS(OMX_AUDIO_PARAM_DTSTYPE *dtsparam);
-  unsigned int SyncDTS(BYTE* pData, unsigned int iSize);
-  unsigned int SyncAC3(BYTE* pData, unsigned int iSize);
+  void UpdateAttenuation();
 
-  bool BadState() { return !m_Initialized; };
-  unsigned int GetAudioRenderingLatency();
+  bool BadState() const { return !m_Initialized; };
+  unsigned int GetAudioRenderingLatency() const;
+  float GetMaxLevel(double &pts);
 
 private:
   IAudioCallback* m_pCallback;
   bool          m_Initialized;
-  bool          m_Pause;
-  bool          m_CanPause;
   float         m_CurrentVolume;
+  bool          m_Mute;
   long          m_drc;
   bool          m_Passthrough;
   bool          m_HWDecode;
   unsigned int  m_BytesPerSec;
+  unsigned int  m_InputBytesPerSec;
   unsigned int  m_BufferLen;
   unsigned int  m_ChunkLen;
+  unsigned int  m_InputChannels;
   unsigned int  m_OutputChannels;
   unsigned int  m_BitsPerSample;
+  float         m_maxLevel;
+  float         m_amplification;
+  float         m_attenuation;
+  float         m_submitted;
   COMXCoreComponent *m_omx_clock;
   OMXClock       *m_av_clock;
-  bool          m_first_frame;
-  bool          m_LostSync;
+  bool          m_settings_changed;
+  bool          m_setStartTime;
   int           m_SampleRate;
   OMX_AUDIO_CODINGTYPE m_eEncoding;
   uint8_t       *m_extradata;
   int           m_extrasize;
   // stuff for visualisation
-  unsigned int  m_vizBufferSamples;
   double        m_last_pts;
-  int           m_vizBufferSize;
-  uint8_t       *m_vizBuffer;
-  int           m_vizRemapBufferSize;
-  uint8_t       *m_vizRemapBuffer;
-  CAERemap      m_vizRemap;
+  bool          m_submitted_eos;
+  bool          m_failed_eos;
+  enum { AESINKPI_UNKNOWN, AESINKPI_HDMI, AESINKPI_ANALOGUE, AESINKPI_BOTH } m_output;
 
+  typedef struct {
+    double pts;
+    float level;
+  } amplitudes_t;
+  std::deque<amplitudes_t> m_ampqueue;
+
+  float m_downmix_matrix[OMX_AUDIO_MAXCHANNELS*OMX_AUDIO_MAXCHANNELS];
+
+  OMX_AUDIO_CHANNELTYPE m_input_channels[OMX_AUDIO_MAXCHANNELS];
+  OMX_AUDIO_CHANNELTYPE m_output_channels[OMX_AUDIO_MAXCHANNELS];
   OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_output;
   OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_input;
   OMX_AUDIO_PARAM_DTSTYPE     m_dtsParam;
   WAVEFORMATEXTENSIBLE        m_wave_header;
   AEAudioFormat m_format;
 protected:
-  COMXCoreComponent *m_omx_render;
+  COMXCoreComponent m_omx_render_analog;
+  COMXCoreComponent m_omx_render_hdmi;
+  COMXCoreComponent m_omx_splitter;
   COMXCoreComponent m_omx_mixer;
   COMXCoreComponent m_omx_decoder;
-  COMXCoreTunel     m_omx_tunnel_clock;
+  COMXCoreTunel     m_omx_tunnel_clock_analog;
+  COMXCoreTunel     m_omx_tunnel_clock_hdmi;
   COMXCoreTunel     m_omx_tunnel_mixer;
   COMXCoreTunel     m_omx_tunnel_decoder;
+  COMXCoreTunel     m_omx_tunnel_splitter_analog;
+  COMXCoreTunel     m_omx_tunnel_splitter_hdmi;
   DllAvUtil         m_dllAvUtil;
 
-  OMX_AUDIO_CHANNELTYPE m_input_channels[OMX_AUDIO_MAXCHANNELS];
-  OMX_AUDIO_CHANNELTYPE m_output_channels[OMX_AUDIO_MAXCHANNELS];
-
-  CAEChannelInfo    m_channelLayout;
-
-  CAEChannelInfo    GetChannelLayout(AEAudioFormat format);
-
-  void CheckOutputBufferSize(void **buffer, int *oldSize, int newSize);
   CCriticalSection m_critSection;
 };
 #endif

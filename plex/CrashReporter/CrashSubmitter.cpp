@@ -8,6 +8,7 @@
 #include "log.h"
 #include "PlexUtils.h"
 #include "settings/GUISettings.h"
+#include "utils/SystemInfo.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -16,7 +17,7 @@
 #include "URL.h"
 #include "utils/Base64.h"
 
-#define SUBMITTER_URL "http://services.openpht.tv/crashreport"
+#define SUBMITTER_URL "https://services.openpht.tv/crashreport"
 
 using namespace std;
 
@@ -121,6 +122,12 @@ bool CrashSubmitter::UploadFile(const CStdString& p)
 
   u.SetOption("version", ExtractVersionFromCrashDump(p));
   u.SetOption("platform", PlexUtils::GetMachinePlatform());
+  u.SetOption("submitter_version", g_infoManager.GetVersion().c_str());
+
+  #ifdef TARGET_RASPBERRY_PI
+    u.SetOption("serial", readProcCPUInfoValue("Serial"));
+    u.SetOption("revision", readProcCPUInfoValue("Revision"));
+  #endif
 
   // Strip off the version number, if present
   CStdString crashUuid = URIUtils::GetFileName(p);
@@ -138,11 +145,21 @@ bool CrashSubmitter::UploadFile(const CStdString& p)
 
   CStdString b64data = GetDumpData(p);
   CStdString data;
+  http.SetUserAgent(g_sysinfo.GetUserAgent());
   if (!http.Post(u.Get(), "dumpfileb64=" + b64data, data))
   {
     CLog::Log(LOGERROR, "CrashSubmitter::UploadFile failed to upload to %s", SUBMITTER_URL);
     return false;
   }
+#ifdef TARGET_RASPBERRY_PI
+  else
+  {
+    CStdString message;
+    message.Format("Please reference crash id [B][U]%s[/U][/B]\nif you file a bug report at tiny.cc/rasplex-bugs", data.c_str());
+    CGUIDialogOK::ShowAndGetInput("Crash report submitted", message,  "", "");
+    CLog::Log(LOGNOTICE, "CrashSubmitter::UploadFile got result: %s", data.c_str());
+  }
+#endif
 
   return true;
 }

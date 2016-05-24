@@ -439,7 +439,6 @@ void NetworkInterface::GetAll(vector<NetworkInterface>& interfaces)
             // Compute the mask
             memset(mask.s6_addr, 0, sizeof(mask.s6_addr));
 
-            int maskIndex;
             for (ULONG len = prefix->PrefixLength, maskIndex = 0; len > 0; len -= 8)
             {
               uint8_t maskByte = (len >= 8) ? 0xFF : (uint8_t)((0xFFU << (8 - len)) & 0xFFU);

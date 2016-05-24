@@ -54,7 +54,7 @@ case $use_darwin in
      if test "$use_arch" = "armv7"; then
        AC_MSG_ERROR(error in configure of --with-arch=$use_arch)
      fi
-     found_sdk_version=[`$use_xcodebuild -showsdks | grep macosx | sort |  tail -n 1 | grep -oE 'macosx[0-9.0-9]+' | cut -c 7-$NF`]
+     found_sdk_version=[`$use_xcodebuild -showsdks | sed -E -n 's/.*macosx([0-9]+)\.([0-9]+)/\1.\2/p' | sort  -n -t. -k1,1 -k2,2 | tail -n 1`]
      use_sdk="${use_sdk:-$found_sdk_version}"
      case $use_sdk in
      10.5);;
@@ -62,6 +62,8 @@ case $use_darwin in
      10.7);;
      10.8);;
      10.9);;
+     10.10);;
+     10.11);;
      *)
        AC_MSG_ERROR(error in configure of --with-sdk=$use_sdk)
      esac

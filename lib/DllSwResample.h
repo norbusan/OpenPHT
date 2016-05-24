@@ -24,6 +24,7 @@
   #include "config.h"
 #endif
 #include "DynamicDll.h"
+#include "DllAvUtil.h"
 #include "utils/log.h"
 
 extern "C" {
@@ -33,6 +34,10 @@ extern "C" {
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
 #endif
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+
 #ifndef __GNUC__
 #pragma warning(disable:4244)
 #endif
@@ -137,7 +142,7 @@ class DllSwResample : public DllDynamic, DllSwResampleInterface
     RESOLVE_METHOD(swr_convert)
   END_METHOD_RESOLVE()
 
-  /* dependencies of libavformat */
+  /* dependency of libswresample */
   DllAvUtil m_dllAvUtil;
 
 public:
@@ -147,6 +152,11 @@ public:
     if (!m_dllAvUtil.Load())
       return false;
     return DllDynamic::Load();
+  }
+  virtual void Unload()
+  {
+    DllDynamic::Unload();
+    m_dllAvUtil.Unload();
   }
 };
 

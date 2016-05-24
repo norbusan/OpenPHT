@@ -23,6 +23,10 @@
 #include "threads/Thread.h"
 #include "PlexApplication.h"
 
+#ifdef TARGET_RASPBERRY_PI
+#include "RaspberryPiProcReader.h"
+#endif
+
 class CPlexAutoUpdate : public IJobCallback, public IPlexGlobalTimeout
 {
   public:

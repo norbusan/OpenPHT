@@ -226,6 +226,8 @@ bool CPlexServerCacheDatabase::getCachedServers(std::vector<CPlexServerPtr>& ser
         // unscramble
         CPlexAES aes(g_guiSettings.GetString("system.uuid"));
         token = aes.decrypt(Base64::Decode(token));
+        if (token.length() != 20)
+          token.clear();
 
         if (address.IsEmpty())
         {

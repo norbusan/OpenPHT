@@ -241,7 +241,7 @@ void CPlexServerManager::ServerRefreshComplete(int connectionType)
 
   BOOST_FOREACH(PlexServerPair p, m_serverMap)
   {
-    bool connected = p.second->GetActiveConnection();
+    bool connected = !!p.second->GetActiveConnection();
     if (!p.second->MarkUpdateFinished(connectionType))
       serversToRemove.push_back(p.first);
     else if (connected && !p.second->GetActiveConnection())

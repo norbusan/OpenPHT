@@ -33,8 +33,8 @@
 		<focusedcolor>Focused</focusedcolor>
 		<disabledcolor>Disabled</disabledcolor>
 		<selectedcolor>Selected</selectedcolor>
-		<texturefocus border="15">black-bottom-grey.png</texturefocus>
-		<texturenofocus border="15">border-bottom-grey.png</texturenofocus>
+		<texturefocus>black-bottom-grey.png</texturefocus>
+		<texturenofocus>border-bottom-grey.png</texturenofocus>
 		<pulseonselect>false</pulseonselect>
 	</default>
 	<default type="radiobutton">
@@ -49,8 +49,8 @@
 		<focusedcolor>Focused</focusedcolor>
 		<disabledcolor>Disabled</disabledcolor>
 		<selectedcolor>Selected</selectedcolor>
-		<texturefocus border="5">black-bottom-grey.png</texturefocus>
-		<texturenofocus border="5">border-bottom-grey.png</texturenofocus>
+		<texturefocus>black-bottom-grey.png</texturefocus>
+		<texturenofocus>border-bottom-grey.png</texturenofocus>
 		<textureradiofocus>b-radio-on.png</textureradiofocus>
 		<textureradionofocus>b-radio-off.png</textureradionofocus>
 		<radiowidth>27</radiowidth>
@@ -69,8 +69,8 @@
 		<focusedcolor>Focused</focusedcolor>
 		<disabledcolor>Disabled</disabledcolor>
 		<selectedcolor>Selected</selectedcolor>
-		<texturefocus border="5">black-bottom-grey.png</texturefocus>
-		<texturenofocus border="5">border-bottom-grey.png</texturenofocus>
+		<texturefocus>black-bottom-grey.png</texturefocus>
+		<texturenofocus>border-bottom-grey.png</texturenofocus>
 		<textureradiofocus>b-radio-on.png</textureradiofocus>
 		<textureradionofocus>b-radio-off.png</textureradionofocus>
 		<radiowidth>27</radiowidth>
@@ -92,8 +92,8 @@
 		<textureupfocus>b-scroll-up-on.png</textureupfocus>
 		<texturedown>b-scroll-down-off.png</texturedown>
 		<texturedownfocus>b-scroll-down-on.png</texturedownfocus>
-		<texturefocus border="5">black-bottom-grey.png</texturefocus>
-		<texturenofocus border="5">border-bottom-grey.png</texturenofocus>
+		<texturefocus>black-bottom-grey.png</texturefocus>
+		<texturenofocus>border-bottom-grey.png</texturenofocus>
 		<spinwidth>16</spinwidth>
 		<spinheight>16</spinheight>
 		<reverse>yes</reverse>
@@ -154,8 +154,8 @@
 		<texturesliderbar border="14,0,14,0">OSDProgressBack.png</texturesliderbar>
 		<textureslidernib border="14,0,14,0">OSDProgressMid-grey.png</textureslidernib>
 		<textureslidernibfocus border="14,0,14,0">OSDProgressMid.png</textureslidernibfocus>
-		<texturefocus border="5">black-bottom-grey.png</texturefocus>
-		<texturenofocus border="5">border-bottom-grey.png</texturenofocus>
+		<texturefocus>black-bottom-grey.png</texturefocus>
+		<texturenofocus>border-bottom-grey.png</texturenofocus>
 	</default>
 	<!-- -->
 	<!-- TO DO (or not, if not useful) -->

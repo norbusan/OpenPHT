@@ -1,0 +1,17 @@
+NEW:
+  - Play from here added to episodes context menu on home screen
+  - Updated default CEC remote keymap for Guide/Info and color buttons
+  - Smaller gui updates to video osd, codec info and preferences in default skin
+  - Use same subtitle name format as Plex Web
+  - Now uses https when checking for updates and sending crash reports
+  - Code can now be compiled with VS2013 on windows
+  - Linux improvements in preparation for embedded builds
+
+FIXES:
+  - Fix french translations (thanks @Maxou44)
+  - Fixes VC-1 decoding on windows with newer Intel graphics
+  - Fix use of cache when loading preplay screen
+  - Fix subtitle selection for transcoded media and after a vobsub has been selected
+  - Fixes for crashes on application shutdown
+  - OpenPHT.app should now be correctly signed on osx
+  - Backport of final fixes from RasPlex

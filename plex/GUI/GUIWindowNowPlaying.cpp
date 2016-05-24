@@ -86,7 +86,8 @@ bool CGUIWindowNowPlaying::OnMessage(CGUIMessage& message)
   {
     case GUI_MSG_WINDOW_DEINIT:
     {
-      g_plexApplication.timer->RemoveTimeout(this);
+      if (g_plexApplication.timer)
+        g_plexApplication.timer->RemoveTimeout(this);
       break;
     }
     case GUI_MSG_WINDOW_INIT:

@@ -447,10 +447,10 @@ int CGUIWindowAddonBrowser::SelectAddonID(const vector<ADDON::TYPE> &types, CStd
   dialog->SetUseDetails(true);
   if (multipleSelection)
     showNone = false;
-  if (multipleSelection || iTypes > 1)
-    dialog->EnableButton(true, 186);
-  else
-    dialog->EnableButton(true, 21452);
+  //if (multipleSelection || iTypes > 1)
+  //  dialog->EnableButton(true, 186);
+  //else
+  //  dialog->EnableButton(true, 21452);
   if (showNone)
   {
     CFileItemPtr item(new CFileItem("", false));

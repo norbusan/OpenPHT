@@ -24,10 +24,13 @@
   #include "config.h"
 #endif
 #include "DynamicDll.h"
+#include "DllAvUtil.h"
 #include "utils/log.h"
 
 extern "C" {
+#ifndef HAVE_MMX
 #define HAVE_MMX
+#endif
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
 #endif
@@ -131,6 +134,22 @@ class DllPostProc : public DllDynamic, DllPostProcInterface
     RESOLVE_METHOD(pp_get_context)
     RESOLVE_METHOD(pp_free_context)
   END_METHOD_RESOLVE()
+
+  /* dependency of libpostproc */
+  DllAvUtil m_dllAvUtil;
+
+public:
+  virtual bool Load()
+  {
+    if (!m_dllAvUtil.Load())
+      return false;
+    return DllDynamic::Load();
+  }
+  virtual void Unload()
+  {
+    DllDynamic::Unload();
+    m_dllAvUtil.Unload();
+  }
 };
 
 #endif

@@ -67,6 +67,13 @@ enum PixelFormat CDVDVideoCodecFFmpeg::GetFormat( struct AVCodecContext * avctx
   if(!ctx->IsHardwareAllowed())
     return ctx->m_dllAvCodec.avcodec_default_get_format(avctx, fmt);
 
+  // fix an ffmpeg issue here, it calls us with an invalid profile
+  // then a 2nd call with a valid one
+  if (avctx->codec_id == CODEC_ID_VC1 && avctx->profile == FF_PROFILE_UNKNOWN)
+  {
+    return ctx->m_dllAvCodec.avcodec_default_get_format(avctx, fmt);
+  }
+
   const PixelFormat * cur = fmt;
   while(*cur != PIX_FMT_NONE)
   {
@@ -90,6 +97,7 @@ enum PixelFormat CDVDVideoCodecFFmpeg::GetFormat( struct AVCodecContext * avctx
 #ifdef HAS_DX
   if(DXVA::CDecoder::Supports(*cur) && g_guiSettings.GetBool("videoplayer.usedxva2"))
   {
+    CLog::Log(LOGNOTICE, "CDVDVideoCodecFFmpeg::GetFormat - Creating DXVA(%ix%i)", avctx->width, avctx->height);
     DXVA::CDecoder* dec = new DXVA::CDecoder();
     if(dec->Open(avctx, *cur, ctx->m_uSurfacesCount))
     {
@@ -156,6 +164,7 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
   if(!m_dllAvUtil.Load()
   || !m_dllAvCodec.Load()
   || !m_dllSwScale.Load()
+  || !m_dllPostProc.Load()
   || !m_dllAvFilter.Load()
   ) return false;
 
@@ -272,9 +281,6 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
     memcpy(m_pCodecContext->extradata, hints.extradata, hints.extrasize);
   }
 
-  // set acceleration
-  m_pCodecContext->dsp_mask = 0;//FF_MM_FORCE | FF_MM_MMX | FF_MM_MMXEXT | FF_MM_SSE;
-
   // advanced setting override for skip loop filter (see avcodec.h for valid options)
   // TODO: allow per video setting?
   if (g_advancedSettings.m_iSkipLoopFilter != 0)
@@ -339,6 +345,7 @@ void CDVDVideoCodecFFmpeg::Dispose()
   m_dllAvCodec.Unload();
   m_dllAvUtil.Unload();
   m_dllAvFilter.Unload();
+  m_dllPostProc.Unload();
 }
 
 void CDVDVideoCodecFFmpeg::SetDropState(bool bDrop)
@@ -469,6 +476,14 @@ int CDVDVideoCodecFFmpeg::Decode(BYTE* pData, int iSize, double dts, double pts)
   m_dllAvCodec.av_init_packet(&avpkt);
   avpkt.data = pData;
   avpkt.size = iSize;
+#define SET_PKT_TS(ts) \
+  if(ts != DVD_NOPTS_VALUE)\
+    avpkt.ts = (ts / DVD_TIME_BASE) * AV_TIME_BASE;\
+  else\
+    avpkt.ts = AV_NOPTS_VALUE
+  SET_PKT_TS(pts);
+  SET_PKT_TS(dts);
+#undef SET_PKT_TS
   /* We lie, but this flag is only used by pngdec.c.
    * Setting it correctly would allow CorePNG decoding. */
   avpkt.flags = AV_PKT_FLAG_KEY;
@@ -558,8 +573,11 @@ void CDVDVideoCodecFFmpeg::Reset()
 
 bool CDVDVideoCodecFFmpeg::GetPictureCommon(DVDVideoPicture* pDvdVideoPicture)
 {
-  pDvdVideoPicture->iWidth = m_pCodecContext->width;
-  pDvdVideoPicture->iHeight = m_pCodecContext->height;
+  if (!m_pFrame)
+    return false;
+
+  pDvdVideoPicture->iWidth = m_pFrame->width;
+  pDvdVideoPicture->iHeight = m_pFrame->height;
 
   if(m_pBufferRef)
   {
@@ -579,7 +597,7 @@ bool CDVDVideoCodecFFmpeg::GetPictureCommon(DVDVideoPicture* pDvdVideoPicture)
   double aspect_ratio;
 
   /* use variable in the frame */
-  AVRational pixel_aspect = m_pCodecContext->sample_aspect_ratio;
+  AVRational pixel_aspect = m_pFrame->sample_aspect_ratio;
   if (m_pBufferRef)
     pixel_aspect = m_pBufferRef->video->sample_aspect_ratio;
 
@@ -603,9 +621,6 @@ bool CDVDVideoCodecFFmpeg::GetPictureCommon(DVDVideoPicture* pDvdVideoPicture)
 
   pDvdVideoPicture->pts = DVD_NOPTS_VALUE;
 
-  if (!m_pFrame)
-    return false;
-
   pDvdVideoPicture->iRepeatPicture = 0.5 * m_pFrame->repeat_pict;
   pDvdVideoPicture->iFlags = DVP_FLAG_ALLOCATED;
   pDvdVideoPicture->iFlags |= m_pFrame->interlaced_frame ? DVP_FLAG_INTERLACED : 0;
@@ -614,6 +629,7 @@ bool CDVDVideoCodecFFmpeg::GetPictureCommon(DVDVideoPicture* pDvdVideoPicture)
   pDvdVideoPicture->chroma_position = m_pCodecContext->chroma_sample_location;
   pDvdVideoPicture->color_primaries = m_pCodecContext->color_primaries;
   pDvdVideoPicture->color_transfer = m_pCodecContext->color_trc;
+  pDvdVideoPicture->color_matrix = m_pCodecContext->colorspace;
   if(m_pCodecContext->color_range == AVCOL_RANGE_JPEG
   || m_pCodecContext->pix_fmt     == PIX_FMT_YUVJ420P)
     pDvdVideoPicture->color_range = 1;
@@ -637,7 +653,11 @@ bool CDVDVideoCodecFFmpeg::GetPictureCommon(DVDVideoPicture* pDvdVideoPicture)
     pDvdVideoPicture->qscale_type = DVP_QSCALE_UNKNOWN;
   }
 
-  pDvdVideoPicture->dts = m_dts;
+  if (pDvdVideoPicture->iRepeatPicture)
+    pDvdVideoPicture->dts = DVD_NOPTS_VALUE;
+  else
+    pDvdVideoPicture->dts = m_dts;
+
   m_dts = DVD_NOPTS_VALUE;
   if (m_pFrame->reordered_opaque)
     pDvdVideoPicture->pts = pts_itod(m_pFrame->reordered_opaque);
@@ -672,7 +692,7 @@ bool CDVDVideoCodecFFmpeg::GetPicture(DVDVideoPicture* pDvdVideoPicture)
   if(m_pBufferRef)
     pix_fmt = (PixelFormat)m_pBufferRef->format;
   else
-    pix_fmt = m_pCodecContext->pix_fmt;
+    pix_fmt = (PixelFormat)m_pFrame->format;
 
   pDvdVideoPicture->format = CDVDCodecUtils::EFormatFromPixfmt(pix_fmt);
   return true;
@@ -710,10 +730,10 @@ int CDVDVideoCodecFFmpeg::FilterOpen(const CStdString& filters, bool scale)
     m_pCodecContext->width,
     m_pCodecContext->height,
     m_pCodecContext->pix_fmt,
-    m_pCodecContext->time_base.num,
-    m_pCodecContext->time_base.den,
-    m_pCodecContext->sample_aspect_ratio.num,
-    m_pCodecContext->sample_aspect_ratio.den);
+    m_pCodecContext->time_base.num ? m_pCodecContext->time_base.num : 1,
+    m_pCodecContext->time_base.num ? m_pCodecContext->time_base.den : 1,
+    m_pCodecContext->sample_aspect_ratio.num != 0 ? m_pCodecContext->sample_aspect_ratio.num : 1,
+    m_pCodecContext->sample_aspect_ratio.num != 0 ? m_pCodecContext->sample_aspect_ratio.den : 1);
 
   if ((result = m_dllAvFilter.avfilter_graph_create_filter(&m_pFilterIn, srcFilter, "src", args, NULL, m_pFilterGraph)) < 0)
   {
@@ -833,7 +853,7 @@ int CDVDVideoCodecFFmpeg::FilterProcess(AVFrame* frame)
   {
 
     result = m_dllAvFilter.av_buffersink_get_buffer_ref(m_pFilterOut, &m_pBufferRef, 0);
-    if(!m_pBufferRef)
+    if(!m_pBufferRef || result < 0)
     {
       CLog::Log(LOGERROR, "CDVDVideoCodecFFmpeg::FilterProcess - cur_buf");
       return VC_ERROR;

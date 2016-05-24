@@ -539,15 +539,11 @@ void CCurlFile::SetCommonOptions(CReadState* state)
   
   /* With PLEX we actually ship a good CA store */
   g_curlInterface.easy_setopt(h, CURLOPT_SSL_VERIFYPEER, 1);
-  g_curlInterface.easy_setopt(h, CURLOPT_SSL_VERIFYHOST, 1);
+  g_curlInterface.easy_setopt(h, CURLOPT_SSL_VERIFYHOST, 2);
   g_curlInterface.easy_setopt(h, CURLOPT_CAINFO, CSpecialProtocol::TranslatePath("special://xbmc/system/cacert.pem").c_str());
 
-  // If we are talking to plex.tv we use our own CA's certificate instead of the generic one.
-  if (boost::starts_with(m_url, "https://plex.tv") && !boost::starts_with(m_url, "https://plex.tv:443/sync") && !boost::starts_with(m_url, "https://plex.tv/sync"))
-    g_curlInterface.easy_setopt(h, CURLOPT_CAINFO, CSpecialProtocol::TranslatePath("special://xbmc/system/plexca.pem").c_str());
-
   CURL u(m_url);
-  if (u.GetProtocol() == "https" && boost::ends_with(u.GetHostName(), ".plex.direct"))
+  if (boost::starts_with(u.GetProtocol(), "http") && boost::ends_with(u.GetHostName(), ".plex.direct"))
   {
     // for plex.direct domains we take control and resolve it ourselves this works around dns-rebinding
     CStdString host = u.GetHostName();
@@ -652,12 +648,14 @@ void CCurlFile::SetCommonOptions(CReadState* state)
   // Set the lowspeed time very low as it seems Curl takes much longer to detect a lowspeed condition
   g_curlInterface.easy_setopt(h, CURLOPT_LOW_SPEED_TIME, m_lowspeedtime);
 
+#ifndef __PLEX__
   if (m_skipshout)
     // For shoutcast file, content-length should not be set, and in libcurl there is a bug, if the
     // cast file was 302 redirected then getinfo of CURLINFO_CONTENT_LENGTH_DOWNLOAD will return
     // the 302 response's body length, which cause the next read request failed, so we ignore
     // content-length for shoutcast file to workaround this.
     g_curlInterface.easy_setopt(h, CURLOPT_IGNORE_CONTENT_LENGTH, 1);
+#endif
 }
 
 void CCurlFile::SetRequestHeaders(CReadState* state)

@@ -62,7 +62,7 @@ void CAdvancedSettings::Initialize()
   m_limiterRelease = 0.1f;
 
   m_omxHWAudioDecode = false;
-  m_omxDecodeStartWithValidFrame = false;
+  m_omxDecodeStartWithValidFrame = true;
 
   m_karaokeSyncDelayCDG = 0.0f;
   m_karaokeSyncDelayLRC = 0.0f;
@@ -349,7 +349,7 @@ void CAdvancedSettings::Initialize()
 #endif
 
   m_bCollapseSingleSeason = true;
-#ifdef TARGET_RASPBERRY_PI
+#ifdef TARGET_RASPBERRY_PI_1
   m_smartCacheUpperLimit = 1024 * 1024 * 50;
 #else
   m_smartCacheUpperLimit = 1024 * 1024 * 100;
@@ -990,8 +990,9 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   XMLUtils::GetFloat(pRootElement, "controllerdeadzone", m_controllerDeadzone, 0.0f, 1.0f);
   XMLUtils::GetUInt(pRootElement, "fanartres", m_fanartRes, 0, 1080);
   XMLUtils::GetUInt(pRootElement, "imageres", m_imageRes, 0, 1080);
+#ifndef TARGET_RASPBERRY_PI
   XMLUtils::GetBoolean(pRootElement, "useddsfanart", m_useDDSFanart);
-
+#endif
   XMLUtils::GetBoolean(pRootElement, "playlistasfolders", m_playlistAsFolders);
   XMLUtils::GetBoolean(pRootElement, "detectasudf", m_detectAsUdf);
 
@@ -1148,6 +1149,25 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   }
 
   /* PLEX */
+  pElement = pRootElement->FirstChildElement("codecs");
+  if (pElement)
+  {
+    TiXmlElement* element = pElement->FirstChildElement("video");
+    while (element)
+    {
+      if (element->GetText())
+        m_knownVideoCodecs.push_back(element->GetText());
+      element = element->NextSiblingElement("video");
+    }
+    element = pElement->FirstChildElement("audio");
+    while (element)
+    {
+      if (element->GetText())
+        m_knownAudioCodecs.push_back(element->GetText());
+      element = element->NextSiblingElement("audio");
+    }
+  }
+
   XMLUtils::GetInt(pRootElement, "nowplayingfliptime", m_nowPlayingFlipTime, 10, 6000);
   XMLUtils::GetBoolean(pRootElement, "enableviewrestricitons", m_bEnableViewRestrictions);
   XMLUtils::GetInt(pRootElement, "secondstovisualizer", m_secondsToVisualizer, 0, 6000);

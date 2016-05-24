@@ -2,12 +2,16 @@ include ../Makefile.include
 
 # lib name, version
 LIBNAME=curl
+ifeq ($(ARCH), i386)
+VERSION=7.21.6
+else
 VERSION=7.46.0
+endif
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.bz2
 
 # configuration settings
-CONFIGURE=./configure --prefix=$(PREFIX) --without-libssh2
+CONFIGURE=./configure --prefix=$(PREFIX) --without-libssh2 --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-imap --disable-smb --disable-smtp --disable-gopher --disable-manual
 CONFIGURE_IOS=$(CONFIGURE) --with-random=/dev/urandom
 
 LIBDYLIB=$(SOURCE)/.libs/(LIBNAME).dylib
@@ -20,6 +24,9 @@ $(TARBALLS_LOCATION)/$(ARCHIVE):
 $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
+ifeq ($(ARCH), i386)
+	cd $(SOURCE); patch -p1 < ../0001-HTTP-reset-expected-DL-UL-sizes-on-redirects.patch
+endif
 	echo $(SOURCE) > .gitignore
 ifeq ($(ARCH),armv7)
 	cd $(SOURCE); $(CONFIGURE_IOS)

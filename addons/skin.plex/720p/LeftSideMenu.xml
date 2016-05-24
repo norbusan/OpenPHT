@@ -493,7 +493,7 @@
 						<label> $LOCALIZE[41001] </label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>XBMC.ActivateWindow(10208)</onclick>
-						<visible>System.isSystem(rasplex) + !System.UserIsRestricted</visible>
+						<visible>System.isSystem(openelec) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="111">
 						<description>Quit</description>
@@ -623,7 +623,7 @@
 						<label> $LOCALIZE[41001] </label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>XBMC.ActivateWindow(10208)</onclick>
-						<visible>System.isSystem(rasplex) + !System.UserIsRestricted</visible>
+						<visible>System.isSystem(openelec) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="112">
 						<description>Sleep</description>
@@ -1038,7 +1038,6 @@
 					<include>leftMenuPreplayButton</include>
 					<onfocus condition="!Window.IsActive(19)">XBMC.ReplaceWindow(19)</onfocus>
 					<onright>Dialog.Close(4997)</onright>
-					<onfocus>Skin.SetString(SettingsCategory,appearance)</onfocus>
 				</control>
 				<control type="button" id="901">
 					<description>Playback Settings Button</description>
@@ -1047,7 +1046,6 @@
 					<include>leftMenuPreplayButton</include>
 					<onfocus condition="!Window.IsActive(17)">XBMC.ReplaceWindow(17)</onfocus>
 					<onright>Dialog.Close(4997)</onright>
-					<onfocus>Skin.SetString(SettingsCategory,playback)</onfocus>
 				</control>
 				<control type="button" id="903">
 					<description>System Settings Button</description>
@@ -1056,7 +1054,6 @@
 					<include>leftMenuPreplayButton</include>
 					<onfocus condition="!Window.IsActive(16)">XBMC.ReplaceWindow(16)</onfocus>
 					<onright>Dialog.Close(4997)</onright>
-					<onfocus>Skin.SetString(SettingsCategory,system)</onfocus>
 				</control>
 				<control type="button" id="904">
 					<description>Network Button</description>
@@ -1065,7 +1062,6 @@
 					<include>leftMenuPreplayButton</include>
 					<onfocus condition="!Window.IsActive(18)">XBMC.ReplaceWindow(18)</onfocus>
 					<onright>Dialog.Close(4997)</onright>
-					<onfocus>Skin.SetString(SettingsCategory,network)</onfocus>
 				</control>
 			</control>
 		</control>

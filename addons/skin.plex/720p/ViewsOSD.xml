@@ -294,7 +294,7 @@
 	<variable name="SeekingLabels">
 		<value condition="Player.Seeking">SEEKING</value>
 		<value condition="Player.Caching">CACHING</value>
-		<value condition="Player.DisplayAfterSeek + ![Player.Forwarding | Player.Rewinding]">$INFO[Player.SeekOffset]</value>
+		<value condition="Player.DisplayAfterSeek + ![Player.Forwarding | Player.Rewinding] + !Player.Paused">$INFO[Player.SeekOffset]</value>
 		<value condition="Player.DisplayAfterSeek + ![Player.Forwarding | Player.Rewinding] + Player.Paused">PAUSED $INFO[Player.SeekOffset]</value>
 		<value condition="Player.Forwarding2x">FORWARDING 2x</value>
 		<value condition="Player.Forwarding4x">FORWARDING 4x</value>
@@ -306,9 +306,10 @@
 		<value condition="Player.Rewinding8x">REWINDING 8x</value>
 		<value condition="Player.Rewinding16x">REWINDING 16x</value>
 		<value condition="Player.Rewinding32x">REWINDING 32x</value>
+		<value></value>
 	</variable>
 	<include name="VideoSeek">
-		<visible>!Window.IsActive(2901) + !Player.Caching</visible>
+		<visible>!Window.IsActive(2901)</visible>
 		<control type="group">
 			<animation effect="slide" end="0,40" time="0" condition="Skin.String(AspectRatio,16:10)">Conditional</animation>
 			<posx>20</posx>
@@ -407,7 +408,6 @@
 	<include name="VideoOSD">
 		<control type="group" id="1111">
 			<animation effect="slide" end="0,30" time="0" condition="Skin.String(AspectRatio,16:10)">Conditional</animation>
-			<visible>![Window.IsActive(OSDVideoSettings) | Window.IsActive(OSDAudioSettings)]</visible>
 			<animation effect="fade" start="0" end="100" time="100" condition="Visible">Conditional</animation>
 			<animation effect="fade" start="100" end="0" time="100" condition="Hidden">Conditional</animation>
 			<animation effect="fade" start="0" end="100" time="100" condition="WindowOpen">Conditional</animation>
@@ -881,7 +881,7 @@
 							<font>Regular-16</font>
 							<textcolor>FF666666</textcolor>
 							<shadowcolor>FF000000</shadowcolor>
-							<visible>!Control.HasFocus(71&#xE7;)</visible>
+							<visible>!Control.HasFocus(719)</visible>
 						</control>
 						<control type="label">
 							<posy>0</posy>

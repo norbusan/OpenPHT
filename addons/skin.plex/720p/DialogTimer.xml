@@ -14,7 +14,6 @@
 		</control>
 		<control type="image">
 			<description>Background Overlay</description>
-			<include>FullScreenOverlayDims</include>
 			<aspectratio>stretch</aspectratio>
 			<texture>BlackTransparent.png</texture>
 			<colordiffuse>99cccccc</colordiffuse>

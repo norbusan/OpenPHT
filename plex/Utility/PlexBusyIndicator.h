@@ -13,6 +13,7 @@ class CPlexBusyIndicator : public IJobCallback
 public:
   CPlexBusyIndicator();
   bool blockWaitingForJob(CJob* job, IJobCallback *callback, CFileItemListPtr *result = NULL);
+  void CancelJobs();
 
   void OnJobComplete(unsigned int jobID, bool success, CJob* job);
   void OnJobProgress(unsigned int jobID, unsigned int progress, unsigned int total,

@@ -24,7 +24,7 @@ if(ENABLE_AUTOUPDATE)
   if (NOT TARGET_RPI)
     include(ExternalProject)
     ExternalProject_Add(Update-Installer
-      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR} -DCMAKE_OSX_ARCHITECTURES=${OSX_ARCH}
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR} -DCMAKE_OSX_ARCHITECTURES=${OSX_ARCH} -DSIGN_UPDATER=ON -DBINARY_SIGNING_TOOL=${plexdir}/scripts/WindowsSign.cmd
       SOURCE_DIR "${plexdir}/Update-Installer"
       INSTALL_DIR "${CMAKE_BINARY_DIR}"
     )
@@ -187,6 +187,11 @@ if(TARGET_WIN32)
 	POST_BUILD
 	COMMAND "mt.exe" -manifest "${plexdir}/Resources/pht.manifest" -outputresource:"$<TARGET_FILE:${PLEX_TARGET_NAME}>"
 	COMMENT "Embedding manifest")
+  add_custom_command(
+    TARGET ${PLEX_TARGET_NAME}
+	POST_BUILD
+	COMMAND "${plexdir}/scripts/WindowsSign.cmd" "$<TARGET_FILE:${PLEX_TARGET_NAME}>"
+	COMMENT "Sign ${PLEX_TARGET_NAME}")
 endif(TARGET_WIN32)
 
 if(ENABLE_PYTHON)

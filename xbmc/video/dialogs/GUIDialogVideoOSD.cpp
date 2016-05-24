@@ -47,13 +47,17 @@ void CGUIDialogVideoOSD::FrameMove()
     // check for movement of mouse or a submenu open
     if (g_Mouse.IsActive() || g_windowManager.IsWindowActive(WINDOW_DIALOG_AUDIO_OSD_SETTINGS)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_VIDEO_OSD_SETTINGS)
+                           || g_windowManager.IsWindowActive(WINDOW_DIALOG_PLEX_AUDIO_PICKER)
+                           || g_windowManager.IsWindowActive(WINDOW_DIALOG_PLEX_SUBTITLE_PICKER)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_VIDEO_BOOKMARKS)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_PVR_OSD_CHANNELS)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_PVR_OSD_GUIDE)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_PVR_OSD_DIRECTOR)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_PVR_OSD_CUTTER)
-                           || g_windowManager.IsWindowActive(WINDOW_DIALOG_OSD_TELETEXT))
-      SetAutoClose(100); // enough for 10fps
+                           || g_windowManager.IsWindowActive(WINDOW_DIALOG_OSD_TELETEXT)
+                           || g_application.IsPaused())
+      // extend show time by original value
+      ResetAutoClose();
   }
   CGUIDialog::FrameMove();
 }
@@ -103,8 +107,7 @@ bool CGUIDialogVideoOSD::OnMessage(CGUIMessage& message)
     {
       // Remove our subdialogs if visible
       CGUIDialog *pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_VIDEO_OSD_SETTINGS);
-      if (pDialog && pDialog->IsDialogRunning())
-        pDialog->Close(true);
+      if (pDialog && pDialog->IsDialogRunning()) pDialog->Close(true);
       pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_AUDIO_OSD_SETTINGS);
       if (pDialog && pDialog->IsDialogRunning()) pDialog->Close(true);
       pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_VIDEO_BOOKMARKS);
@@ -118,6 +121,10 @@ bool CGUIDialogVideoOSD::OnMessage(CGUIMessage& message)
       pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_PVR_OSD_CUTTER);
       if (pDialog && pDialog->IsDialogRunning()) pDialog->Close(true);
       pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_OSD_TELETEXT);
+      if (pDialog && pDialog->IsDialogRunning()) pDialog->Close(true);
+      pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_PLEX_AUDIO_PICKER);
+      if (pDialog && pDialog->IsDialogRunning()) pDialog->Close(true);
+      pDialog = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_PLEX_SUBTITLE_PICKER);
       if (pDialog && pDialog->IsDialogRunning()) pDialog->Close(true);
     }
     break;

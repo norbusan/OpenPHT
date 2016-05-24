@@ -6,21 +6,22 @@
 		<control type="group" id="0">
 			<posx>0</posx>
 			<posy>20</posy>
-			<animation effect="fade" time="200">VisibleChange</animation>
+			<animation effect="fade" time="150">VisibleChange</animation>
 			<control type="image">
-				<description>bg</description>
+				<description>media info background image</description>
 				<posx>0</posx>
-				<posy>-250</posy>
+				<posy>-20</posy>
 				<width>1280</width>
-				<height>420</height>
+				<height>190</height>
 				<texture>black.png</texture>
+				<colordiffuse>99000000</colordiffuse>
 			</control>
 			<control type="label" id="10">
 				<description>row 1 label</description>
 				<posx>50</posx>
-				<posy>10</posy>
+				<posy>0</posy>
 				<width>1180</width>
-				<height>30</height>
+				<height>50</height>
 				<align>left</align>
 				<aligny>center</aligny>
 				<font>Regular-18</font>
@@ -29,9 +30,9 @@
 			<control type="label" id="11">
 				<description>row 2 label</description>
 				<posx>50</posx>
-				<posy>55</posy>
+				<posy>50</posy>
 				<width>1180</width>
-				<height>30</height>
+				<height>50</height>
 				<align>left</align>
 				<aligny>center</aligny>
 				<font>Regular-18</font>
@@ -42,7 +43,7 @@
 				<posx>50</posx>
 				<posy>100</posy>
 				<width>1180</width>
-				<height>30</height>
+				<height>50</height>
 				<align>left</align>
 				<aligny>center</aligny>
 				<font>Regular-18</font>

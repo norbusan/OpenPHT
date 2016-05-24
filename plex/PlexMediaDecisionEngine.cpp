@@ -26,6 +26,7 @@
 #include "GUI/GUIDialogPlexMedia.h"
 #include "PlayListPlayer.h"
 #include "music/tags/MusicInfoTag.h"
+#include "video/VideoInfoTag.h"
 #include "GUISettings.h"
 #include "PlexPlayQueueManager.h"
 #include "ApplicationMessenger.h"
@@ -127,7 +128,10 @@ bool CPlexMediaDecisionEngine::resolveItem(const CFileItem& _item, CFileItem &re
     resolvedItem.SetProperty("avoidPrompts", item.GetProperty("avoidPrompts"));
     resolvedItem.SetProperty("playQueueID", item.GetProperty("playQueueID"));
     resolvedItem.SetProperty("playQueueVersion", item.GetProperty("playQueueVersion"));
-    resolvedItem.GetMusicInfoTag()->SetDatabaseId(PlexUtils::GetItemListID(item), "video");
+    if (resolvedItem.HasMusicInfoTag())
+      resolvedItem.GetMusicInfoTag()->SetDatabaseId(PlexUtils::GetItemListID(item), "video");
+    else if (resolvedItem.HasVideoInfoTag())
+      resolvedItem.GetVideoInfoTag()->m_iDbId = PlexUtils::GetItemListID(item);
 
     if (item.HasProperty("playQueueItemID") && !resolvedItem.HasProperty("playQueueItemID"))
       resolvedItem.SetProperty("playQueueItemID", item.GetProperty("playQueueItemID"));

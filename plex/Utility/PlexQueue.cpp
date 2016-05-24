@@ -38,7 +38,7 @@ bool CPlexQueue<T>::tryPop(T &item)
   item = m_queue.front();
   m_queue.pop();
 
-  return item;
+  return item != NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

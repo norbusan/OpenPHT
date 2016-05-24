@@ -304,6 +304,9 @@ void CGUISettings::Initialize()
   AddBool(myPlex, "myplex.hidecloudsync", 52505, false);
   AddBool(myPlex, "myplex.recentlywatched", 52212, false);
   AddBool(myPlex, "myplex.hidechannels", 52213, false);
+  AddBool(myPlex, "myplex.disablepreplay", 52214, false);
+  AddBool(myPlex, "myplex.disablefanarttranscode", 52215, false);
+  AddBool(myPlex, "myplex.disablepicturetranscode", 52216, false);
   AddBool(myPlex, "myplex.automaticlogin", 52211, false);
 
 
@@ -382,8 +385,14 @@ void CGUISettings::Initialize()
   AddBool(NULL, "audiooutput.dtshdpassthrough" , 347, false );
 #endif
 
+#ifdef TARGET_RASPBERRY_PI
+  AddBool(ao, "audiooutput.supportdtshdcpudecoding", 38118, false);
+#endif
   AddBool(ao, "audiooutput.stereoupmix", 252, false);
   AddBool(ao, "audiooutput.normalizelevels", 346, true);
+#ifdef TARGET_RASPBERRY_PI
+  AddInt(ao, "audiooutput.boostcenter", 36043, 0, 0, 1, 30, SPIN_CONTROL_INT);
+#endif
 
   map<int,int> channelLayout;
   for(int layout = AE_CH_LAYOUT_2_0; layout < AE_CH_LAYOUT_MAX; ++layout)
@@ -562,6 +571,21 @@ void CGUISettings::Initialize()
   AddBool(advs, "videoscreen.blankdisplays", 13130, false);
 #endif
   AddSeparator(advs, "videoscreen.sep1");
+#endif
+#ifdef TARGET_RASPBERRY_PI_1
+  AddBool(advs, "videoscreen.textures32", 37020, false);
+#endif
+#ifdef TARGET_RASPBERRY_PI_2
+  AddBool(advs, "videoscreen.textures32", 37020, true);
+#endif
+#ifdef TARGET_RASPBERRY_PI
+  map<int,int> limitgui;
+  limitgui.insert(make_pair(37026,0));
+  limitgui.insert(make_pair(37027,540));
+  limitgui.insert(make_pair(37028,720));
+  limitgui.insert(make_pair(37029,900));
+  limitgui.insert(make_pair(37030,1080));
+  AddInt(advs, "videoscreen.limitgui", 37021, 0, limitgui, SPIN_CONTROL_TEXT);
 #endif
 
   map<int,int> vsync;

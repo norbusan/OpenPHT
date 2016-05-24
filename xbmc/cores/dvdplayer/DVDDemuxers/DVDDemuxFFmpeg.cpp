@@ -287,8 +287,8 @@ bool CDVDDemuxFFmpeg::Open(CDVDInputStream* pInput)
   m_pFormatContext  = m_dllAvFormat.avformat_alloc_context();
   m_pFormatContext->interrupt_callback = int_cb;
 
-  // try to abort after 30 seconds
-  m_timeout.Set(30000);
+  // try to abort after 60 seconds
+  m_timeout.Set(60000);
 
   if( m_pInput->IsStreamType(DVDSTREAM_TYPE_FFMPEG) )
   {
@@ -471,8 +471,9 @@ bool CDVDDemuxFFmpeg::Open(CDVDInputStream* pInput)
   }
   
   // Avoid detecting framerate if advancedsettings.xml says so
-  m_pFormatContext->fps_probe_size = (g_advancedSettings.m_videoFpsDetect == 0) ? 0 : -1;
-
+  if (g_advancedSettings.m_videoFpsDetect == 0) 
+      m_pFormatContext->fps_probe_size = 0;
+  
   // analyse very short to speed up mjpeg playback start
   if (iformat && (strcmp(iformat->name, "mjpeg") == 0) && m_ioContext->seekable == 0)
     m_pFormatContext->max_analyze_duration = 500000;
@@ -515,7 +516,7 @@ bool CDVDDemuxFFmpeg::Open(CDVDInputStream* pInput)
   m_dllAvFormat.av_dump_format(m_pFormatContext, 0, strFile.c_str(), 0);
 
   // check if plex transcoding
-  m_bPlexTranscode = m_dllAvUtil.av_dict_get(m_pFormatContext->metadata, "plex.start_offset", NULL, 0) != NULL;
+  m_bPlexTranscode = m_dllAvUtil.av_dict_get(m_pFormatContext->metadata, "plex.total_duration", NULL, 0) != NULL;
 
   UpdateCurrentPTS();
 
@@ -710,7 +711,8 @@ double CDVDDemuxFFmpeg::ConvertTimestamp(int64_t pts, int den, int num)
 
   if(timestamp > starttime)
     timestamp -= starttime;
-  else if( timestamp + 0.1f > starttime )
+  // allow for largest possible difference in pts and dts for a single packet
+  else if( timestamp + 0.5f > starttime )
     timestamp = 0;
 
   return timestamp*DVD_TIME_BASE;

@@ -51,7 +51,7 @@ bool CMyPlexPinInfo::SetFromXmlElement(TiXmlElement *root)
       {
         id = boost::lexical_cast<int>(elem->GetText());
       }
-      catch(boost::bad_lexical_cast &e)
+      catch(boost::bad_lexical_cast)
       {
         CLog::Log(LOGERROR, "CMyPlexPinInfo::SetFromXmlElement failed to parse code element %s", elem->GetText());
         id = -1;

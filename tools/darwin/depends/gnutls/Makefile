@@ -3,7 +3,7 @@ include ../Makefile.include
 # lib name, version
 BASE_URL=ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3
 LIBNAME=gnutls
-VERSION=3.3.20
+VERSION=3.3.21
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.xz
 ARCHIVE_TOOL=/usr/local/bin/gtar

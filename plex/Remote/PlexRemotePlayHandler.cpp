@@ -143,8 +143,9 @@ CPlexRemoteResponse CPlexRemotePlayHandler::handle(const CStdString& url, const 
   if (!getKeyAndContainerUrl(arguments, key, containerPath))
     return CPlexRemoteResponse(500, "Could not parse key argument");
 
-  g_application.WakeUpScreenSaverAndDPMS();
   g_application.ResetSystemIdleTimer();
+  g_application.ResetScreenSaver();
+  g_application.WakeUpScreenSaverAndDPMS();
 
   CURL dirURL;
   if (!containerPath.empty())

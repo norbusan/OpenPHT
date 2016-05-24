@@ -1,2 +1,0 @@
-; filename                   mirror of the file
-tinyxml.zip     https://nightlies.plex.tv/plex-dependencies/plex-home-theater-dependencies/win32/

@@ -1236,15 +1236,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9001)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9001).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1254,7 +1255,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9001).ListItem(0).Year]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1264,7 +1266,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9001).ListItem(0).DurationStr]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1361,15 +1364,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9002)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9002).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1379,7 +1383,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9002).ListItem(0).Year]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1389,7 +1394,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9002).ListItem(0).DurationStr]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1484,15 +1490,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9004)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9004).ListItem(0).TVShowTitle]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1502,7 +1509,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9004).ListItem(0).Date]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1512,7 +1520,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9004).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1522,7 +1531,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9004).ListItem(0).DurationStr]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1630,20 +1640,21 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9008)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9008).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<label>$INFO[Container(9008).ListItem(0).Artist]</label>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
 								<width min="1" max="300">auto</width>
-								<visible>!IsEmpty(Container(9008).ListItem(0).Title)</visible>
+								<visible>!IsEmpty(Container(9008).ListItem(0).Artist)</visible>
 							</control>
 						</control>
 						<control type="fixedlist" id="9008">
@@ -1721,15 +1732,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9009)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9009).ListItem(0).Artist]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1739,7 +1751,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9009).ListItem(0).Album]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1749,7 +1762,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9009).ListItem(0).Year]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1834,15 +1848,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9010)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9010).ListItem(0).Artist]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1852,7 +1867,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9010).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1862,7 +1878,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9010).ListItem(0).DurationStr]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -1946,15 +1963,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9013)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9013).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -2055,15 +2073,16 @@
 						<!-- title bar infos -->
 						<control type="grouplist">
 							<posx>38</posx>
-							<posy>10</posy>
-							<height>23</height>
+							<posy>7</posy>
+							<height>30</height>
 							<orientation>horizontal</orientation>
 							<itemgap>0</itemgap>
 							<visible>Control.HasFocus(9012)</visible>
 							<control type="label">
 								<align>left</align>
 								<label>$INFO[Container(9012).ListItem(0).Title]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
 								<wrapmultiline>false</wrapmultiline>
@@ -2073,7 +2092,8 @@
 							<control type="label">
 								<align>left</align>
 								<label> &#xB7; $INFO[Container(9012).ListItem(0).DurationStr]</label>
-								<font>SearchResult</font>
+								<font>Bold-16</font>
+								<height>30</height>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
 								<wrapmultiline>false</wrapmultiline>

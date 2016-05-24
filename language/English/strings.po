@@ -11436,3 +11436,63 @@ msgstr ""
 msgctxt "#36042"
 msgid "Use limited colour range (16-235)"
 msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#36043"
+msgid "Boost center channel when downmixing"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37020"
+msgid "Enable higher colour depth artwork"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37021"
+msgid "Set GUI resolution limit"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37026"
+msgid "Auto"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37027"
+msgid "540"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37028"
+msgid "720"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37029"
+msgid "900"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37030"
+msgid "Unlimited"
+msgstr ""
+
+#: system/peripherals.xml
+msgctxt "#38050"
+msgid "Remote button press delay before repeating (ms)"
+msgstr ""
+
+#: system/peripherals.xml
+msgctxt "#38051"
+msgid "Remote button press repeat rate (ms)"
+msgstr ""
+
+#: system/peripherals.xml
+msgctxt "#38052"
+msgid "Remote button press release time (ms)"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#38118"
+msgid "Support 8 channel DTS-HD audio decoding"
+msgstr ""

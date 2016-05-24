@@ -43,7 +43,7 @@
 #include "libsquish/squish.h"
 
 #ifdef _WIN32
-#define strncasecmp strnicmp
+#define strncasecmp _strnicmp
 #endif
 
 #ifdef USE_LZO_PACKING

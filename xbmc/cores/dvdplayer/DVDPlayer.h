@@ -110,11 +110,7 @@ public:
   }
 };
 
-#ifndef __PLEX__
-typedef struct
-#else
-struct SelectionStream
-#endif
+typedef struct SelectionStream
 {
   StreamType   type;
   int          type_index;
@@ -128,40 +124,20 @@ struct SelectionStream
   std::string  codec;
   int          channels;
 
-
   /* PLEX */
-  SelectionStream()
-    : plexID(-1)
-    , plexSubIndex(-1)
-  {}
-
-  SelectionStream& operator=(const SelectionStream& other)
-  {
-    // Preserve Plex ID by *not* copying over plexID member
-    type = other.type;
-    filename = other.filename;
-
-    // Stream language from Plex stream.
-    if (type != STREAM_SUBTITLE)
-      name = other.name;
-    else if (language.size() != 3)
-      name = language;
-
-    language = other.language;
-    id = other.id;
-    flags = other.flags;
-    source = other.source;
-
-    return *this;
-  }
   int plexID;
-  int plexSubIndex;
+
+  SelectionStream() :
+    type(STREAM_NONE), 
+    type_index(0), 
+    flags(CDemuxStream::FLAG_NONE), 
+    source(0), 
+    id(0), 
+    channels(0), 
+    plexID(-1)
+  {}
   /* END PLEX */
-#ifndef __PLEX__
 } SelectionStream;
-#else
-};
-#endif
 
 typedef std::vector<SelectionStream> SelectionStreams;
 
@@ -196,7 +172,7 @@ public:
   int              Source  (StreamSource source, std::string filename);
 
   void             Update  (SelectionStream& s);
-  void             Update  (CDVDInputStream* input, CDVDDemux* demuxer);
+  void             Update  (CDVDInputStream* input, CDVDDemux* demuxer, CFileItemPtr mediaPart);
 };
 
 
@@ -309,10 +285,10 @@ public:
   virtual int OnDVDNavResult(void* pData, int iMessage);
 
   /* PLEX */
-  virtual int GetSubtitlePlexID();
-  virtual int GetAudioStreamPlexID();
-  virtual void SetAudioStreamPlexID(int plexID);
-  virtual void SetSubtitleStreamPlexID(int plexID);
+  virtual int GetAudioStreamPlexID() { return GetStreamPlexID(STREAM_AUDIO); }
+  virtual int GetSubtitlePlexID() { return GetStreamPlexID(STREAM_SUBTITLE); }
+  virtual void SetAudioStreamPlexID(int plexID) { SetStreamPlexID(STREAM_AUDIO, plexID); }
+  virtual void SetSubtitleStreamPlexID(int plexID) { SetStreamPlexID(STREAM_SUBTITLE, plexID); }
   virtual int GetPlexMediaPartID()
   {
     CFileItemPtr part = m_item.m_selectedMediaPart;
@@ -323,6 +299,7 @@ public:
   }
   virtual bool CanOpenAsync() { return false; }
   virtual void Abort() { m_bAbortRequest = true; }
+  virtual bool IsTranscoded() { return m_item.GetProperty("plexDidTranscode").asBoolean(); }
   /* END PLEX */
 protected:
   friend class CSelectionStreams;
@@ -402,6 +379,9 @@ protected:
   bool m_bAbortRequest;
 
   /* PLEX */
+  int GetStreamPlexID(StreamType type);
+  void SetStreamPlexID(StreamType type, int plexID);
+
   bool m_EndPlaybackRequest;
   /* END PLEX */
   
@@ -552,18 +532,6 @@ protected:
   } m_EdlAutoSkipMarkers;
 
   CPlayerOptions m_PlayerOptions;
-
-  /* PLEX */
-  void RelinkPlexStreams();
-
-  CStdString   m_strError;
-  CFileItemPtr m_itemWithDetails;
-  bool         m_hidingSub;
-  int          m_vobsubToDisplay;
-
-  unsigned int m_readRate;
-  void UpdateReadRate();
-  /* END PLEX */
 
   bool m_HasVideo;
   bool m_HasAudio;

@@ -4418,7 +4418,7 @@ bool CMusicDatabase::GetScraperForPath(const CStdString& strPath, ADDON::Scraper
       if(ADDON::CAddonMgr::Get().GetDefault(type, addon))
       {
         info = boost::dynamic_pointer_cast<ADDON::CScraper>(addon);
-        return (info);
+        return info != NULL;
       }
       else
         return false;

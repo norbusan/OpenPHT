@@ -43,7 +43,13 @@ CPlexAnalytics::CPlexAnalytics() : m_firstEvent(true), m_numberOfPlays(0)
   m_baseOptions.AddOption("v", "1");
   m_baseOptions.AddOption("tid", ANALYTICS_TID_PHT);
   m_baseOptions.AddOption("ul", g_guiSettings.GetString("locale.language"));
+#ifdef TARGET_RASPBERRY_PI
+  m_baseOptions.AddOption("an", "RasPlex");
+#elif defined(TARGET_OPENELEC)
+  m_baseOptions.AddOption("an", "OpenPHT-Embedded");
+#else
   m_baseOptions.AddOption("an", "OpenPHT");
+#endif
   m_baseOptions.AddOption("av", g_infoManager.GetVersion());
   m_baseOptions.AddOption("cid", g_guiSettings.GetString("system.uuid"));
 

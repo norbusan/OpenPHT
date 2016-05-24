@@ -12,7 +12,7 @@ include(VersionConfiguration)
 # This tool must take a single argument which is the filename of the
 # binary to sign.
 option(SIGN_UPDATER "Enable signing of the updater binary" OFF)
-set(BINARY_SIGNING_TOOL sign-updater.bat CACHE PATH "Path to the tool used to sign the updater")
+set(BINARY_SIGNING_TOOL sign-updater.bat CACHE FILEPATH "Path to the tool used to sign the updater")
 
 include_directories(external)
 include_directories(external/TinyThread/source)

@@ -78,6 +78,19 @@ bool CPlexBusyIndicator::blockWaitingForJob(CJob* job, IJobCallback* callback, C
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexBusyIndicator::CancelJobs()
+{
+  CSingleLock lk(m_section);
+  std::pair<int, IJobCallback*> p;
+  BOOST_FOREACH(p, m_callbackMap)
+    CJobManager::GetInstance().CancelJob(p.first);
+
+  m_callbackMap.clear();
+  m_resultMap.clear();
+  m_blockEvent.Set();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 void CPlexBusyIndicator::OnJobComplete(unsigned int jobID, bool success, CJob* job)
 {
   CSingleLock lk(m_section);

@@ -922,6 +922,10 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
     if (snd_card_get_name(cardNr, &cardName) == 0)
       info.m_displayName = cardName;
 
+    // hack: hifiberry digi doesn't correctly report as iec958 device. Needs fixing in kernel driver
+    if (info.m_displayName == "snd_rpi_hifiberry_digi")
+      info.m_deviceType = AE_DEVTYPE_IEC958;
+
     if (info.m_deviceType == AE_DEVTYPE_HDMI && info.m_displayName.size() > 5 &&
         info.m_displayName.substr(info.m_displayName.size()-5) == " HDMI")
     {

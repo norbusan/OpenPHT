@@ -1372,8 +1372,14 @@ LONG CWIN32Util::UtilRegGetValue( const HKEY hKey, const char *const pcKey, DWOR
   {
     if (ppcBuffer)
     {
-      char *pcValue=*ppcBuffer;
-      if (!pcValue || !pdwSizeBuff || dwSize +dwSizeAdd > *pdwSizeBuff) pcValue= (char*)realloc(pcValue, dwSize +dwSizeAdd);
+      char *pcValue=*ppcBuffer, *pcValueTmp;
+      if (!pcValue || !pdwSizeBuff || dwSize +dwSizeAdd > *pdwSizeBuff) {
+        pcValueTmp = (char*)realloc(pcValue, dwSize +dwSizeAdd);
+        if(pcValueTmp != NULL)
+        {
+          pcValue = pcValueTmp;
+        }
+      }
       lRet= RegQueryValueEx(hKey,pcKey,NULL,NULL,(LPBYTE)pcValue,&dwSize);
 
       if ( lRet == ERROR_SUCCESS || *ppcBuffer ) *ppcBuffer= pcValue;
@@ -1424,6 +1430,26 @@ bool CWIN32Util::GetCrystalHDLibraryPath(CStdString &strPath)
     return true;
   else
     return false;
+}
+
+bool CWIN32Util::GetInstallerDependenciesVersion(const CStdString &strGuid, CStdString &strVersion)
+{
+  HKEY hKey;
+  CStdString strRegKey;
+  strRegKey.Format("SOFTWARE\\Classes\\Installer\\Dependencies\\%s", strGuid.c_str());
+  if (CWIN32Util::UtilRegOpenKeyEx(HKEY_LOCAL_MACHINE, strRegKey.c_str(), KEY_READ, &hKey))
+  {
+    DWORD dwType;
+    DWORD dwSize = 64;
+    char *pcVersion = (char*)calloc(dwSize, sizeof(char));
+    if (CWIN32Util::UtilRegGetValue(hKey, "Version", &dwType, &pcVersion, &dwSize, sizeof(char)) == ERROR_SUCCESS)
+    {
+      strVersion = pcVersion;
+      free(pcVersion);
+      return true;
+    }
+  }
+  return false;
 }
 
 // Retrieve the filename of the process that currently has the focus.

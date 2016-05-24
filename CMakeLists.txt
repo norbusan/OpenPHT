@@ -28,7 +28,7 @@ endif()
 
 set(PLEX_VERSION_MAJOR 1)
 set(PLEX_VERSION_MINOR 5)
-set(PLEX_VERSION_PATCH 1)
+set(PLEX_VERSION_PATCH 2)
 if(DEFINED ENV{BUILD_NUMBER})
   set(PLEX_VERSION_BUILD "$ENV{BUILD_NUMBER}")
   set(PLEX_VERSION_BUILD_NR "$ENV{BUILD_NUMBER}")
@@ -93,7 +93,7 @@ if(TARGET_WIN32)
   )
 endif(TARGET_WIN32)
 
-if(NOT TARGET_RPI)
+if(NOT OPENELEC)
   # Build the texturepacker
   add_subdirectory(tools/TexturePacker)
 endif()

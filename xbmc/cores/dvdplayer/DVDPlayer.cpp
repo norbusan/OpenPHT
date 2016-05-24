@@ -105,6 +105,10 @@
 #include "Client/PlexTranscoderClient.h"
 #include "PlexApplication.h"
 #include "FileSystem/PlexFile.h"
+
+static StreamType ConvertPlexStreamType(int plexStreamType);
+static void UpdatePlexSelectionStream(SelectionStream &s, const CFileItemPtr &part);
+static bool DownloadSubtitle(CURL url, std::string filename);
 /* END PLEX */
 
 using namespace std;
@@ -128,8 +132,8 @@ void CSelectionStreams::Clear(StreamType type, StreamSource source)
 void CDVDPlayer::GetAudioStreamLanguage(int iStream, CStdString &strLanguage)
 {
   strLanguage = "";
-  SelectionStream& s = m_SelectionStreams.Get(STREAM_AUDIO, iStream);
-  if(s.language.length() > 0)
+  SelectionStream s = m_SelectionStreams.Get(STREAM_AUDIO, iStream);
+  if (!s.language.empty())
     strLanguage = s.language;
 }
 
@@ -167,6 +171,11 @@ std::vector<SelectionStream> CSelectionStreams::Get(StreamType type)
 
 static bool PredicateAudioPriority(const SelectionStream& lh, const SelectionStream& rh)
 {
+  /* PLEX */
+  PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_SELECTED
+                 , rh.flags & CDemuxStream::FLAG_SELECTED);
+  /* END PLEX */
+
   PREDICATE_RETURN(lh.type_index == g_settings.m_currentVideoSettings.m_AudioStream
                  , rh.type_index == g_settings.m_currentVideoSettings.m_AudioStream);
 
@@ -190,6 +199,11 @@ static bool PredicateAudioPriority(const SelectionStream& lh, const SelectionStr
 
 static bool PredicateSubtitlePriority(const SelectionStream& lh, const SelectionStream& rh)
 {
+  /* PLEX */
+  PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_SELECTED
+                 , rh.flags & CDemuxStream::FLAG_SELECTED);
+  /* END PLEX */
+
   if(!g_settings.m_currentVideoSettings.m_SubtitleOn)
   {
     PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_FORCED
@@ -199,33 +213,22 @@ static bool PredicateSubtitlePriority(const SelectionStream& lh, const Selection
   PREDICATE_RETURN(lh.type_index == g_settings.m_currentVideoSettings.m_SubtitleStream
                  , rh.type_index == g_settings.m_currentVideoSettings.m_SubtitleStream);
 
-  CStdString subtitle_language = g_langInfo.GetSubtitleLanguage();
-  if(!g_guiSettings.GetString("locale.subtitlelanguage").Equals("original"))
-  {
-    PREDICATE_RETURN((lh.source == STREAM_SOURCE_DEMUX_SUB || lh.source == STREAM_SOURCE_TEXT) && subtitle_language.Equals(lh.language.c_str())
-                   , (rh.source == STREAM_SOURCE_DEMUX_SUB || rh.source == STREAM_SOURCE_TEXT) && subtitle_language.Equals(rh.language.c_str()));
-  }
-
-  PREDICATE_RETURN(lh.source == STREAM_SOURCE_DEMUX_SUB
-                 , rh.source == STREAM_SOURCE_DEMUX_SUB);
-
-  PREDICATE_RETURN(lh.source == STREAM_SOURCE_TEXT
-                 , rh.source == STREAM_SOURCE_TEXT);
-
-  if(!g_guiSettings.GetString("locale.subtitlelanguage").Equals("original"))
-  {
-    PREDICATE_RETURN(subtitle_language.Equals(lh.language.c_str())
-                   , subtitle_language.Equals(rh.language.c_str()));
-  }
-
   PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_DEFAULT
                  , rh.flags & CDemuxStream::FLAG_DEFAULT);
+
+  PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_FORCED
+                 , rh.flags & CDemuxStream::FLAG_FORCED);
 
   return false;
 }
 
 static bool PredicateVideoPriority(const SelectionStream& lh, const SelectionStream& rh)
 {
+  /* PLEX */
+  PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_SELECTED
+                 , rh.flags & CDemuxStream::FLAG_SELECTED);
+  /* END PLEX */
+
   PREDICATE_RETURN(lh.flags & CDemuxStream::FLAG_DEFAULT
                  , rh.flags & CDemuxStream::FLAG_DEFAULT);
   return false;
@@ -331,7 +334,7 @@ void CSelectionStreams::Update(SelectionStream& s)
   }
 }
 
-void CSelectionStreams::Update(CDVDInputStream* input, CDVDDemux* demuxer)
+void CSelectionStreams::Update(CDVDInputStream* input, CDVDDemux* demuxer, CFileItemPtr part)
 {
   if(input && input->IsStreamType(DVDSTREAM_TYPE_DVD))
   {
@@ -382,6 +385,9 @@ void CSelectionStreams::Update(CDVDInputStream* input, CDVDDemux* demuxer)
     for(int i=0;i<count;i++)
     {
       CDemuxStream* stream = demuxer->GetStream(i);
+      /* skip streams with no type */
+      if (stream->type == STREAM_NONE)
+        continue;
       /* make sure stream is marked with right source */
       stream->source = source;
 
@@ -409,6 +415,10 @@ void CSelectionStreams::Update(CDVDInputStream* input, CDVDDemux* demuxer)
         }
         s.channels = ((CDemuxStreamAudio*)stream)->iChannels;
       }
+      /* PLEX */
+      // Update selection stream with metadata from PMS
+      UpdatePlexSelectionStream(s, part);
+      /* END PLEX */
       Update(s);
     }
   }
@@ -426,11 +436,6 @@ CDVDPlayer::CDVDPlayer(IPlayerCallback& callback)
       m_dvdPlayerAudio(&m_clock, m_messenger),
       m_dvdPlayerSubtitle(&m_overlayContainer),
       m_dvdPlayerTeletext(),
-      /* PLEX */
-      m_hidingSub(false),
-      m_vobsubToDisplay(-1),
-      m_readRate(0),
-      /* END PLEX */
       m_ready(true)
 {
   m_pDemuxer = NULL;
@@ -606,7 +611,7 @@ bool CDVDPlayer::OpenInputStream()
       maxrate = INT_MAX;
 
     /* PLEX */
-    if (m_item.GetProperty("plexDidTranscode").asBoolean())
+    if (IsTranscoded())
       maxrate = INT_MAX;
     else
       maxrate = CPlexTranscoderClient::getBandwidthForQuality(g_guiSettings.GetInt("plexmediaserver.onlinemediaquality"));
@@ -665,111 +670,70 @@ bool CDVDPlayer::OpenInputStream()
     } // end loop over all subtitle files    
 #else
     CFileItemPtr part = m_item.m_selectedMediaPart;
-    if (part)
+    if (part && !(IsTranscoded() && g_guiSettings.GetBool("plexmediaserver.transcodesubtitles")))
     {
-      CFileItemPtr   lastIdxStream;
-      int            lastIdxSource = -1;
-
-      BOOST_FOREACH(CFileItemPtr stream, part->m_mediaPartStreams)
+      SelectionStream idx;
+      BOOST_FOREACH(const CFileItemPtr &stream, part->m_mediaPartStreams)
       {
-        if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_SUBTITLE &&
-            (stream->GetProperty("index").asInteger(-1) == -1) &&
-          (!g_guiSettings.GetBool("plexmediaserver.transcodesubtitles")))
+        // External subtitles have no index
+        StreamType type = ConvertPlexStreamType(stream->GetProperty("streamType").asInteger(0));
+        int index = stream->GetProperty("index").asInteger(-1);
+        if (type == STREAM_SUBTITLE && index == -1)
         {
+          // idx files have subIndex
+          int subIndex = stream->GetProperty("subIndex").asInteger(-1);
+
           SelectionStream s;
-          s.type     = STREAM_SUBTITLE;
-          s.id       = stream->GetProperty("subIndex").asInteger() >= 0 ? stream->GetProperty("subIndex").asInteger() : stream->GetProperty("id").asInteger();
-          s.plexID   = stream->GetProperty("id").asInteger();
-          s.filename = stream->GetProperty("key").asString();
-          s.name     = stream->GetProperty("language").asString();
+          s.plexID = stream->GetProperty("id").asInteger(-1);
+          s.type = STREAM_SUBTITLE;
+          s.id = subIndex >= 0 ? subIndex : s.plexID;
+          s.language = stream->GetProperty("language").asString();
+          s.name = stream->GetLabel();
+          s.codec = stream->GetProperty("codec").asString();
 
-          if (stream->GetProperty("codec").asString() == "idx")
+          if (stream->GetProperty("selected").asBoolean())
+            s.flags = (CDemuxStream::EFlags)(s.flags | CDemuxStream::FLAG_SELECTED);
+          if (stream->GetProperty("default").asBoolean())
+            s.flags = (CDemuxStream::EFlags)(s.flags | CDemuxStream::FLAG_DEFAULT);
+          if (stream->GetProperty("forced").asBoolean())
+            s.flags = (CDemuxStream::EFlags)(s.flags | CDemuxStream::FLAG_FORCED);
+
+          // Download subtitle file
+          if (subIndex == -1 || subIndex == 0)
           {
-            // All IDX streams have the same source.
-            if (lastIdxStream)
-              s.source = lastIdxSource;
-            else
-              s.source = m_SelectionStreams.Source(STREAM_SOURCE_DEMUX_SUB, stream->GetProperty("key").asString());
-          }
-          else
-          {
-            // New file, new source.
-            s.source = m_SelectionStreams.Source(STREAM_SOURCE_TEXT, stream->GetProperty("key").asString());
-          }
+            StreamSource sourceType = (s.codec == "idx") ? STREAM_SOURCE_DEMUX_SUB : STREAM_SOURCE_TEXT;
 
-          // Cache the subtitle locally. Since multiple streams can be served out of a single file,
-          // let's not download it multiple times, one for each stream.
-          //
-          CFileItemPtr idxStream = stream;
-          if (lastIdxStream)
-            idxStream = lastIdxStream;
+            s.filename = "special://temp/subtitle.plex." + stream->GetProperty("id").asString() + "." + s.codec;
+            CURL url(stream->GetProperty("key").asString());
+            if (sourceType == STREAM_SOURCE_TEXT)
+              url.SetOption("encoding", "utf-8");
 
-          CStdString path = "special://temp/subtitle.plex." + idxStream->GetProperty("id").asString() + "." + idxStream->GetProperty("codec").asString();
-          CLog::Log(LOGINFO, "Considering caching Plex subtitle locally for stream %s (codec: %s) to %s (exists: %d)",
-                    idxStream->GetProperty("id").asString().c_str(),
-                    idxStream->GetProperty("codec").asString().c_str(),
-                    path.c_str(),
-                    CFile::Exists(path));
-          
-          CURL newUrl(idxStream->GetProperty("key").asString());
-          CStdString encoding = g_langInfo.GetSubtitleCharSet();
-          if (encoding == "UTF-8")
-            newUrl.SetOption("encoding", "utf-8");
-
-
-          /* PLEX */
-          if (CFile::Exists(path))
-          {     
-            s.filename = path;
-            m_SelectionStreams.Update(s);
-          }
-          else
-          {
-            CURL plexUrl(newUrl);
-            CPlexFile::BuildHTTPURL(plexUrl);
-            if (g_plexApplication.busy.blockWaitingForJob(new CPlexDownloadFileJob(plexUrl.Get(), path), NULL))
-            {
-              CLog::Log(LOGDEBUG,"file %s was downloaded successfully", path.c_str());
-              s.filename = path;
-              m_SelectionStreams.Update(s);
-            }
-            else
-            {
-              CLog::Log(LOGERROR,"Failed to download  %s", path.c_str());
+            if (!DownloadSubtitle(url, s.filename))
               return false;
-            }
-          }
-          /* END PLEX */
 
-          // If it's an IDX, we need to cache the SUB file as well.
-          if (idxStream->GetProperty("codec").asString() == "idx")
-          {
-            CStdString path = "special://temp/subtitle.plex." + idxStream->GetProperty("id").asString() + ".sub";
-            if (CFile::Exists(path) == false)
+            // Also download .sub file for vobsub
+            if (sourceType == STREAM_SOURCE_DEMUX_SUB)
             {
-              CLog::Log(LOGINFO, "Caching Plex subtitle locally for stream %lld to %s", idxStream->GetProperty("id").asInteger(), path.c_str());
-              
-              CURL subUrl(idxStream->GetProperty("key").asString());
-              subUrl.SetFileName(subUrl.GetFileName() + ".sub");
-              
-              CURL plexUrl(subUrl);
-              CPlexFile::BuildHTTPURL(plexUrl);
+              s.filename2 = "special://temp/subtitle.plex." + stream->GetProperty("id").asString() + ".sub";
+              CURL url2(stream->GetProperty("key").asString());
+              url2.SetFileName(url2.GetFileName() + ".sub");
 
-              if (g_plexApplication.busy.blockWaitingForJob(new CPlexDownloadFileJob(plexUrl.Get(), path), NULL))
-              {
-                CLog::Log(LOGDEBUG,"file %s was downloaded successfully", path.c_str());
-              }
-              else
-              {
-                CLog::Log(LOGERROR,"Failed to download  %s", path.c_str());
+              if (!DownloadSubtitle(url2, s.filename2))
                 return false;
-              }
             }
 
-            // Remember the last IDX stream.
-            lastIdxStream = idxStream;
-            lastIdxSource = s.source;
+            s.source = m_SelectionStreams.Source(sourceType, s.filename);
+            idx = s;
           }
+          else
+          {
+            // Reuse last known source for vobsub
+            s.filename = idx.filename;
+            s.filename2 = idx.filename2;
+            s.source = idx.source;
+          }
+
+          m_SelectionStreams.Update(s);
         }
       }
     }
@@ -831,11 +795,7 @@ bool CDVDPlayer::OpenDemuxStream()
 
   m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_DEMUX);
   m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_NAV);
-  m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
-
-  // Update Plex streams from the demuxer.
-  RelinkPlexStreams();
-  /* END PLEX */
+  m_SelectionStreams.Update(m_pInputStream, m_pDemuxer, m_item.m_selectedMediaPart);
 
 #if 0
   int64_t len = m_pInputStream->GetLength();
@@ -851,14 +811,13 @@ bool CDVDPlayer::OpenDemuxStream()
   /* There is probably a good reason why we limit the readRate in upsteam
    * But I am just going to ignore that until I run into any problems.
    */
-  m_readRate = g_advancedSettings.m_cacheReadRate;
-  m_pInputStream->SetReadRate(m_readRate);
+  int readRate = g_advancedSettings.m_cacheReadRate;
+  m_pInputStream->SetReadRate(readRate);
 #endif
 
   return true;
 }
 
-#ifndef __PLEX__
 void CDVDPlayer::OpenDefaultStreams(bool reset)
 {
   // if input stream dictate, we will open later
@@ -895,23 +854,34 @@ void CDVDPlayer::OpenDefaultStreams(bool reset)
   if(!valid)
     CloseAudioStream(true);
 
-  // enable subtitles
-  m_dvdPlayerVideo.EnableSubtitle(g_settings.m_currentVideoSettings.m_SubtitleOn);
+  // If user have selected to transcode subtitles we should not show it again here
+  if (IsTranscoded() && g_guiSettings.GetBool("plexmediaserver.transcodesubtitles"))
+  {
+    m_dvdPlayerVideo.EnableSubtitle(false);
+    CloseSubtitleStream(true);
+    return;
+  }
+
+  // enable or disable subtitles
+  bool visible = false;
 
   // open subtitle stream
   streams = m_SelectionStreams.Get(STREAM_SUBTITLE, PredicateSubtitlePriority);
   valid   = false;
+  CloseSubtitleStream(true);
   for(SelectionStreams::iterator it = streams.begin(); it != streams.end() && !valid; ++it)
   {
     if(OpenSubtitleStream(it->id, it->source))
     {
       valid = true;
-      if(it->flags & CDemuxStream::FLAG_FORCED)
-        m_dvdPlayerVideo.EnableSubtitle(true);
+      visible = (it->flags & (CDemuxStream::FLAG_SELECTED | CDemuxStream::FLAG_FORCED));
     }
   }
   if(!valid)
     CloseSubtitleStream(true);
+
+  g_settings.m_currentVideoSettings.m_SubtitleOn = visible;
+  m_dvdPlayerVideo.EnableSubtitle(visible);
 
   // open teletext stream
   streams = m_SelectionStreams.Get(STREAM_TELETEXT);
@@ -924,7 +894,6 @@ void CDVDPlayer::OpenDefaultStreams(bool reset)
   if(!valid)
     CloseTeletextStream(true);
 }
-#endif
 
 bool CDVDPlayer::ReadPacket(DemuxPacket*& packet, CDemuxStream*& stream)
 {
@@ -950,7 +919,7 @@ bool CDVDPlayer::ReadPacket(DemuxPacket*& packet, CDemuxStream*& stream)
       if(stream->source == STREAM_SOURCE_NONE)
       {
         m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_DEMUX_SUB);
-        m_SelectionStreams.Update(NULL, m_pSubtitleDemuxer);
+        m_SelectionStreams.Update(NULL, m_pSubtitleDemuxer, m_item.m_selectedMediaPart);
       }
       return true;
     }
@@ -966,7 +935,7 @@ bool CDVDPlayer::ReadPacket(DemuxPacket*& packet, CDemuxStream*& stream)
     if(packet->iStreamId == DMX_SPECIALID_STREAMCHANGE)
     {
         m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_DEMUX);
-        m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
+        m_SelectionStreams.Update(m_pInputStream, m_pDemuxer, m_item.m_selectedMediaPart);
         OpenDefaultStreams(false);
 
         // reevaluate HasVideo/Audio, we may have switched from/to a radio channel
@@ -999,27 +968,7 @@ bool CDVDPlayer::ReadPacket(DemuxPacket*& packet, CDemuxStream*& stream)
       if(stream->source == STREAM_SOURCE_NONE)
       {
         m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_DEMUX);
-        m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
-
-        /* PLEX */
-        // Make sure the Plex streams are still linked.
-        RelinkPlexStreams();
-
-        if (m_vobsubToDisplay != -1)
-        {
-          int count = m_SelectionStreams.Count(STREAM_SUBTITLE);
-          for (int i = 0; i<count; i++)
-          {
-            SelectionStream& s = m_SelectionStreams.Get(STREAM_SUBTITLE, i);
-            if (s.plexID == m_vobsubToDisplay && OpenSubtitleStream(s.id, s.source))
-            {
-              break;
-            }
-          }
-
-          m_vobsubToDisplay = -1;
-        }
-        /* END PLEX */
+        m_SelectionStreams.Update(m_pInputStream, m_pDemuxer, m_item.m_selectedMediaPart);
       }
     }
     return true;
@@ -1436,7 +1385,7 @@ void CDVDPlayer::Process()
 
   /* PLEX */
   // We're done, if we transcoded we need to stop that now
-  if (m_item.GetProperty("plexDidTranscode").asBoolean() && g_plexApplication.serverManager)
+  if (IsTranscoded() && g_plexApplication.serverManager)
   {
     CPlexServerPtr server = g_plexApplication.serverManager->FindByUUID(m_item.GetProperty("plexserver").asString());
     if (server)
@@ -2532,14 +2481,11 @@ void CDVDPlayer::SetCaching(ECacheState state)
 {
   if(state == CACHESTATE_FLUSH)
   {
-#ifndef __PLEX__ // This makes little sense for streams, ask it to always fill my buffer instead
     double level, delay, offset;
     if(GetCachingTimes(level, delay, offset))
       state = CACHESTATE_FULL;
     else
       state = CACHESTATE_INIT;
-#endif
-    state = CACHESTATE_FULL;
   }
 
   if(m_caching == state)
@@ -2908,8 +2854,6 @@ float CDVDPlayer::GetSubTitleDelay()
 // priority: 1: libdvdnav, 2: external subtitles, 3: muxed subtitles
 int CDVDPlayer::GetSubtitleCount()
 {
-  StreamLock lock(this);
-  m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
   return m_SelectionStreams.Count(STREAM_SUBTITLE);
 }
 
@@ -2920,22 +2864,22 @@ int CDVDPlayer::GetSubtitle()
 
 void CDVDPlayer::GetSubtitleName(int iStream, CStdString &strStreamName)
 {
-  strStreamName = "";
-  SelectionStream& s = m_SelectionStreams.Get(STREAM_SUBTITLE, iStream);
-  if(s.name.length() > 0)
+  SelectionStream s = m_SelectionStreams.Get(STREAM_SUBTITLE, iStream);
+  if (!s.name.empty())
     strStreamName = s.name;
   else
     strStreamName = g_localizeStrings.Get(13205); // Unknown
 
   if(s.type == STREAM_NONE)
-    strStreamName += "(Invalid)";
+    strStreamName += " (Invalid)";
 }
 
 void CDVDPlayer::GetSubtitleLanguage(int iStream, CStdString &strStreamLang)
 {
-  SelectionStream& s = m_SelectionStreams.Get(STREAM_SUBTITLE, iStream);
-  if (!g_LangCodeExpander.Lookup(strStreamLang, s.language))
-    strStreamLang = g_localizeStrings.Get(13205); // Unknown
+  strStreamLang = "";
+  SelectionStream s = m_SelectionStreams.Get(STREAM_SUBTITLE, iStream);
+  if (!s.language.empty())
+    strStreamLang = s.language;
 }
 
 void CDVDPlayer::SetSubtitle(int iStream)
@@ -2943,13 +2887,9 @@ void CDVDPlayer::SetSubtitle(int iStream)
   m_messenger.Put(new CDVDMsgPlayerSetSubtitleStream(iStream));
 
   /* PLEX */
-  // Return the ID of the selected stream.
-  StreamLock lock(this);
-  SelectionStream& s = m_SelectionStreams.Get(STREAM_SUBTITLE, iStream);
-
-  // Send the change to the Media Server.
-  CFileItemPtr item = g_application.CurrentFileItemPtr();
-  g_plexApplication.mediaServerClient->SelectStream(item, GetPlexMediaPartID(), g_settings.m_currentVideoSettings.m_SubtitleOn ? s.plexID : 0, -1);
+  // Notify the Plex Media Server.
+  SelectionStream s = m_SelectionStreams.Get(STREAM_SUBTITLE, iStream);
+  g_plexApplication.mediaServerClient->SelectStream(g_application.CurrentFileItemPtr(), GetPlexMediaPartID(), s.plexID, -1);
   /* END PLEX */
 }
 
@@ -2973,17 +2913,13 @@ void CDVDPlayer::SetSubtitleVisible(bool bVisible)
   m_messenger.Put(new CDVDMsgBool(CDVDMsg::PLAYER_SET_SUBTITLESTREAM_VISIBLE, bVisible));
 
   /* PLEX */
-  // Send the change to the Media Server.
-  // Don't send the message over if we're just hiding the initial sub.
-  if (m_hidingSub == false)
-    g_plexApplication.mediaServerClient->SelectStream(g_application.CurrentFileItemPtr(), GetPlexMediaPartID(), g_settings.m_currentVideoSettings.m_SubtitleOn ? GetSubtitlePlexID() : 0, -1);
+  // Notify the Plex Media Server.
+  g_plexApplication.mediaServerClient->SelectStream(g_application.CurrentFileItemPtr(), GetPlexMediaPartID(), bVisible ? GetSubtitlePlexID() : 0, -1);
   /* END PLEX */
 }
 
 int CDVDPlayer::GetAudioStreamCount()
 {
-  StreamLock lock(this);
-  m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
   return m_SelectionStreams.Count(STREAM_AUDIO);
 }
 
@@ -2994,12 +2930,11 @@ int CDVDPlayer::GetAudioStream()
 
 void CDVDPlayer::GetAudioStreamName(int iStream, CStdString& strStreamName)
 {
-  strStreamName = "";
-  SelectionStream& s = m_SelectionStreams.Get(STREAM_AUDIO, iStream);
-  if(s.name.length() > 0)
-    strStreamName += s.name;
+  SelectionStream s = m_SelectionStreams.Get(STREAM_AUDIO, iStream);
+  if (!s.name.empty())
+    strStreamName = s.name;
   else
-    strStreamName += "Unknown";
+    strStreamName = g_localizeStrings.Get(13205); // Unknown
 
   if(s.type == STREAM_NONE)
     strStreamName += " (Invalid)";
@@ -3011,11 +2946,9 @@ void CDVDPlayer::SetAudioStream(int iStream)
   SynchronizeDemuxer(100);
 
   /* PLEX */
-  StreamLock lock(this);
-
   // Notify the Plex Media Server.
-  CFileItemPtr item = g_application.CurrentFileItemPtr();
-  g_plexApplication.mediaServerClient->SelectStream(item, GetPlexMediaPartID(), -1, GetAudioStreamPlexID());
+  SelectionStream s = m_SelectionStreams.Get(STREAM_AUDIO, iStream);
+  g_plexApplication.mediaServerClient->SelectStream(g_application.CurrentFileItemPtr(), GetPlexMediaPartID(), -1, s.plexID);
   /* END PLEX */
 }
 
@@ -3227,7 +3160,7 @@ bool CDVDPlayer::OpenVideoStream(int iStream, int source, bool reset)
 bool CDVDPlayer::OpenSubtitleStream(int iStream, int source)
 {
   /* PLEX */
-  if (g_guiSettings.GetBool("plexmediaserver.transcodesubtitles") && m_item.GetProperty("plexDidTranscode").asBoolean())
+  if (IsTranscoded() && g_guiSettings.GetBool("plexmediaserver.transcodesubtitles"))
   {
     CLog::Log(LOGNOTICE, "Skipping Subtitle stream: %i source: %i, subtitles are transcoded", iStream, source);
     return true;
@@ -3251,22 +3184,23 @@ bool CDVDPlayer::OpenSubtitleStream(int iStream, int source)
     {
       CLog::Log(LOGNOTICE, "Opening Subtitle file: %s", st.filename.c_str());
       auto_ptr<CDVDDemuxVobsub> demux(new CDVDDemuxVobsub());
-      if(!demux->Open(st.filename, st.filename2))
+      if(!demux->Open(st.filename, source, st.filename2))
         return false;
       m_pSubtitleDemuxer = demux.release();
     }
 
-    pStream = m_pSubtitleDemuxer->GetStream(iStream);
-    if(!pStream || pStream->disabled)
-      return false;
-    pStream->SetDiscard(AVDISCARD_NONE);
     double pts = m_dvdPlayerVideo.GetCurrentPts();
     if(pts == DVD_NOPTS_VALUE)
       pts = m_CurrentVideo.dts;
     if(pts == DVD_NOPTS_VALUE)
       pts = 0;
     pts += m_offset_pts;
-    m_pSubtitleDemuxer->SeekTime((int)(1000.0 * pts / (double)DVD_TIME_BASE));
+    if (!m_pSubtitleDemuxer->SeekTime((int)(1000.0 * pts / (double)DVD_TIME_BASE)))
+        CLog::Log(LOGDEBUG, "%s - failed to start subtitle demuxing from: %f", __FUNCTION__, pts);
+    pStream = m_pSubtitleDemuxer->GetStream(iStream);
+    if(!pStream || pStream->disabled)
+      return false;
+    pStream->SetDiscard(AVDISCARD_NONE);
 
     hint.Assign(*pStream, true);
   }
@@ -3629,7 +3563,7 @@ int CDVDPlayer::OnDVDNavResult(void* pData, int iMessage)
           m_dvdPlayerVideo.SendMessage(new CDVDMsgDouble(CDVDMsg::VIDEO_SET_ASPECT, m_CurrentVideo.hint.aspect));
 
         m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_NAV);
-        m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
+        m_SelectionStreams.Update(m_pInputStream, m_pDemuxer, m_item.m_selectedMediaPart);
 
         return NAVRESULT_HOLD;
       }
@@ -4073,9 +4007,9 @@ int CDVDPlayer::AddSubtitleFile(const std::string& filename, const std::string& 
       vobsubfile = URIUtils::ReplaceExtension(filename, ".sub");
 
     CDVDDemuxVobsub v;
-    if(!v.Open(filename, vobsubfile))
+    if(!v.Open(filename, STREAM_SOURCE_NONE, vobsubfile))
       return -1;
-    m_SelectionStreams.Update(NULL, &v);
+    m_SelectionStreams.Update(NULL, &v, CFileItemPtr());
     int index = m_SelectionStreams.IndexOf(STREAM_SUBTITLE, m_SelectionStreams.Source(STREAM_SOURCE_DEMUX_SUB, filename), 0);
     m_SelectionStreams.Get(STREAM_SUBTITLE, index).flags = flags;
     m_SelectionStreams.Get(STREAM_SUBTITLE, index).filename2 = vobsubfile;
@@ -4386,218 +4320,89 @@ bool CDVDPlayer::CachePVRStream(void) const
 }
 
 /* PLEX */
-void CDVDPlayer::OpenDefaultStreams(bool reset)
+int CDVDPlayer::GetStreamPlexID(StreamType type)
 {
-  int  count;
-  bool valid;
-  SelectionStream st;
-
-  // open video stream
-  count = m_SelectionStreams.Count(STREAM_VIDEO);
-  valid = false;
-
-  if(!valid
-  && m_SelectionStreams.Get(STREAM_VIDEO, CDemuxStream::FLAG_DEFAULT, st))
+  int index = m_SelectionStreams.IndexOf(type, *this);
+  if (index >= 0)
   {
-    if(OpenVideoStream(st.id, st.source, reset))
-      valid = true;
-    else
-      CLog::Log(LOGWARNING, "%s - failed to open default stream (%d)", __FUNCTION__, st.id);
+    SelectionStream stream = m_SelectionStreams.Get(type, index);
+    return stream.plexID;
   }
+  return -1;
+}
 
-  for(int i = 0;i<count && !valid;i++)
+void CDVDPlayer::SetStreamPlexID(StreamType type, int plexID)
+{
+  if (plexID == -1)
+    return;
+  SelectionStreams streams = m_SelectionStreams.Get(type);
+  for (SelectionStreams::iterator it = streams.begin(); it != streams.end(); ++it)
   {
-    SelectionStream& s = m_SelectionStreams.Get(STREAM_VIDEO, i);
-    if(OpenVideoStream(s.id, s.source, reset))
-      valid = true;
-  }
-  if(!valid)
-    CloseVideoStream(true);
-
-  if(!m_PlayerOptions.video_only)
-  {
-    // open audio stream
-    count = m_SelectionStreams.Count(STREAM_AUDIO);
-    valid = false;
-
-    // Pick selected audio stream.
-    CFileItemPtr part = m_item.m_selectedMediaPart;
-    if (part)
+    if (it->plexID == plexID && it->type == type)
     {
-      BOOST_FOREACH(CFileItemPtr stream, part->m_mediaPartStreams)
-      {
-        int streamType = stream->GetProperty("streamType").asInteger();
-        int streamId = stream->GetProperty("id").asInteger();
-        std::string streamLang = stream->GetProperty("language").asString();
-        bool selected = stream->GetProperty("selected").asBoolean();
-        CLog::Log(LOGINFO, "CDVDPlayer::OpenDefaultStreams Considering Plex stream %d[%s] of type %d (selected: %d)",
-                  streamId, streamLang.c_str(), streamType, selected);
-
-        // If we've found the selected audio stream...
-        if (streamType == PLEX_STREAM_AUDIO && selected)
-        {
-          // ...see if we can match it up with our stream.
-          for (int i=0; i<count && !valid; i++)
-          {
-            SelectionStream& s = m_SelectionStreams.Get(STREAM_AUDIO, i);
-            if (s.plexID == streamId && OpenAudioStream(s.id, s.source, reset))
-            {
-              CLog::Log(LOGINFO, "CDVDPlayer::OpenDefaultStreams selected stream %d[%s]", streamId, streamLang.c_str());
-              valid = true;
-            }
-          }
-        }
-
-        if (valid) break;
-      }
+      if (type == STREAM_AUDIO)
+        SetAudioStream(it->type_index);
+      else if (type == STREAM_SUBTITLE)
+        SetSubtitle(it->type_index);
+      break;
     }
-
-    // If that didn't work, just pick the first valid stream.
-    for(int i = 0; i<count && !valid; i++)
-    {
-      SelectionStream& s = m_SelectionStreams.Get(STREAM_AUDIO, i);
-      if(OpenAudioStream(s.id, s.source, reset))
-      {
-        CLog::Log(LOGINFO, "CDVDPlayer::OpenDefaultStreams failed to find the stream based plexId, instead you will get %d[%s]", s.plexID, s.language.c_str());
-        valid = true;
-      }
-    }
-
-    // If we don't have an audio stream, close it.
-    if(!valid)
-      CloseAudioStream(true);
   }
+}
 
-  /* If user have selected to transcode subtitles we should not show it again here */
-  if (m_item.GetProperty("plexDidTranscode").asBoolean() && g_guiSettings.GetBool("plexmediaserver.transcodesubtitles"))
+static StreamType ConvertPlexStreamType(int plexStreamType)
+{
+  if (plexStreamType == PLEX_STREAM_VIDEO)
+    return STREAM_VIDEO;
+  else if (plexStreamType == PLEX_STREAM_AUDIO)
+    return STREAM_AUDIO;
+  else if (plexStreamType == PLEX_STREAM_SUBTITLE)
+    return STREAM_SUBTITLE;
+  return STREAM_NONE;
+}
+
+static void UpdatePlexSelectionStream(SelectionStream &s, const CFileItemPtr &part)
+{
+  if (!part)
     return;
 
-  // open subtitle stream
-  count = m_SelectionStreams.Count(STREAM_SUBTITLE);
-  valid = false;
-  m_dvdPlayerVideo.EnableSubtitle(true);
-
-  // Open subtitle stream.
-  CFileItemPtr part = m_item.m_selectedMediaPart;
-  if (part)
+  BOOST_FOREACH(const CFileItemPtr &stream, part->m_mediaPartStreams)
   {
-    BOOST_FOREACH(CFileItemPtr stream, part->m_mediaPartStreams)
+    StreamType type = ConvertPlexStreamType(stream->GetProperty("streamType").asInteger(0));
+    int index = stream->GetProperty("index").asInteger(-1);
+    if (s.type == type && s.id == index)
     {
-      // If we've found the selected subtitle stream...
-      if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_SUBTITLE && stream->GetProperty("selected").asBoolean())
-      {
-        for (int i = 0; i<count && !valid; i++)
-        {
-          SelectionStream& s = m_SelectionStreams.Get(STREAM_SUBTITLE, i);
-          if (s.plexID == stream->GetProperty("id").asInteger() && OpenSubtitleStream(s.id, s.source))
-          {
-            // We're going to need to open this later.
-            if (s.source == STREAM_SOURCE_DEMUX_SUB)
-              m_vobsubToDisplay = s.plexID;
+      s.plexID = stream->GetProperty("id").asInteger(-1);
 
-            valid = true;
-          }
-        }
-      }
+      if (stream->GetProperty("selected").asBoolean(false))
+        s.flags = (CDemuxStream::EFlags)(s.flags | CDemuxStream::FLAG_SELECTED);
+      if (stream->GetProperty("default").asBoolean(false))
+        s.flags = (CDemuxStream::EFlags)(s.flags | CDemuxStream::FLAG_DEFAULT);
+      if (stream->GetProperty("forced").asBoolean(false))
+        s.flags = (CDemuxStream::EFlags)(s.flags | CDemuxStream::FLAG_FORCED);
 
-      if (valid) break;
-    }
+      std::string language = stream->GetProperty("language").asString();
+      if (!language.empty())
+        s.language = language;
 
-    // If that didn't pick one, just open the first stream and make it invisible.
-    if (valid == false && count > 0)
-    {
-      SelectionStream& s = m_SelectionStreams.Get(STREAM_SUBTITLE, 0);
-      OpenSubtitleStream(s.id, s.source);
-
-      if (s.source == STREAM_SOURCE_DEMUX_SUB)
-        m_vobsubToDisplay = s.plexID;
-    }
-
-    // Set them on/off based on whether we found one.
-    g_settings.m_currentVideoSettings.m_SubtitleOn = valid;
-
-    // We don't have subtitles to show, close.
-    if (valid == false)
-    {
-      m_hidingSub = true;
-      SetSubtitleVisible(false);
-      m_hidingSub = false;
-    }
-  }
-}
-
-void CDVDPlayer::RelinkPlexStreams()
-{
-  CFileItemPtr part = m_item.m_selectedMediaPart;
-  if (part)
-  {
-    BOOST_FOREACH(CFileItemPtr stream, part->m_mediaPartStreams)
-    {
-      StreamType type = STREAM_NONE;
-
-      if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_SUBTITLE)
-        type = STREAM_SUBTITLE;
-      else if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_AUDIO)
-        type = STREAM_AUDIO;
-
-      if (type != STREAM_NONE)
-      {
-        // Look for the right index and set the Plex stream ID.
-        int count = m_SelectionStreams.Count(type);
-        for (int i=0; i<count; i++)
-        {
-          SelectionStream& s = m_SelectionStreams.Get(type, i);
-
-          if (s.id == stream->GetProperty("index").asInteger() || s.id == stream->GetProperty("subIndex").asInteger())
-          {
-            s.plexID = stream->GetProperty("id").asInteger();
-            s.language = stream->GetProperty("language").asString();
-
-            if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_SUBTITLE)
-              s.name = stream->GetProperty("language").asString();
-          }
-        }
-      }
-    }
-  }
-}
-
-int CDVDPlayer::GetAudioStreamPlexID()
-{
-  SelectionStream& stream = m_SelectionStreams.Get(STREAM_AUDIO, m_SelectionStreams.IndexOf(STREAM_AUDIO, *this));
-  return stream.plexID;
-}
-
-int CDVDPlayer::GetSubtitlePlexID()
-{
-  SelectionStream& stream = m_SelectionStreams.Get(STREAM_SUBTITLE, m_SelectionStreams.IndexOf(STREAM_SUBTITLE, *this));
-  return stream.plexID;
-}
-
-void CDVDPlayer::SetAudioStreamPlexID(int plexID)
-{
-  std::vector<SelectionStream> audiost = m_SelectionStreams.Get(STREAM_AUDIO);
-  for (int i = 0; i < audiost.size(); i ++)
-  {
-    if (audiost[i].plexID == plexID)
-    {
-      SetAudioStream(audiost[i].type_index);
+      if (s.type != STREAM_VIDEO)
+        s.name = stream->GetLabel();
       break;
     }
   }
 }
 
-void CDVDPlayer::SetSubtitleStreamPlexID(int plexID)
+static bool DownloadSubtitle(CURL url, std::string filename)
 {
-  std::vector<SelectionStream> subst = m_SelectionStreams.Get(STREAM_SUBTITLE);
-  for (int i = 0; i < subst.size(); i ++)
-  {
-    if (subst[i].plexID == plexID)
-    {
-      SetSubtitle(subst[i].type_index);
-      break;
-    }
-  }
-}
+  if (CFile::Exists(filename, false))
+    return true;
 
+  CPlexFile http;
+  if (!http.DownloadFile(url.Get(), filename))
+  {
+    CLog::Log(LOGINFO, "DownloadSubtitle - Failed to download subtitle file %s from %s", filename.c_str(), url.Get().c_str());
+    return false;
+  }
+
+  return true;
+}
 /* END PLEX */

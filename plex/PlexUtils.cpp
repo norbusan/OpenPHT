@@ -29,6 +29,7 @@
 #include "threads/Atomics.h"
 #include "music/tags/MusicInfoTag.h"
 #include "video/VideoInfoTag.h"
+#include "settings/GUISettings.h"
 
 #include "File.h"
 
@@ -227,14 +228,16 @@ string PlexUtils::GetMachinePlatform()
 {
 #ifdef TARGET_WINDOWS
   return "Windows";
-#elif TARGET_LINUX
-  return "Linux";
-#elif TARGET_DARWIN_OSX
+#elif defined(TARGET_DARWIN_OSX)
   return "MacOSX";
-#elif TARGET_DARWIN_IOS_ATV
+#elif defined(TARGET_DARWIN_IOS_ATV)
   return "AppleTV2";
-#elif TARGET_RPI
-  return "RaspberryPI";
+#elif defined(TARGET_RASPBERRY_PI)
+  return "RaspberryPi";
+#elif defined(TARGET_OPENELEC)
+  return "OpenELEC";
+#elif defined(TARGET_LINUX)
+  return "Linux";
 #else
   return "Unknown";
 #endif
@@ -245,7 +248,7 @@ string PlexUtils::GetMachinePlatformVersion()
 {
   string ver;
 
-#if TARGET_WINDOWS
+#if defined(TARGET_WINDOWS)
 
   DWORD dwVersion = GetVersion();
   DWORD dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
@@ -256,7 +259,7 @@ string PlexUtils::GetMachinePlatformVersion()
   sprintf(str, "%d.%d (Build %d)", dwMajorVersion, dwMinorVersion, dwBuildNumber);
   ver = str;
 
-#elif TARGET_LINUX
+#elif defined(TARGET_LINUX)
 
   struct utsname buf;
   if (uname(&buf) == 0)
@@ -265,7 +268,7 @@ string PlexUtils::GetMachinePlatformVersion()
     ver = " (" + string(buf.version) + ")";
   }
 
-#elif TARGET_DARWIN_OSX
+#elif defined(TARGET_DARWIN_OSX)
 
   // TODO: Gestalt() is deprecated in 10.8!
 
@@ -364,6 +367,7 @@ bool PlexUtils::PlexMediaStreamCompare(CFileItemPtr stream1, CFileItemPtr stream
       stream1->GetProperty("language").asString() == stream2->GetProperty("language").asString() &&
       stream1->GetProperty("codec").asString() == stream2->GetProperty("codec").asString() &&
       stream1->GetProperty("index").asInteger() == stream2->GetProperty("index").asInteger() &&
+      stream1->GetProperty("subIndex").asInteger() == stream2->GetProperty("subIndex").asInteger() &&
       stream1->GetProperty("channels").asInteger() == stream2->GetProperty("channels").asInteger())
     return true;
   return false;
@@ -418,12 +422,12 @@ void PlexUtils::SetSelectedStream(CFileItemPtr item, CFileItemPtr stream)
           g_plexApplication.mediaServerClient->SelectStream(item, part->GetProperty("id").asInteger(), subId, audioId);
           
           str->Select(true);
-          str->SetProperty("select", true);
+          str->SetProperty("selected", true);
         }
         else if (stream->GetProperty("streamType").asInteger() == str->GetProperty("streamType").asInteger())
         {
           str->Select(false);
-          str->SetProperty("select", false);
+          str->SetProperty("selected", false);
         }
       }
     }
@@ -449,7 +453,7 @@ int usleep(useconds_t useconds)
 ///////////////////////////////////////////////////////////////////////////////
 bool PlexUtils::CurrentSkinHasPreplay()
 {
-  return g_SkinInfo->HasSkinFile("PlexPreplayVideo.xml");
+  return !g_guiSettings.GetBool("myplex.disablepreplay") && g_SkinInfo->HasSkinFile("PlexPreplayVideo.xml");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -527,18 +531,16 @@ CStdString PlexUtils::GetPrettyStreamNameFromStreamItem(CFileItemPtr stream)
   }
   else if (stream->GetProperty("streamType") == PLEX_STREAM_SUBTITLE)
   {
-    if (!stream->GetProperty("format").empty() || stream->HasProperty("codec"))
+    if (stream->HasProperty("codec"))
     {
-      name += " (";
-      if (!stream->GetProperty("format").empty())
-        name += boost::to_upper_copy(stream->GetProperty("format").asString());
-      else if (stream->HasProperty("codec"))
-        name += boost::to_upper_copy(stream->GetProperty("codec").asString());
+      name += " (" + boost::to_upper_copy(stream->GetProperty("codec").asString());
+
+      if (stream->HasProperty("key"))
+        name += " " + g_localizeStrings.Get(52506); // External
 
       if (stream->GetProperty("forced").asBoolean())
-        name += " " + g_localizeStrings.Get(52503) + ")";
-      else
-        name += ")";
+        name += " " + g_localizeStrings.Get(52503); // Forced
+      name += ")";
     }
   }
 

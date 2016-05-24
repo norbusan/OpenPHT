@@ -37,6 +37,7 @@ extern "C"
   const char *GetDarwinOSReleaseString(void);
   const char *GetDarwinVersionString(void);
   float       GetIOSVersion(void);
+  const char *GetOSXVersionString(void);
   int         GetDarwinFrameworkPath(bool forPython, char* path, uint32_t *pathsize);
   int         GetDarwinExecutablePath(char* path, uint32_t *pathsize);
   bool        DarwinHasVideoToolboxDecoder(void);
@@ -44,6 +45,7 @@ extern "C"
   void        DarwinSetScheduling(int message);
   bool        DarwinCFStringRefToString(CFStringRef source, std::string& destination);
   bool        DarwinCFStringRefToUTF8String(CFStringRef source, std::string& destination);
+  const char *GetDarwinManufacturer(void);
   /* PLEX */
   int         GetDarwinBundlePath(char *path, uint32_t *pathsize);
   /* END PLEX */

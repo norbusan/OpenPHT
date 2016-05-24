@@ -33,10 +33,14 @@
 #define DEFAULT_SKIN          "skin.plex"
 #endif
 #define DEFAULT_WEB_INTERFACE "webinterface.default"
-#ifdef MID
+/* PLEX */
+#if defined( MID ) || defined(TARGET_RASPBERRY_PI)
+/* PLEX */
 #define DEFAULT_VSYNC       VSYNC_DISABLED
 #else  // MID
-#if defined(TARGET_DARWIN) || defined(_WIN32) || defined(TARGET_RASPBERRY_PI)
+/* PLEX */
+#if defined(TARGET_DARWIN) || defined(_WIN32) 
+/* PLEX */
 #define DEFAULT_VSYNC       VSYNC_ALWAYS
 #else
 #define DEFAULT_VSYNC       VSYNC_DRIVER

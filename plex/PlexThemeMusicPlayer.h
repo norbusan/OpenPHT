@@ -6,7 +6,7 @@
 #include "threads/Timer.h"
 #include "JobManager.h"
 
-class CPlexThemeMusicPlayer : public IPlayerCallback, public IAudioCallback, public IJobCallback
+class CPlexThemeMusicPlayer : public IPlayerCallback, public IJobCallback
 {
   public:
     CPlexThemeMusicPlayer();
@@ -23,10 +23,6 @@ class CPlexThemeMusicPlayer : public IPlayerCallback, public IAudioCallback, pub
     virtual void OnPlayBackStarted() {}
     virtual void OnPlayBackStopped() {}
     virtual void OnQueueNextItem();
-
-    /* IAudioCallback */
-    virtual void OnInitialize(int iChannels, int iSamplesPerSec, int iBitsPerSample) {}
-    virtual void OnAudioData(const float* pAudioData, int iAudioDataLength) {}
 
     /* IJobCallback */
     virtual void OnJobComplete(unsigned int jobID, bool success, CJob *job);

@@ -745,11 +745,7 @@ bool GUIFontManager::FindSystemFontPath(const CStdString& strFilename, CStdStrin
 std::vector<std::string> GUIFontManager::GetSystemFontNames()
 {
 #ifndef TARGET_DARWIN_OSX
-#ifdef _MSC_VER
-#pragma message(__WARNING__"TODO: IMPLEMENT ME")
-#else
 #pragma message("TODO: IMPLEMENT ME")
-#endif
   return std::vector<std::string>();
 #else
   // should we add all the fonts found in the skin's path?

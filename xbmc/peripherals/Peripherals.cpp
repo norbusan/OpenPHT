@@ -55,8 +55,6 @@ using namespace std;
 
 CPeripherals::CPeripherals(void)
 {
-  CDirectory::Create("special://profile/peripheral_data");
-
   Clear();
 }
 
@@ -77,6 +75,8 @@ void CPeripherals::Initialise(void)
   if (!m_bIsStarted)
   {
     m_bIsStarted = true;
+
+    CDirectory::Create("special://profile/peripheral_data");
 
     /* load mappings from peripherals.xml */
     LoadMappings();
@@ -320,7 +320,9 @@ void CPeripherals::OnDeviceAdded(const CPeripheralBus &bus, const CPeripheral &p
   CGUIMessage msg(GUI_MSG_UPDATE, WINDOW_SETTINGS_SYSTEM, 0);
   g_windowManager.SendThreadMessage(msg, WINDOW_SETTINGS_SYSTEM);
 
-  CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(35005), peripheral.DeviceName());
+  // don't show a notification for devices detected during the initial scan
+  if (bus.IsInitialised())
+    CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(35005), peripheral.DeviceName());
 }
 
 void CPeripherals::OnDeviceDeleted(const CPeripheralBus &bus, const CPeripheral &peripheral)

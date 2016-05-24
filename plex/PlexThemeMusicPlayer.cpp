@@ -25,7 +25,6 @@ void CPlexThemeMusicPlayer::initPlayer()
   if (!m_player)
   {
     m_player = CPlayerCoreFactory::CreatePlayer(EPC_PAPLAYER, *this);
-    m_player->RegisterAudioCallback(this);
     m_player->SetVolume(g_guiSettings.GetInt("backgroundmusic.bgmusicvolume") / 100.0);
     m_player->FadeOut(2 * 1000);
   }

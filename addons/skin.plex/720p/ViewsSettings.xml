@@ -40,7 +40,7 @@
 					<posx>-1</posx>
 					<posy>-1</posy>
 					<width>678</width>
-					<height>452</height>
+					<height>552</height>
 					<texture>transparent.png</texture>
 					<bordertexture border="10">border-black.png</bordertexture>
 					<bordersize>1</bordersize>
@@ -49,7 +49,7 @@
 				</control>
 				<control type="image">
 					<width>676</width>
-					<height>500</height>
+					<height>550</height>
 					<texture border="10">base-rounded.png</texture>
 					<colordiffuse>FF000000</colordiffuse>
 					<animation effect="fade" start="0" end="60" time="0" condition="true">Conditional</animation>
@@ -118,7 +118,7 @@
 				<posx>105</posx>
 				<posy>65</posy>
 				<width>625</width>
-				<height>400</height>
+				<height>500</height>
 				<onup>5</onup>
 				<ondown>5</ondown>
 				<onleft>302</onleft>
@@ -136,9 +136,9 @@
 				<textoffsetx>20</textoffsetx>
 			</control>
 			<control type="scrollbar" id="61">
-				<posy>60</posy>
+				<posy>58</posy>
 				<posx>732</posx>
-				<height>410</height>
+				<height>510</height>
 				<onup>61</onup>
 				<ondown>61</ondown>
 			</control>

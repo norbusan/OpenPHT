@@ -413,7 +413,7 @@ CUPnP::CreateRenderer(int port /* = 0 */)
     device->m_ModelNumber      = g_infoManager.GetVersion().c_str();
     device->m_ModelDescription = "OpenPHT - Media Renderer";
     device->m_ModelURL         = "http://www.openpht.tv/";
-    device->m_Manufacturer     = "Team OpenPHT";
+    device->m_Manufacturer     = "Team RasPlex";
     device->m_ManufacturerURL  = "http://www.openpht.tv/";
 #endif
 
