@@ -31,9 +31,9 @@ bool CPlexNavigationHelper::CacheUrl(const std::string& url, bool& cancel)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void CPlexNavigationHelper::navigateToNowPlaying()
 {
-  if (g_application.IsPlayingVideo())
+  if (g_application.m_pPlayer->IsPlayingVideo())
     g_windowManager.ActivateWindow(WINDOW_FULLSCREEN_VIDEO);
-  else if (g_application.IsPlayingAudio())
+  else if (g_application.m_pPlayer->IsPlayingAudio())
     g_windowManager.ActivateWindow(WINDOW_NOW_PLAYING);
 }
 

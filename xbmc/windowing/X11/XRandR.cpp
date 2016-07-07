@@ -20,30 +20,31 @@
 
 #include "XRandR.h"
 
-#ifdef HAS_XRANDR
+#ifdef HAVE_X11
 
 #include <string.h>
 #include <sys/wait.h>
 #include "system.h"
 #include "PlatformInclude.h"
 #include "utils/XBMCTinyXML.h"
+#include "utils/StringUtils.h"
 #include "../xbmc/utils/log.h"
+#include "threads/SystemClock.h"
 
-#if defined(__FreeBSD__)
+#if defined(TARGET_FREEBSD)
 #include <sys/types.h>
 #include <sys/wait.h>
 #endif
 
-using namespace std;
-
 CXRandR::CXRandR(bool query)
 {
   m_bInit = false;
+  m_numScreens = 1;
   if (query)
     Query();
 }
 
-bool CXRandR::Query(bool force)
+bool CXRandR::Query(bool force, bool ignoreoff)
 {
   if (!force)
     if (m_bInit)
@@ -55,11 +56,23 @@ bool CXRandR::Query(bool force)
     return false;
 
   m_outputs.clear();
-  m_current.clear();
+  // query all screens
+  // we are happy if at least one screen returns results
+  bool success = false;
+  for(unsigned int screennum=0; screennum<m_numScreens; ++screennum)
+  {
+    if(Query(force, screennum, ignoreoff))
+      success = true;
+  }
+  return success;
+}
 
+bool CXRandR::Query(bool force, int screennum, bool ignoreoff)
+{
   CStdString cmd;
   cmd  = getenv("XBMC_BIN_HOME");
   cmd += "/xbmc-xrandr";
+  cmd = StringUtils::Format("%s -q --screen %d", cmd.c_str(), screennum);
 
   FILE* file = popen(cmd.c_str(),"r");
   if (!file)
@@ -79,7 +92,7 @@ bool CXRandR::Query(bool force)
   pclose(file);
 
   TiXmlElement *pRootElement = xmlDoc.RootElement();
-  if (strcasecmp(pRootElement->Value(), "screen") != 0)
+  if (atoi(pRootElement->Attribute("id")) != screennum)
   {
     // TODO ERROR
     return false;
@@ -92,12 +105,21 @@ bool CXRandR::Query(bool force)
     xoutput.name.TrimLeft(" \n\r\t");
     xoutput.name.TrimRight(" \n\r\t");
     xoutput.isConnected = (strcasecmp(output->Attribute("connected"), "true") == 0);
+    xoutput.screen = screennum;
     xoutput.w = (output->Attribute("w") != NULL ? atoi(output->Attribute("w")) : 0);
     xoutput.h = (output->Attribute("h") != NULL ? atoi(output->Attribute("h")) : 0);
     xoutput.x = (output->Attribute("x") != NULL ? atoi(output->Attribute("x")) : 0);
     xoutput.y = (output->Attribute("y") != NULL ? atoi(output->Attribute("y")) : 0);
+    xoutput.crtc = (output->Attribute("crtc") != NULL ? atoi(output->Attribute("crtc")) : 0);
     xoutput.wmm = (output->Attribute("wmm") != NULL ? atoi(output->Attribute("wmm")) : 0);
     xoutput.hmm = (output->Attribute("hmm") != NULL ? atoi(output->Attribute("hmm")) : 0);
+    if (output->Attribute("rotation") != NULL
+        && (strcasecmp(output->Attribute("rotation"), "left") == 0 || strcasecmp(output->Attribute("rotation"), "right") == 0))
+    {
+      xoutput.isRotated = true;
+    }
+    else
+      xoutput.isRotated = false;
 
     if (!xoutput.isConnected)
        continue;
@@ -115,17 +137,83 @@ bool CXRandR::Query(bool force)
       xmode.isCurrent = (strcasecmp(mode->Attribute("current"), "true") == 0);
       xoutput.modes.push_back(xmode);
       if (xmode.isCurrent)
-      {
-        m_current.push_back(xoutput);
         hascurrent = true;
-      }
     }
-    if (hascurrent)
+    if (hascurrent || !ignoreoff)
       m_outputs.push_back(xoutput);
     else
       CLog::Log(LOGWARNING, "CXRandR::Query - output %s has no current mode, assuming disconnected", xoutput.name.c_str());
   }
   return m_outputs.size() > 0;
+}
+
+bool CXRandR::TurnOffOutput(const CStdString& name)
+{
+  XOutput *output = GetOutput(name);
+  if (!output)
+    return false;
+
+  CStdString cmd;
+  cmd  = getenv("XBMC_BIN_HOME");
+  cmd += "/xbmc-xrandr";
+  cmd = StringUtils::Format("%s --screen %d --output %s --off", cmd.c_str(), output->screen, name.c_str());
+
+  int status = system(cmd.c_str());
+  if (status == -1)
+    return false;
+
+  if (WEXITSTATUS(status) != 0)
+    return false;
+
+  return true;
+}
+
+bool CXRandR::TurnOnOutput(const CStdString& name)
+{
+  XOutput *output = GetOutput(name);
+  if (!output)
+    return false;
+
+  XMode mode = GetCurrentMode(output->name);
+  if (mode.isCurrent)
+    return true;
+
+  // get preferred mode
+  for (unsigned int j = 0; j < m_outputs.size(); j++)
+  {
+    if (m_outputs[j].name == output->name)
+    {
+      for (unsigned int i = 0; i < m_outputs[j].modes.size(); i++)
+      {
+        if (m_outputs[j].modes[i].isPreferred)
+        {
+          mode = m_outputs[j].modes[i];
+          break;
+        }
+      }
+    }
+  }
+
+  if (!mode.isPreferred)
+    return false;
+
+  if (!SetMode(*output, mode))
+    return false;
+
+  XbmcThreads::EndTime timeout(5000);
+  while (!timeout.IsTimePast())
+  {
+    if (!Query(true))
+      return false;
+
+    output = GetOutput(name);
+    if (output && output->h > 0)
+      return true;
+
+    Sleep(200);
+  }
+
+  return false;
 }
 
 std::vector<XOutput> CXRandR::GetModes(void)
@@ -139,28 +227,9 @@ void CXRandR::SaveState()
   Query(true);
 }
 
-void CXRandR::RestoreState()
-{
-  vector<XOutput>::iterator outiter;
-  for (outiter=m_current.begin() ; outiter!=m_current.end() ; outiter++)
-  {
-    vector<XMode> modes = (*outiter).modes;
-    vector<XMode>::iterator modeiter;
-    for (modeiter=modes.begin() ; modeiter!=modes.end() ; modeiter++)
-    {
-      XMode mode = *modeiter;
-      if (mode.isCurrent)
-      {
-        SetMode(*outiter, mode);
-        return;
-      }
-    }
-  }
-}
-
 bool CXRandR::SetMode(XOutput output, XMode mode)
 {
-  if ((output.name == m_currentOutput && mode.id == m_currentMode) || (output.name == "" && mode.id == ""))
+  if ((output.name == "" && mode.id == ""))
     return true;
 
   Query();
@@ -245,7 +314,7 @@ bool CXRandR::SetMode(XOutput output, XMode mode)
   m_currentMode = modeFound.id;
   char cmd[255];
   if (getenv("XBMC_BIN_HOME"))
-    snprintf(cmd, sizeof(cmd), "%s/xbmc-xrandr --output %s --mode %s", getenv("XBMC_BIN_HOME"), outputFound.name.c_str(), modeFound.id.c_str());
+    snprintf(cmd, sizeof(cmd), "%s/xbmc-xrandr --screen %d --output %s --mode %s", getenv("XBMC_BIN_HOME"), outputFound.screen, outputFound.name.c_str(), modeFound.id.c_str());
   else
     return false;
   CLog::Log(LOGINFO, "XRANDR: %s", cmd);
@@ -259,18 +328,7 @@ bool CXRandR::SetMode(XOutput output, XMode mode)
   return true;
 }
 
-XOutput CXRandR::GetCurrentOutput()
-{
-  Query();
-  for (unsigned int j = 0; j < m_outputs.size(); j++)
-  {
-    if(m_outputs[j].isConnected)
-      return m_outputs[j];
-  }
-  XOutput empty;
-  return empty;
-}
-XMode CXRandR::GetCurrentMode(CStdString outputName)
+XMode CXRandR::GetCurrentMode(const CStdString& outputName)
 {
   Query();
   XMode result;
@@ -282,6 +340,29 @@ XMode CXRandR::GetCurrentMode(CStdString outputName)
       for (unsigned int i = 0; i < m_outputs[j].modes.size(); i++)
       {
         if (m_outputs[j].modes[i].isCurrent)
+        {
+          result = m_outputs[j].modes[i];
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+XMode CXRandR::GetPreferredMode(const CStdString& outputName)
+{
+  Query();
+  XMode result;
+
+  for (unsigned int j = 0; j < m_outputs.size(); j++)
+  {
+    if (m_outputs[j].name == outputName || outputName == "")
+    {
+      for (unsigned int i = 0; i < m_outputs[j].modes.size(); i++)
+      {
+        if (m_outputs[j].modes[i].isPreferred)
         {
           result = m_outputs[j].modes[i];
           break;
@@ -343,9 +424,72 @@ void CXRandR::LoadCustomModeLinesToAllOutputs(void)
   }
 }
 
+void CXRandR::SetNumScreens(unsigned int num)
+{
+  m_numScreens = num;
+  m_bInit = false;
+}
+
+bool CXRandR::IsOutputConnected(const CStdString& name)
+{
+  bool result = false;
+  Query();
+
+  for (unsigned int i = 0; i < m_outputs.size(); ++i)
+  {
+    if (m_outputs[i].name == name)
+    {
+      result = true;
+      break;
+    }
+  }
+  return result;
+}
+
+XOutput* CXRandR::GetOutput(const CStdString& outputName)
+{
+  XOutput *result = 0;
+  Query();
+  for (unsigned int i = 0; i < m_outputs.size(); ++i)
+  {
+    if (m_outputs[i].name == outputName)
+    {
+      result = &m_outputs[i];
+      break;
+    }
+  }
+  return result;
+}
+
+int CXRandR::GetCrtc(int x, int y, float &hz)
+{
+  int crtc = 0;
+  for (unsigned int i = 0; i < m_outputs.size(); ++i)
+  {
+    if (!m_outputs[i].isConnected)
+      continue;
+
+    if ((m_outputs[i].x <= x && (m_outputs[i].x+m_outputs[i].w) > x) &&
+        (m_outputs[i].y <= y && (m_outputs[i].y+m_outputs[i].h) > y))
+    {
+      crtc = m_outputs[i].crtc;
+      for (auto mode: m_outputs[i].modes)
+      {
+        if (mode.isCurrent)
+        {
+          hz = mode.hz;
+          break;
+        }
+      }
+      break;
+    }
+  }
+  return crtc;
+}
+
 CXRandR g_xrandr;
 
-#endif // HAS_XRANDR
+#endif // HAVE_X11
 
 /*
   int main()

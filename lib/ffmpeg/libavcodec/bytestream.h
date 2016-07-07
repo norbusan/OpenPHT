@@ -23,21 +23,23 @@
 #ifndef AVCODEC_BYTESTREAM_H
 #define AVCODEC_BYTESTREAM_H
 
+#include <stdint.h>
 #include <string.h>
 
+#include "libavutil/avassert.h"
 #include "libavutil/common.h"
 #include "libavutil/intreadwrite.h"
 
-typedef struct {
+typedef struct GetByteContext {
     const uint8_t *buffer, *buffer_end, *buffer_start;
 } GetByteContext;
 
-typedef struct {
+typedef struct PutByteContext {
     uint8_t *buffer, *buffer_end, *buffer_start;
     int eof;
 } PutByteContext;
 
-#define DEF_T(type, name, bytes, read, write)                                  \
+#define DEF(type, name, bytes, read, write)                                  \
 static av_always_inline type bytestream_get_ ## name(const uint8_t **b)        \
 {                                                                              \
     (*b) += bytes;                                                             \
@@ -69,8 +71,10 @@ static av_always_inline type bytestream2_get_ ## name ## u(GetByteContext *g)  \
 }                                                                              \
 static av_always_inline type bytestream2_get_ ## name(GetByteContext *g)       \
 {                                                                              \
-    if (g->buffer_end - g->buffer < bytes)                                     \
+    if (g->buffer_end - g->buffer < bytes) {                                   \
+        g->buffer = g->buffer_end;                                             \
         return 0;                                                              \
+    }                                                                          \
     return bytestream2_get_ ## name ## u(g);                                   \
 }                                                                              \
 static av_always_inline type bytestream2_peek_ ## name(GetByteContext *g)      \
@@ -80,24 +84,15 @@ static av_always_inline type bytestream2_peek_ ## name(GetByteContext *g)      \
     return read(g->buffer);                                                    \
 }
 
-#define DEF(name, bytes, read, write)                                          \
-    DEF_T(unsigned int, name, bytes, read, write)
-#define DEF64(name, bytes, read, write)                                        \
-    DEF_T(uint64_t, name, bytes, read, write)
-
-DEF64(le64, 8, AV_RL64, AV_WL64)
-DEF  (le32, 4, AV_RL32, AV_WL32)
-DEF  (le24, 3, AV_RL24, AV_WL24)
-DEF  (le16, 2, AV_RL16, AV_WL16)
-DEF64(be64, 8, AV_RB64, AV_WB64)
-DEF  (be32, 4, AV_RB32, AV_WB32)
-DEF  (be24, 3, AV_RB24, AV_WB24)
-DEF  (be16, 2, AV_RB16, AV_WB16)
-DEF  (byte, 1, AV_RB8 , AV_WB8 )
-
-#undef DEF
-#undef DEF64
-#undef DEF_T
+DEF(uint64_t,     le64, 8, AV_RL64, AV_WL64)
+DEF(unsigned int, le32, 4, AV_RL32, AV_WL32)
+DEF(unsigned int, le24, 3, AV_RL24, AV_WL24)
+DEF(unsigned int, le16, 2, AV_RL16, AV_WL16)
+DEF(uint64_t,     be64, 8, AV_RB64, AV_WB64)
+DEF(unsigned int, be32, 4, AV_RB32, AV_WB32)
+DEF(unsigned int, be24, 3, AV_RB24, AV_WB24)
+DEF(unsigned int, be16, 2, AV_RB16, AV_WB16)
+DEF(unsigned int, byte, 1, AV_RB8 , AV_WB8)
 
 #if HAVE_BIGENDIAN
 #   define bytestream2_get_ne16  bytestream2_get_be16
@@ -139,6 +134,7 @@ static av_always_inline void bytestream2_init(GetByteContext *g,
                                               const uint8_t *buf,
                                               int buf_size)
 {
+    av_assert0(buf_size >= 0);
     g->buffer       = buf;
     g->buffer_start = buf;
     g->buffer_end   = buf + buf_size;
@@ -148,6 +144,7 @@ static av_always_inline void bytestream2_init_writer(PutByteContext *p,
                                                      uint8_t *buf,
                                                      int buf_size)
 {
+    av_assert0(buf_size >= 0);
     p->buffer       = buf;
     p->buffer_start = buf;
     p->buffer_end   = buf + buf_size;

@@ -21,6 +21,8 @@
 #include "RenderSystem.h"
 
 CRenderSystemBase::CRenderSystemBase()
+  : m_stereoView(RENDER_STEREO_VIEW_OFF)
+  , m_stereoMode(RENDER_STEREO_MODE_OFF)
 {
   m_bRenderCreated = false;
   m_bVSync = true;
@@ -63,5 +65,19 @@ bool CRenderSystemBase::SupportsBGRA() const
 bool CRenderSystemBase::SupportsBGRAApple() const
 {
   return (m_renderCaps & RENDER_CAPS_BGRA_APPLE) == RENDER_CAPS_BGRA_APPLE;
+}
+
+bool CRenderSystemBase::SupportsStereo(RENDER_STEREO_MODE mode) const
+{
+  switch(mode)
+  {
+    case RENDER_STEREO_MODE_OFF:
+    case RENDER_STEREO_MODE_SPLIT_HORIZONTAL:
+    case RENDER_STEREO_MODE_SPLIT_VERTICAL:
+    case RENDER_STEREO_MODE_MONO:
+      return true;
+    default:
+      return false;
+  }
 }
 

@@ -39,11 +39,10 @@ static int vc1t_probe(AVProbeData *p)
     if (p->buf[3] != 0xC5 || AV_RL32(&p->buf[4]) != 4 || AV_RL32(&p->buf[20]) != 0xC)
         return 0;
 
-    return AVPROBE_SCORE_MAX/2;
+    return AVPROBE_SCORE_EXTENSION;
 }
 
-static int vc1t_read_header(AVFormatContext *s,
-                           AVFormatParameters *ap)
+static int vc1t_read_header(AVFormatContext *s)
 {
     AVIOContext *pb = s->pb;
     AVStream *st;
@@ -52,23 +51,22 @@ static int vc1t_read_header(AVFormatContext *s,
 
     frames = avio_rl24(pb);
     if(avio_r8(pb) != 0xC5 || avio_rl32(pb) != 4)
-        return -1;
+        return AVERROR_INVALIDDATA;
 
     /* init video codec */
     st = avformat_new_stream(s, NULL);
     if (!st)
-        return -1;
+        return AVERROR(ENOMEM);
 
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id = CODEC_ID_WMV3;
+    st->codec->codec_id = AV_CODEC_ID_WMV3;
 
-    st->codec->extradata = av_malloc(VC1_EXTRADATA_SIZE);
-    st->codec->extradata_size = VC1_EXTRADATA_SIZE;
-    avio_read(pb, st->codec->extradata, VC1_EXTRADATA_SIZE);
+    if (ff_get_extradata(st->codec, pb, VC1_EXTRADATA_SIZE) < 0)
+        return AVERROR(ENOMEM);
     st->codec->height = avio_rl32(pb);
     st->codec->width = avio_rl32(pb);
     if(avio_rl32(pb) != 0xC)
-        return -1;
+        return AVERROR_INVALIDDATA;
     avio_skip(pb, 8);
     fps = avio_rl32(pb);
     if(fps == 0xFFFFFFFF)
@@ -93,7 +91,7 @@ static int vc1t_read_packet(AVFormatContext *s,
     int keyframe = 0;
     uint32_t pts;
 
-    if(url_feof(pb))
+    if(avio_feof(pb))
         return AVERROR(EIO);
 
     frame_size = avio_rl24(pb);
@@ -112,9 +110,9 @@ static int vc1t_read_packet(AVFormatContext *s,
 
 AVInputFormat ff_vc1t_demuxer = {
     .name           = "vc1test",
-    .long_name      = NULL_IF_CONFIG_SMALL("VC-1 test bitstream format"),
+    .long_name      = NULL_IF_CONFIG_SMALL("VC-1 test bitstream"),
     .read_probe     = vc1t_probe,
     .read_header    = vc1t_read_header,
     .read_packet    = vc1t_read_packet,
-    .flags = AVFMT_GENERIC_INDEX,
+    .flags          = AVFMT_GENERIC_INDEX,
 };

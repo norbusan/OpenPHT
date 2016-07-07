@@ -39,11 +39,16 @@
 #include "timer.h"
 #include "cpu.h"
 #include "dict.h"
+#include "pixfmt.h"
+#include "version.h"
 
-struct AVDictionary {
-    int count;
-    AVDictionaryEntry *elems;
-};
+#if ARCH_X86
+#   include "x86/emms.h"
+#endif
+
+#ifndef emms_c
+#   define emms_c() while(0)
+#endif
 
 #ifndef attribute_align_arg
 #if ARCH_X86_32 && AV_GCC_VERSION_AT_LEAST(4,2)
@@ -53,118 +58,78 @@ struct AVDictionary {
 #endif
 #endif
 
-#ifndef INT16_MIN
-#define INT16_MIN       (-0x7fff - 1)
-#endif
-
-#ifndef INT16_MAX
-#define INT16_MAX       0x7fff
-#endif
-
-#ifndef INT32_MIN
-#define INT32_MIN       (-0x7fffffff - 1)
-#endif
-
-#ifndef INT32_MAX
-#define INT32_MAX       0x7fffffff
-#endif
-
-#ifndef UINT32_MAX
-#define UINT32_MAX      0xffffffff
-#endif
-
-#ifndef INT64_MIN
-#define INT64_MIN       (-0x7fffffffffffffffLL - 1)
-#endif
-
-#ifndef INT64_MAX
-#define INT64_MAX INT64_C(9223372036854775807)
-#endif
-
-#ifndef UINT64_MAX
-#define UINT64_MAX UINT64_C(0xFFFFFFFFFFFFFFFF)
-#endif
-
-#ifndef INT_BIT
-#    define INT_BIT (CHAR_BIT * sizeof(int))
-#endif
-
-#ifndef offsetof
-#    define offsetof(T, F) ((unsigned int)((char *)&((T *)0)->F))
-#endif
-
-/* Use to export labels from asm. */
-#define LABEL_MANGLE(a) EXTERN_PREFIX #a
-
-// Use rip-relative addressing if compiling PIC code on x86-64.
-#if ARCH_X86_64 && defined(PIC)
-#    define LOCAL_MANGLE(a) #a "(%%rip)"
+#if defined(_MSC_VER) && CONFIG_SHARED
+#    define av_export __declspec(dllimport)
 #else
-#    define LOCAL_MANGLE(a) #a
+#    define av_export
 #endif
 
-#define MANGLE(a) EXTERN_PREFIX LOCAL_MANGLE(a)
-
-/* debug stuff */
-
-#define av_abort()      do { av_log(NULL, AV_LOG_ERROR, "Abort at %s:%d\n", __FILE__, __LINE__); abort(); } while (0)
-
-/* math */
-
-#if ARCH_X86
-#define MASK_ABS(mask, level)\
-            __asm__ volatile(\
-                "cltd                   \n\t"\
-                "xorl %1, %0            \n\t"\
-                "subl %1, %0            \n\t"\
-                : "+a" (level), "=&d" (mask)\
-            );
+#if HAVE_PRAGMA_DEPRECATED
+#    if defined(__ICL) || defined (__INTEL_COMPILER)
+#        define FF_DISABLE_DEPRECATION_WARNINGS __pragma(warning(push)) __pragma(warning(disable:1478))
+#        define FF_ENABLE_DEPRECATION_WARNINGS  __pragma(warning(pop))
+#    elif defined(_MSC_VER)
+#        define FF_DISABLE_DEPRECATION_WARNINGS __pragma(warning(push)) __pragma(warning(disable:4996))
+#        define FF_ENABLE_DEPRECATION_WARNINGS  __pragma(warning(pop))
+#    else
+#        define FF_DISABLE_DEPRECATION_WARNINGS _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#        define FF_ENABLE_DEPRECATION_WARNINGS  _Pragma("GCC diagnostic warning \"-Wdeprecated-declarations\"")
+#    endif
 #else
-#define MASK_ABS(mask, level)\
-            mask  = level >> 31;\
-            level = (level ^ mask) - mask;
+#    define FF_DISABLE_DEPRECATION_WARNINGS
+#    define FF_ENABLE_DEPRECATION_WARNINGS
 #endif
 
-/* avoid usage of dangerous/inappropriate system functions */
-#undef  malloc
-#define malloc please_use_av_malloc
-#undef  free
-#define free please_use_av_free
-#undef  realloc
-#define realloc please_use_av_realloc
-#undef  time
-#define time time_is_forbidden_due_to_security_issues
-#undef  rand
-#define rand rand_is_forbidden_due_to_state_trashing_use_av_lfg_get
-#undef  srand
-#define srand srand_is_forbidden_due_to_state_trashing_use_av_lfg_init
-#undef  random
-#define random random_is_forbidden_due_to_state_trashing_use_av_lfg_get
-#undef  sprintf
-#define sprintf sprintf_is_forbidden_due_to_security_issues_use_snprintf
-#undef  strcat
-#define strcat strcat_is_forbidden_due_to_security_issues_use_av_strlcat
-#undef  strncpy
-#define strncpy strncpy_is_forbidden_due_to_security_issues_use_av_strlcpy
-#undef  exit
-#define exit exit_is_forbidden
-#undef  printf
-#define printf please_use_av_log_instead_of_printf
-#undef  fprintf
-#define fprintf please_use_av_log_instead_of_fprintf
-#undef  puts
-#define puts please_use_av_log_instead_of_puts
-#undef  perror
-#define perror please_use_av_log_instead_of_perror
-#undef strcasecmp
-#define strcasecmp please_use_av_strcasecmp
-#undef strncasecmp
-#define strncasecmp please_use_av_strncasecmp
+
+#define FF_MEMORY_POISON 0x2a
+
+#define MAKE_ACCESSORS(str, name, type, field) \
+    type av_##name##_get_##field(const str *s) { return s->field; } \
+    void av_##name##_set_##field(str *s, type v) { s->field = v; }
+
+// Some broken preprocessors need a second expansion
+// to be forced to tokenize __VA_ARGS__
+#define E1(x) x
+
+/* Check if the hard coded offset of a struct member still matches reality.
+ * Induce a compilation failure if not.
+ */
+#define AV_CHECK_OFFSET(s, m, o) struct check_##o {    \
+        int x_##o[offsetof(s, m) == o? 1: -1];         \
+    }
+
+#define LOCAL_ALIGNED_A(a, t, v, s, o, ...)             \
+    uint8_t la_##v[sizeof(t s o) + (a)];                \
+    t (*v) o = (void *)FFALIGN((uintptr_t)la_##v, a)
+
+#define LOCAL_ALIGNED_D(a, t, v, s, o, ...)             \
+    DECLARE_ALIGNED(a, t, la_##v) s o;                  \
+    t (*v) o = la_##v
+
+#define LOCAL_ALIGNED(a, t, v, ...) E1(LOCAL_ALIGNED_A(a, t, v, __VA_ARGS__,,))
+
+#if HAVE_LOCAL_ALIGNED_8
+#   define LOCAL_ALIGNED_8(t, v, ...) E1(LOCAL_ALIGNED_D(8, t, v, __VA_ARGS__,,))
+#else
+#   define LOCAL_ALIGNED_8(t, v, ...) LOCAL_ALIGNED(8, t, v, __VA_ARGS__)
+#endif
+
+#if HAVE_LOCAL_ALIGNED_16
+#   define LOCAL_ALIGNED_16(t, v, ...) E1(LOCAL_ALIGNED_D(16, t, v, __VA_ARGS__,,))
+#else
+#   define LOCAL_ALIGNED_16(t, v, ...) LOCAL_ALIGNED(16, t, v, __VA_ARGS__)
+#endif
+
+#if HAVE_LOCAL_ALIGNED_32
+#   define LOCAL_ALIGNED_32(t, v, ...) E1(LOCAL_ALIGNED_D(32, t, v, __VA_ARGS__,,))
+#else
+#   define LOCAL_ALIGNED_32(t, v, ...) LOCAL_ALIGNED(32, t, v, __VA_ARGS__)
+#endif
 
 #define FF_ALLOC_OR_GOTO(ctx, p, size, label)\
 {\
     p = av_malloc(size);\
-    if (p == NULL && (size) != 0) {\
+    if (!(p) && (size) != 0) {\
         av_log(ctx, AV_LOG_ERROR, "Cannot allocate memory.\n");\
         goto label;\
     }\
@@ -173,7 +138,25 @@ struct AVDictionary {
 #define FF_ALLOCZ_OR_GOTO(ctx, p, size, label)\
 {\
     p = av_mallocz(size);\
-    if (p == NULL && (size) != 0) {\
+    if (!(p) && (size) != 0) {\
+        av_log(ctx, AV_LOG_ERROR, "Cannot allocate memory.\n");\
+        goto label;\
+    }\
+}
+
+#define FF_ALLOC_ARRAY_OR_GOTO(ctx, p, nelem, elsize, label)\
+{\
+    p = av_malloc_array(nelem, elsize);\
+    if (!p) {\
+        av_log(ctx, AV_LOG_ERROR, "Cannot allocate memory.\n");\
+        goto label;\
+    }\
+}
+
+#define FF_ALLOCZ_ARRAY_OR_GOTO(ctx, p, nelem, elsize, label)\
+{\
+    p = av_mallocz_array(nelem, elsize);\
+    if (!p) {\
         av_log(ctx, AV_LOG_ERROR, "Cannot allocate memory.\n");\
         goto label;\
     }\
@@ -231,19 +214,74 @@ struct AVDictionary {
 #   define ONLY_IF_THREADS_ENABLED(x) NULL
 #endif
 
-#if HAVE_MMX
 /**
- * Empty mmx state.
- * this must be called between any dsp function and float/double code.
- * for example sin(); dsp->idct_put(); emms_c(); cos()
+ * Log a generic warning message about a missing feature.
+ *
+ * @param[in] avc a pointer to an arbitrary struct of which the first
+ *                field is a pointer to an AVClass struct
+ * @param[in] msg string containing the name of the missing feature
  */
-static av_always_inline void emms_c(void)
+void avpriv_report_missing_feature(void *avc,
+                                   const char *msg, ...) av_printf_format(2, 3);
+
+/**
+ * Log a generic warning message about a missing feature.
+ * Additionally request that a sample showcasing the feature be uploaded.
+ *
+ * @param[in] avc a pointer to an arbitrary struct of which the first field is
+ *                a pointer to an AVClass struct
+ * @param[in] msg string containing the name of the missing feature
+ */
+void avpriv_request_sample(void *avc,
+                           const char *msg, ...) av_printf_format(2, 3);
+
+#if HAVE_LIBC_MSVCRT
+#include <crtversion.h>
+#if defined(_VC_CRT_MAJOR_VERSION) && _VC_CRT_MAJOR_VERSION < 14
+#pragma comment(linker, "/include:" EXTERN_PREFIX "avpriv_strtod")
+#pragma comment(linker, "/include:" EXTERN_PREFIX "avpriv_snprintf")
+#endif
+
+#define avpriv_open ff_open
+#define PTRDIFF_SPECIFIER "Id"
+#define SIZE_SPECIFIER "Iu"
+#else
+#define PTRDIFF_SPECIFIER "td"
+#define SIZE_SPECIFIER "zu"
+#endif
+
+#ifdef DEBUG
+#   define ff_dlog(ctx, ...) av_log(ctx, AV_LOG_DEBUG, __VA_ARGS__)
+#else
+#   define ff_dlog(ctx, ...) do { if (0) av_log(ctx, AV_LOG_DEBUG, __VA_ARGS__); } while (0)
+#endif
+
+/**
+ * A wrapper for open() setting O_CLOEXEC.
+ */
+int avpriv_open(const char *filename, int flags, ...);
+
+int avpriv_set_systematic_pal2(uint32_t pal[256], enum AVPixelFormat pix_fmt);
+
+static av_always_inline av_const int avpriv_mirror(int x, int w)
 {
-    if(av_get_cpu_flags() & AV_CPU_FLAG_MMX)
-        __asm__ volatile ("emms" ::: "memory");
+    if (!w)
+        return 0;
+
+    while ((unsigned)x > (unsigned)w) {
+        x = -x;
+        if (x < 0)
+            x += 2 * w;
+    }
+    return x;
 }
-#else /* HAVE_MMX */
-#define emms_c()
-#endif /* HAVE_MMX */
+
+#if FF_API_GET_CHANNEL_LAYOUT_COMPAT
+uint64_t ff_get_channel_layout(const char *name, int compat);
+#endif
+
+void ff_check_pixfmt_descriptors(void);
+
+extern const uint8_t ff_reverse[256];
 
 #endif /* AVUTIL_INTERNAL_H */

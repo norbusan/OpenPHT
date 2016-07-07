@@ -33,6 +33,7 @@
 #include "XBDateTime.h"
 #include "utils/Observer.h"
 #include "interfaces/info/SkinVariable.h"
+#include "cores/IPlayer.h"
 
 #include <list>
 #include <map>
@@ -117,6 +118,7 @@ namespace INFO
 #define PLAYER_ONNEW                 54
 #define PLAYER_PLAYLIST              55
 /* END PLEX */
+#define PLAYER_SEEKSTEPSIZE          56
 
 #define WEATHER_CONDITIONS          100
 #define WEATHER_TEMPERATURE         101
@@ -193,6 +195,7 @@ namespace INFO
 #define SYSTEM_ISINHIBIT            184
 #define SYSTEM_HAS_SHUTDOWN         185
 #define SYSTEM_HAS_PVR              186
+#define SYSTEM_STEREOSCOPIC_MODE    188
 #define SYSTEM_BUILD_VERSION_SHORT  189
 
 #define NETWORK_IP_ADDRESS          190
@@ -293,14 +296,19 @@ namespace INFO
 #define VIDEOPLAYER_CHANNEL_GROUP     306
 #define VIDEOPLAYER_PARENTAL_RATING   307
 #define VIDEOPLAYER_HAS_EPG           308
+#define VIDEOPLAYER_IS_STEREOSCOPIC   310
+#define VIDEOPLAYER_STEREOSCOPIC_MODE 311
+#define VIDEOPLAYER_SUBTITLE_LANG     312
+#define VIDEOPLAYER_AUDIO_LANG        313
 
 /* PLEX */
-#define VIDEOPLAYER_AUDIOSTREAM       311
-#define VIDEOPLAYER_SUBTITLESTREAM    312
-#define VIDEOPLAYER_DURATION_STRING   313
-#define VIDEOPLAYER_PLEXCONTENT       314
-#define VIDEOPLAYER_PLEXCONTENT_STRING 315
-#define VIDEOPLAYER_HASNEXT           316
+#define VIDEOPLAYER_SEEKIMAGE         318
+#define VIDEOPLAYER_AUDIOSTREAM       319
+#define VIDEOPLAYER_SUBTITLESTREAM    320
+#define VIDEOPLAYER_DURATION_STRING   321
+#define VIDEOPLAYER_PLEXCONTENT       322
+#define VIDEOPLAYER_PLEXCONTENT_STRING 323
+#define VIDEOPLAYER_HASNEXT           324
 /* END PLEX */
 
 #define AUDIOSCROBBLER_ENABLED      325
@@ -640,6 +648,8 @@ namespace INFO
 #define LISTITEM_PARENTALRATING     (LISTITEM_START + 101)
 #define LISTITEM_PROGRESS           (LISTITEM_START + 102)
 #define LISTITEM_HAS_EPG            (LISTITEM_START + 103)
+#define LISTITEM_STEREOSCOPIC_MODE  (LISTITEM_START + 104)
+#define LISTITEM_IS_STEREOSCOPIC    (LISTITEM_START + 105)
 
 #define LISTITEM_PROPERTY_START     (LISTITEM_START + 200)
 #define LISTITEM_PROPERTY_END       (LISTITEM_PROPERTY_START + 1000)
@@ -803,6 +813,7 @@ public:
   CStdString GetCurrentSeekTime(TIME_FORMAT format = TIME_FORMAT_GUESS) const;
   int GetPlayTimeRemaining() const;
   int GetTotalPlayTime() const;
+  float GetSeekPercent() const;
   CStdString GetCurrentPlayTimeRemaining(TIME_FORMAT format) const;
   CStdString GetVersionShort(void);
   CStdString GetVersion();
@@ -810,18 +821,17 @@ public:
 
   bool GetDisplayAfterSeek();
   void SetDisplayAfterSeek(unsigned int timeOut = 2500, int seekOffset = 0);
-  void SetSeeking(bool seeking) { m_playerSeeking = seeking; };
   void SetShowTime(bool showtime) { m_playerShowTime = showtime; };
   void SetShowCodec(bool showcodec) { m_playerShowCodec = showcodec; };
   void SetShowInfo(bool showinfo) { m_playerShowInfo = showinfo; };
   void ToggleShowCodec() { m_playerShowCodec = !m_playerShowCodec; };
   bool ToggleShowInfo() { m_playerShowInfo = !m_playerShowInfo; return m_playerShowInfo; };
-  bool m_performingSeek;
 
   std::string GetSystemHeatInfo(int info);
   CTemperature GetGPUTemperature();
 
   void UpdateFPS();
+  void UpdateAVInfo();
   inline float GetFPS() const { return m_fps; };
 
   void SetNextWindow(int windowID) { m_nextWindowID = windowID; };
@@ -861,7 +871,6 @@ public:
   bool ConditionsChangedValues(const std::map<int, bool>& map);
 
   /* PLEX */
-  bool GetSeeking() const { return m_playerSeeking; };
   bool GetSlideshowShowDescription();
   void SetSlideshowShowDescription(bool show);
   CStdString GetVideoLabel(int item, const CFileItemPtr& file = CFileItemPtr());
@@ -940,8 +949,6 @@ protected:
   // Current playing stuff
   CFileItemPtr m_currentFile;
   CStdString m_currentMovieThumb;
-  unsigned int m_lastMusicBitrateTime;
-  unsigned int m_MusicBitrate;
   CFileItem* m_currentSlide;
 
   // fan stuff
@@ -953,7 +960,6 @@ protected:
   //Fullscreen OSD Stuff
   unsigned int m_AfterSeekTimeout;
   int m_seekOffset;
-  bool m_playerSeeking;
   bool m_playerShowTime;
   bool m_playerShowCodec;
   bool m_playerShowInfo;
@@ -976,6 +982,9 @@ protected:
   int m_libraryHasTVShows;
   int m_libraryHasMusicVideos;
   int m_libraryHasMovieSets;
+
+  SPlayerVideoStreamInfo m_videoInfo;
+  SPlayerAudioStreamInfo m_audioInfo;
 
   CCriticalSection m_critInfo;
 

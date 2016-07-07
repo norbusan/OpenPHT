@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2010-2012 Team XBMC
+ *      Copyright (C) 2010-2013 Team XBMC
  *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -21,15 +21,9 @@
 
 #include "AEFactory.h"
 
-#if defined(TARGET_DARWIN)
-  #include "Engines/CoreAudio/CoreAudioAE.h"
-#else
-  #include "Engines/SoftAE/SoftAE.h"
-#endif
+#include "Engines/ActiveAE/ActiveAE.h"
 
-#if defined(HAS_PULSEAUDIO)
-  #include "Engines/PulseAE/PulseAE.h"
-#endif
+#include "settings/GUISettings.h"
 
 IAE* CAEFactory::AE = NULL;
 static float  g_fVolume = 1.0f;
@@ -42,62 +36,11 @@ IAE *CAEFactory::GetEngine()
 
 bool CAEFactory::LoadEngine()
 {
-  bool loaded = false;
-
-  std::string engine;
-
-#if defined(TARGET_LINUX)
-  if (getenv("AE_ENGINE"))
-  {
-    engine = (std::string)getenv("AE_ENGINE");
-    std::transform(engine.begin(), engine.end(), engine.begin(), ::toupper);
-
-    #if defined(HAS_PULSEAUDIO)
-    if (!loaded && engine == "PULSE")
-      loaded = CAEFactory::LoadEngine(AE_ENGINE_PULSE);
-    #endif
-    if (!loaded && engine == "SOFT" )
-      loaded = CAEFactory::LoadEngine(AE_ENGINE_SOFT);
-  }
-#endif
-
-#if defined(HAS_PULSEAUDIO)
-  if (!loaded)
-    loaded = CAEFactory::LoadEngine(AE_ENGINE_PULSE);
-#endif
-
-#if defined(TARGET_DARWIN)
-  if (!loaded)
-    loaded = CAEFactory::LoadEngine(AE_ENGINE_COREAUDIO);
-#else
-  if (!loaded)
-    loaded = CAEFactory::LoadEngine(AE_ENGINE_SOFT);
-#endif
-
-  return loaded;
-}
-
-bool CAEFactory::LoadEngine(enum AEEngine engine)
-{
   /* can only load the engine once, XBMC restart is required to change it */
   if (AE)
     return false;
 
-  switch(engine)
-  {
-    case AE_ENGINE_NULL     :
-#if defined(TARGET_DARWIN)
-    case AE_ENGINE_COREAUDIO: AE = new CCoreAudioAE(); break;
-#else
-    case AE_ENGINE_SOFT     : AE = new CSoftAE(); break;
-#endif
-#if defined(HAS_PULSEAUDIO)
-    case AE_ENGINE_PULSE    : AE = new CPulseAE(); break;
-#endif
-
-    default:
-      return false;
-  }
+  AE = new ActiveAE::CActiveAE();
 
   if (AE && !AE->CanInit())
   {
@@ -195,9 +138,8 @@ void CAEFactory::VerifyOutputDevice(std::string &device, bool passthrough)
   EnumerateOutputDevices(devices, passthrough);
   std::string firstDevice;
 
-  for (AEDeviceList::const_iterator deviceIt = devices.begin(); deviceIt != devices.end(); deviceIt++)
+  for (AEDeviceList::const_iterator deviceIt = devices.begin(); deviceIt != devices.end(); ++deviceIt)
   {
-    std::string currentDevice = deviceIt->second;
     /* remember the first device so we can default to it if required */
     if (firstDevice.empty())
       firstDevice = deviceIt->second;
@@ -223,14 +165,70 @@ std::string CAEFactory::GetDefaultDevice(bool passthrough)
   return "default";
 }
 
-bool CAEFactory::SupportsRaw()
+bool CAEFactory::SupportsRaw(AEDataFormat format, int samplerate)
 {
+  // check if passthrough is enabled
+  if (!g_guiSettings.GetBool("audiooutput.passthrough"))
+    return false;
+
+  // fixed config disabled passthrough
+  if (g_guiSettings.GetInt("audiooutput.config") == AE_CONFIG_FIXED)
+    return false;
+
+  // check if the format is enabled in settings
+  if (format == AE_FMT_AC3 && !g_guiSettings.GetBool("audiooutput.ac3passthrough"))
+    return false;
+  if (format == AE_FMT_DTS && !g_guiSettings.GetBool("audiooutput.dtspassthrough"))
+    return false;
+  if (format == AE_FMT_EAC3 && !g_guiSettings.GetBool("audiooutput.eac3passthrough"))
+    return false;
+  if (format == AE_FMT_TRUEHD && !g_guiSettings.GetBool("audiooutput.truehdpassthrough"))
+    return false;
+  if (format == AE_FMT_DTSHD && !g_guiSettings.GetBool("audiooutput.dtshdpassthrough"))
+    return false;
+
   if(AE)
-    return AE->SupportsRaw();
+    return AE->SupportsRaw(format, samplerate);
 
   return false;
 }
 
+bool CAEFactory::SupportsSilenceTimeout()
+{
+  if(AE)
+    return AE->SupportsSilenceTimeout();
+
+  return false;
+}
+
+bool CAEFactory::HasStereoAudioChannelCount()
+{
+  if(AE)
+    return AE->HasStereoAudioChannelCount();
+  return false;
+}
+
+bool CAEFactory::HasHDAudioChannelCount()
+{
+  if(AE)
+    return AE->HasHDAudioChannelCount();
+  return false;
+}
+
+/**
+  * Returns true if current AudioEngine supports at lest two basic quality levels
+  * @return true if quality setting is supported, otherwise false
+  */
+bool CAEFactory::SupportsQualitySetting(void) 
+{
+  if (!AE)
+    return false;
+
+  return ((AE->SupportsQualityLevel(AE_QUALITY_LOW)? 1 : 0) + 
+          (AE->SupportsQualityLevel(AE_QUALITY_MID)? 1 : 0) +
+          (AE->SupportsQualityLevel(AE_QUALITY_HIGH)? 1 : 0)) >= 2; 
+}
+  
 void CAEFactory::SetMute(const bool enabled)
 {
   if(AE)
@@ -290,4 +288,36 @@ void CAEFactory::GarbageCollect()
 {
   if(AE)
     AE->GarbageCollect();
+}
+
+void CAEFactory::RegisterAudioCallback(IAudioCallback* pCallback)
+{
+  if (AE)
+    AE->RegisterAudioCallback(pCallback);
+}
+
+void CAEFactory::UnregisterAudioCallback()
+{
+  if (AE)
+    AE->UnregisterAudioCallback();
+}
+
+bool CAEFactory::IsSettingVisible(const std::string &value)
+{
+  if (value.empty() || !AE)
+    return false;
+
+  return AE->IsSettingVisible(value);
+}
+
+void CAEFactory::KeepConfiguration(unsigned int millis)
+{
+  if (AE)
+    AE->KeepConfiguration(millis);
+}
+
+void CAEFactory::DeviceChange()
+{
+  if (AE)
+    AE->DeviceChange();
 }

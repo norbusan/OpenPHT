@@ -89,6 +89,7 @@
 #include "peripherals/Peripherals.h"
 #include "peripherals/dialogs/GUIDialogPeripheralManager.h"
 #include "peripherals/devices/PeripheralImon.h"
+#include "utils/SeekHandler.h"
 
 #ifdef _WIN32
 #include "WIN32Util.h"
@@ -111,10 +112,6 @@
 #include "pvr/dialogs/GUIDialogPVRChannelManager.h"
 #include "pvr/PVRManager.h"
 #include "pvr/addons/PVRClients.h"
-
-#if defined(HAVE_LIBCRYSTALHD)
-#include "cores/dvdplayer/DVDCodecs/Video/CrystalHD.h"
-#endif
 
 #if defined(HAS_AIRPLAY)
 #include "network/AirPlayServer.h"
@@ -640,6 +637,60 @@ void CGUIWindowSettingsCategory::UpdateSettings()
     BaseSettingControlPtr pSettingControl = m_vecSettings[i];
     pSettingControl->Update();
     CStdString strSetting = pSettingControl->GetSetting()->GetSetting();
+
+    if ( strSetting.Equals("audiooutput.channels")
+      || strSetting.Equals("audiooutput.samplerate")
+      || strSetting.Equals("audiooutput.stereoupmix")
+      || strSetting.Equals("audiooutput.passthrough"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      if (pControl)
+        pControl->SetVisible(CAEFactory::IsSettingVisible(strSetting));
+    }
+    else if (strSetting.Equals("audiooutput.processquality"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      if (pControl)
+        pControl->SetVisible(CAEFactory::SupportsQualitySetting());
+    }
+    else if (strSetting.Equals("audiooutput.supportdtshdcpudecoding"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      if (pControl)
+        pControl->SetEnabled(!g_guiSettings.GetBool("audiooutput.passthrough") || (!g_guiSettings.GetBool("audiooutput.dtshdpassthrough") && !g_guiSettings.GetBool("audiooutput.dtspassthrough")));
+    }
+    else if (strSetting.Equals("audiooutput.passthroughdevice")
+      || strSetting.Equals("audiooutput.ac3passthrough")
+      || strSetting.Equals("audiooutput.dtspassthrough"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      if (pControl)
+      {
+        pControl->SetVisible(CAEFactory::IsSettingVisible("audiooutput.passthrough"));
+        pControl->SetEnabled(g_guiSettings.GetBool("audiooutput.passthrough"));
+      }
+    }
+    else if (strSetting.Equals("audiooutput.ac3transcode"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      if (pControl)
+      {
+        pControl->SetVisible(CAEFactory::IsSettingVisible(strSetting));
+        pControl->SetEnabled(g_guiSettings.GetBool("audiooutput.passthrough") && g_guiSettings.GetBool("audiooutput.ac3passthrough"));
+      }
+    }
+    else if (strSetting.Equals("audiooutput.eac3passthrough")
+      || strSetting.Equals("audiooutput.truehdpassthrough")
+      || strSetting.Equals("audiooutput.dtshdpassthrough"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      if (pControl)
+      {
+        pControl->SetVisible(CAEFactory::IsSettingVisible(strSetting));
+        pControl->SetEnabled(g_guiSettings.GetBool("audiooutput.passthrough"));
+      }
+    }
+
 #ifdef HAVE_LIBVDPAU
     if (strSetting.Equals("videoplayer.vdpauUpscalingLevel"))
     {
@@ -851,30 +902,6 @@ void CGUIWindowSettingsCategory::UpdateSettings()
     { // only visible if we are doing FLAC ripping
       CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
       if (pControl) pControl->SetEnabled(g_guiSettings.GetInt("audiocds.encoder") == CDDARIP_ENCODER_FLAC);
-    }
-    else if (
-             strSetting.Equals("audiooutput.passthroughdevice") ||
-             strSetting.Equals("audiooutput.ac3passthrough") ||
-             strSetting.Equals("audiooutput.eac3passthrough") ||
-             strSetting.Equals("audiooutput.dtspassthrough") ||
-             strSetting.Equals("audiooutput.passthroughaac"))
-    { // only visible if we are in digital mode
-      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
-      if (pControl) pControl->SetEnabled(AUDIO_IS_BITSTREAM(g_guiSettings.GetInt("audiooutput.mode")));
-    }
-    else if (
-             strSetting.Equals("audiooutput.multichannellpcm" ) ||
-             strSetting.Equals("audiooutput.truehdpassthrough") ||
-             strSetting.Equals("audiooutput.dtshdpassthrough" ))
-    {
-      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
-      if (pControl)
-      {
-        if (strSetting.Equals("audiooutput.dtshdpassthrough") && !g_guiSettings.GetBool("audiooutput.dtspassthrough"))
-          pControl->SetEnabled(false);
-        else
-          pControl->SetEnabled(g_guiSettings.GetInt("audiooutput.mode") == AUDIO_HDMI);
-      }
     }
     else if (strSetting.Equals("musicplayer.crossfadealbumtracks"))
     {
@@ -1335,7 +1362,7 @@ void CGUIWindowSettingsCategory::OnSettingChanged(BaseSettingControlPtr pSetting
     CSettingAddon *pSettingAddon = (CSettingAddon*)pSettingControl->GetSetting();
     if (pSettingAddon->m_type == ADDON_SKIN)
     {
-      g_application.ReloadSkin();
+      g_application.ReloadSkin(true);
     }
     else if (pSettingAddon->m_type == ADDON_SCRIPT_WEATHER)
     {
@@ -1491,6 +1518,8 @@ void CGUIWindowSettingsCategory::OnSettingChanged(BaseSettingControlPtr pSetting
       CLibrefmScrobbler::GetInstance()->Term();
     }
   }
+  else if (strSetting.Equals("videoplayer.seekdelay") || strSetting.Equals("musicplayer.seekdelay"))
+    CSeekHandler::GetInstance().Configure();
   else if (strSetting.Left(22).Equals("MusicPlayer.ReplayGain"))
   { // Update our replaygain settings
     g_guiSettings.m_replayGain.iType = g_guiSettings.GetInt("musicplayer.replaygaintype");
@@ -1703,8 +1732,10 @@ void CGUIWindowSettingsCategory::OnSettingChanged(BaseSettingControlPtr pSetting
   else if (strSetting.Equals("videoscreen.screen"))
   {
     DisplayMode mode = g_guiSettings.GetInt("videoscreen.screen");
+    // get desktop resolution for screen
+    RESOLUTION newRes = g_guiSettings.GetResolutionForScreen();
     // Cascade
-    FillInResolutions("videoscreen.resolution", mode, RES_DESKTOP, true);
+    FillInResolutions("videoscreen.resolution", mode, newRes, true);
   }
   else if (strSetting.Equals("videoscreen.resolution"))
   {
@@ -2220,24 +2251,13 @@ void CGUIWindowSettingsCategory::OnSettingChanged(BaseSettingControlPtr pSetting
     if (strSetting.Equals("audiooutput.audiodevice"))
     {
       CGUISpinControlEx *pControl = (CGUISpinControlEx *)GetControl(pSettingControl->GetID());
-#if defined(TARGET_DARWIN)
-      // save the sinkname - since we don't have sinks on osx
-      // we need to get the fitting sinkname for the device label from the
-      // factory
-      std::string label2sink = pControl->GetCurrentLabel();
-      CAEFactory::VerifyOutputDevice(label2sink, false);
-      g_guiSettings.SetString("audiooutput.audiodevice", label2sink.c_str());
-#else
       g_guiSettings.SetString("audiooutput.audiodevice", m_AnalogAudioSinkMap[pControl->GetCurrentLabel()]);
-#endif
     }
-#if !defined(TARGET_DARWIN)
     else if (strSetting.Equals("audiooutput.passthroughdevice"))
     {
       CGUISpinControlEx *pControl = (CGUISpinControlEx *)GetControl(pSettingControl->GetID());
       g_guiSettings.SetString("audiooutput.passthroughdevice", m_DigitalAudioSinkMap[pControl->GetCurrentLabel()]);
     }
-#endif
     else if (strSetting.Equals("audiooutput.guisoundmode"))
     {
       CAEFactory::SetSoundMode(g_guiSettings.GetInt("audiooutput.guisoundmode"));
@@ -2751,6 +2771,8 @@ void CGUIWindowSettingsCategory::FillInCharSets(CSetting *pSetting)
 DisplayMode CGUIWindowSettingsCategory::FillInScreens(CStdString strSetting, RESOLUTION res)
 {
   DisplayMode mode;
+  if (res == RES_WINDOW && !g_Windowing.CanDoWindowed())
+    res = RES_DESKTOP;
   if (res == RES_WINDOW)
     mode = DM_WINDOWED;
   else
@@ -2766,14 +2788,29 @@ DisplayMode CGUIWindowSettingsCategory::FillInScreens(CStdString strSetting, RES
     pControl->Clear();
 
     CStdString strScreen;
-    if (g_advancedSettings.m_canWindowed)
-      pControl->AddLabel(g_localizeStrings.Get(242), -1);
+    if (g_advancedSettings.m_canWindowed && g_Windowing.CanDoWindowed())
+      pControl->AddLabel(g_localizeStrings.Get(242), DM_WINDOWED);
+
+#if defined(HAS_GLX)
+    pControl->AddLabel(g_localizeStrings.Get(244), 0);
+#else
 
     for (int idx = 0; idx < g_Windowing.GetNumScreens(); idx++)
     {
-      strScreen.Format(g_localizeStrings.Get(241), g_settings.m_ResInfo[RES_DESKTOP + idx].iScreen + 1);
-      pControl->AddLabel(strScreen, g_settings.m_ResInfo[RES_DESKTOP + idx].iScreen);
+      int screen = g_settings.m_ResInfo[RES_DESKTOP + idx].iScreen;
+#if defined(TARGET_DARWIN_OSX)
+      if (!g_settings.m_ResInfo[RES_DESKTOP + idx].strOutput.empty())
+        pControl->AddLabel(g_settings.m_ResInfo[RES_DESKTOP + idx].strOutput, screen);
+      else
+#endif
+      {
+        strScreen.Format(g_localizeStrings.Get(241), screen + 1);
+        pControl->AddLabel(strScreen, screen);
+      }
     }
+
+#endif
+
     pControl->SetValue(mode);
     g_guiSettings.SetInt("videoscreen.screen", mode);
   }
@@ -2798,46 +2835,30 @@ void CGUIWindowSettingsCategory::FillInResolutions(CStdString strSetting, Displa
   }
   else
   {
-    vector<RESOLUTION_WHR> resolutions = g_Windowing.ScreenResolutions(mode);
-
-    for (unsigned int idx = 0; idx < resolutions.size(); idx++)
+    RESOLUTION_INFO info = g_settings.m_ResInfo[res];
+    std::map<RESOLUTION, RESOLUTION_INFO> resolutionInfos;
+    std::vector<RESOLUTION_WHR> resolutions = g_Windowing.ScreenResolutions(info.iScreen, info.fRefreshRate);
+    for (std::vector<RESOLUTION_WHR>::const_iterator resolution = resolutions.begin(); resolution != resolutions.end(); ++resolution)
     {
       CStdString strRes;
-      strRes.Format("%dx%d%s", resolutions[idx].width, resolutions[idx].height,
-        (resolutions[idx].interlaced == D3DPRESENTFLAG_INTERLACED) ? "i" : "p");
-      pControl->AddLabel(strRes, resolutions[idx].ResInfo_Index);
+      strRes.Format("%dx%d%s", resolution->width, resolution->height,
+        CGUISettings::ModeFlagsToString(resolution->flags, false).c_str());
+      pControl->AddLabel(strRes, resolution->ResInfo_Index);
 
-      RESOLUTION_INFO res1 = g_settings.m_ResInfo[res];
-      RESOLUTION_INFO res2 = g_settings.m_ResInfo[resolutions[idx].ResInfo_Index];
-      if (   res1.iScreen == res2.iScreen
-          && res1.iScreenWidth  == res2.iScreenWidth
-          && res1.iScreenHeight == res2.iScreenHeight
-          && (res1.dwFlags & D3DPRESENTFLAG_INTERLACED) == (res2.dwFlags & D3DPRESENTFLAG_INTERLACED))
-        spinres = (RESOLUTION) resolutions[idx].ResInfo_Index;
+      resolutionInfos.insert(std::make_pair((RESOLUTION)resolution->ResInfo_Index, g_settings.m_ResInfo[resolution->ResInfo_Index]));
     }
+
+    spinres = g_guiSettings.FindBestMatchingResolution(resolutionInfos, info.iScreen,
+      info.iScreenWidth, info.iScreenHeight,
+      info.fRefreshRate, info.dwFlags);
   }
 
   if (UserChange)
   {
-    // Auto-select the windowed or desktop resolution of the screen
-    int autoresolution = RES_DESKTOP;
-    if (mode == DM_WINDOWED)
-    {
-      autoresolution = RES_WINDOW;
-    }
-    else
-    {
-      for (int idx=0; idx < g_Windowing.GetNumScreens(); idx++)
-        if (g_settings.m_ResInfo[RES_DESKTOP + idx].iScreen == mode)
-        {
-          autoresolution = RES_DESKTOP + idx;
-          break;
-        }
-    }
-    pControl->SetValue(autoresolution);
+    pControl->SetValue(spinres);
 
     // Cascade
-    FillInRefreshRates("videoscreen.screenmode", (RESOLUTION) autoresolution, true);
+    FillInRefreshRates("videoscreen.screenmode", res, true);
   }
   else
   {
@@ -2868,17 +2889,19 @@ void CGUIWindowSettingsCategory::FillInRefreshRates(CStdString strSetting, RESOL
     pControl = (CGUISpinControlEx *)GetControl(control->GetID());
     pControl->Clear();
 
+    // only add "Windowed" if in windowed mode
     if (res == RES_WINDOW)
     {
       pControl->AddLabel(g_localizeStrings.Get(242), RES_WINDOW);
     }
     else
     {
-      for (unsigned int idx = 0; idx < refreshrates.size(); idx++)
+      bool match = false;
+      for (std::vector<REFRESHRATE>::const_iterator refreshrate = refreshrates.begin(); refreshrate != refreshrates.end(); ++refreshrate)
       {
         CStdString strRR;
-        strRR.Format("%.02f", refreshrates[idx].RefreshRate);
-        pControl->AddLabel(strRR, refreshrates[idx].ResInfo_Index);
+        strRR.Format("%.02f", refreshrate->RefreshRate);
+        pControl->AddLabel(strRR, refreshrate->ResInfo_Index);
       }
     }
   }
@@ -2909,12 +2932,12 @@ void CGUIWindowSettingsCategory::OnRefreshRateChanged(RESOLUTION nextRes)
   RESOLUTION lastRes = g_graphicsContext.GetVideoResolution();
   bool cancelled = false;
 
-  g_guiSettings.SetResolution(nextRes);
+  g_guiSettings.SetCurrentResolution(nextRes, true);
   g_graphicsContext.SetVideoResolution(nextRes);
 
   if (!CGUIDialogYesNo::ShowAndGetInput(13110, 13111, 20022, 20022, -1, -1, cancelled, 10000))
   {
-    g_guiSettings.SetResolution(lastRes);
+    g_guiSettings.SetCurrentResolution(lastRes, true);
     g_graphicsContext.SetVideoResolution(lastRes);
 
     DisplayMode mode = FillInScreens("videoscreen.screen", lastRes);
@@ -3266,7 +3289,6 @@ void CGUIWindowSettingsCategory::FillInAudioDevices(CSetting* pSetting, bool Pas
   int selectedValue = -1;
   AEDeviceList sinkList;
   CAEFactory::EnumerateOutputDevices(sinkList, Passthrough);
-#if !defined(TARGET_DARWIN)
   if (sinkList.size()==0)
   {
     pControl->AddLabel("Error - no devices found", 0);
@@ -3274,7 +3296,6 @@ void CGUIWindowSettingsCategory::FillInAudioDevices(CSetting* pSetting, bool Pas
   }
   else
   {
-#endif
     AEDeviceList::const_iterator iter = sinkList.begin();
     for (int i=0; iter != sinkList.end(); iter++)
     {
@@ -3293,9 +3314,7 @@ void CGUIWindowSettingsCategory::FillInAudioDevices(CSetting* pSetting, bool Pas
       i++;
     }
 
-#if !defined(TARGET_DARWIN)
   }
-#endif
 
   if (selectedValue < 0)
   {
@@ -3398,12 +3417,10 @@ void CGUIWindowSettingsCategory::FillInPlexUpdateChannels(CSetting *pSetting)
   pControl->Clear();
 
   pControl->AddLabel(g_localizeStrings.Get(40003), CMyPlexUserInfo::ROLE_USER);
-#ifdef TARGET_RASPBERRY_PI
-  pControl->AddLabel(g_localizeStrings.Get(40007), CMyPlexUserInfo::ROLE_EMPLOYEE);
-  pControl->AddLabel("Beta (unsupported!)", CMyPlexUserInfo::ROLE_NINJA);
-#else
   pControl->AddLabel(g_localizeStrings.Get(40007), CMyPlexUserInfo::ROLE_PLEXPASS);
-#endif
+
+  if (g_advancedSettings.m_bEnableBetaChannel)
+    pControl->AddLabel(g_localizeStrings.Get(40008), CMyPlexUserInfo::ROLE_NINJA);
 
   if (pControl->GetMaximum() < 1)
     /* only one choice */

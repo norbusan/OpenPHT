@@ -18,9 +18,14 @@
 *
 */
 
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
+#include <math.h>
+
 #include "utils/log.h"
 #include "Windowsx.h"
-#include "windowing/WinEvents.h"
+#include "WinEventsWin32.h"
 #include "WIN32Util.h"
 #include "storage/windows/Win32StorageProvider.h"
 #include "Application.h"
@@ -36,20 +41,26 @@
 #include "guilib/GUIControl.h"       // for EVENT_RESULT
 #include "powermanagement/windows/Win32PowerSyscall.h"
 #include "Shlobj.h"
-#include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
 #include "peripherals/Peripherals.h"
 #include "utils/JobManager.h"
 #include "network/Zeroconf.h"
 #include "network/ZeroconfBrowser.h"
+#include "GUIUserMessages.h"
+#include "Util.h"
 
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 
 using namespace PERIPHERALS;
 
 HWND g_hWnd = NULL;
 
-#define XBMC_arraysize(array)	(sizeof(array)/sizeof(array[0]))
+#ifndef LODWORD
+#define LODWORD(longval) ((DWORD)((DWORDLONG)(longval)))
+#endif
+
+#define ROTATE_ANGLE_DEGREE(arg) GID_ROTATE_ANGLE_FROM_ARGUMENT(LODWORD(arg)) * 180 / M_PI
 
 /* Masks for processing the windows KEYDOWN and KEYUP messages */
 #define REPEATED_KEYMASK  (1<<30)
@@ -64,7 +75,7 @@ uint32_t g_uQueryCancelAutoPlay = 0;
 
 int XBMC_TranslateUNICODE = 1;
 
-PHANDLE_EVENT_FUNC CWinEventsBase::m_pEventFunc = NULL;
+PHANDLE_EVENT_FUNC CWinEventsWin32::m_pEventFunc = NULL;
 int CWinEventsWin32::m_lastGesturePosX = 0;
 int CWinEventsWin32::m_lastGesturePosY = 0;
 
@@ -82,7 +93,7 @@ void DIB_InitOSKeymap()
   LoadKeyboardLayout(current_layout, KLF_ACTIVATE);
 
   /* Map the VK keysyms */
-  for (int i = 0; i < XBMC_arraysize(VK_keymap); ++i)
+  for (int i = 0; i < ARRAY_SIZE(VK_keymap); ++i)
     VK_keymap[i] = XBMCK_UNKNOWN;
 
   VK_keymap[VK_BACK] = XBMCK_BACKSPACE;
@@ -320,7 +331,7 @@ static XBMC_keysym *TranslateKey(WPARAM vkey, UINT scancode, XBMC_keysym *keysym
     {
       keysym->unicode = vkey - VK_NUMPAD0 + '0';
     }
-    else if (ToUnicode((UINT)vkey, scancode, keystate, (LPWSTR)wchars, sizeof(wchars)/sizeof(wchars[0]), 0) > 0)
+    else if (ToUnicode((UINT)vkey, scancode, keystate, (LPWSTR)wchars, ARRAY_SIZE(wchars), 0) > 0)
     {
       keysym->unicode = wchars[0];
     }
@@ -355,6 +366,16 @@ static XBMC_keysym *TranslateKey(WPARAM vkey, UINT scancode, XBMC_keysym *keysym
   return(keysym);
 }
 
+void CWinEventsWin32::MessagePush(XBMC_Event *newEvent)
+{
+  // m_pEventFunc should be set because MessagePush is only executed by
+  // methods called from WndProc()
+  if (m_pEventFunc == NULL)
+    return;
+
+  m_pEventFunc(*newEvent);
+}
+
 bool CWinEventsWin32::MessagePump()
 {
   MSG  msg;
@@ -364,6 +385,12 @@ bool CWinEventsWin32::MessagePump()
     DispatchMessage( &msg );
   }
   return true;
+}
+
+size_t CWinEventsWin32::GetQueueSize()
+{
+  MSG  msg;
+  return PeekMessage( &msg, NULL, 0U, 0U, PM_NOREMOVE );
 }
 
 LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -413,11 +440,11 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
       break;
     case WM_SHOWWINDOW:
       {
-        bool active = g_application.m_AppActive;
-        g_application.m_AppActive = wParam != 0;
-        if (g_application.m_AppActive != active)
-          g_Windowing.NotifyAppActiveChange(g_application.m_AppActive);
-        CLog::Log(LOGDEBUG, __FUNCTION__"Window is %s", g_application.m_AppActive ? "shown" : "hidden");
+        bool active = g_application.GetRenderGUI();
+        g_application.SetRenderGUI(wParam != 0);
+        if (g_application.GetRenderGUI() != active)
+          g_Windowing.NotifyAppActiveChange(g_application.GetRenderGUI());
+        CLog::Log(LOGDEBUG, __FUNCTION__"Window is %s", g_application.GetRenderGUI() ? "shown" : "hidden");
       }
       break;
     case WM_ACTIVATE:
@@ -425,10 +452,10 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
         if( WA_INACTIVE != wParam )
           g_Joystick.Reinitialize();
 
-        bool active = g_application.m_AppActive;
+        bool active = g_application.GetRenderGUI();
         if (HIWORD(wParam))
         {
-          g_application.m_AppActive = false;
+          g_application.SetRenderGUI(false);
         }
         else
         {
@@ -437,16 +464,16 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
           if (LOWORD(wParam) != WA_INACTIVE)
           {
             if (GetWindowPlacement(hWnd, &lpwndpl))
-              g_application.m_AppActive = lpwndpl.showCmd != SW_HIDE;
+              g_application.SetRenderGUI(lpwndpl.showCmd != SW_HIDE);
           }
           else
           {
-            g_application.m_AppActive = g_Windowing.WindowedMode();
+            g_application.SetRenderGUI(g_Windowing.WindowedMode());
           }
         }
-        if (g_application.m_AppActive != active)
-          g_Windowing.NotifyAppActiveChange(g_application.m_AppActive);
-        CLog::Log(LOGDEBUG, __FUNCTION__"Window is %s", g_application.m_AppActive ? "active" : "inactive");
+        if (g_application.GetRenderGUI() != active)
+          g_Windowing.NotifyAppActiveChange(g_application.GetRenderGUI());
+        CLog::Log(LOGDEBUG, __FUNCTION__"Window is %s", g_application.GetRenderGUI() ? "active" : "inactive");
       }
       break;
     case WM_SETFOCUS:
@@ -466,7 +493,7 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
       switch( wParam&0xFFF0 )
       {
         case SC_MONITORPOWER:
-          if (g_application.IsPlaying() || g_application.IsPaused())
+          if (g_application.m_pPlayer->IsPlaying() || g_application.IsPausedPlayback())
             return 0;
           else if(g_guiSettings.GetInt("powermanagement.displaysoff") == 0)
             return 0;
@@ -648,7 +675,7 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
 
       CLog::Log(LOGDEBUG, __FUNCTION__": window resize event");
 
-      if (!g_Windowing.IsAlteringWindow() && newEvent.resize.w > 0 && newEvent.resize.h > 0)
+      if (g_application.GetRenderGUI() && !g_Windowing.IsAlteringWindow() && newEvent.resize.w > 0 && newEvent.resize.h > 0)
         m_pEventFunc(newEvent);
 
       return(0);
@@ -659,7 +686,7 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
 
       CLog::Log(LOGDEBUG, __FUNCTION__": window move event");
 
-      if (!g_Windowing.IsAlteringWindow())
+      if (g_application.GetRenderGUI() && !g_Windowing.IsAlteringWindow())
         m_pEventFunc(newEvent);
 
       return(0);

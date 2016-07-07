@@ -42,6 +42,7 @@ include_directories(${DirectX_INCLUDE_DIR})
 
 set(system_libs
   yajl
+  pcre
   dwmapi
   winmm
   Mpr
@@ -56,13 +57,12 @@ set(external_libs
   libfribidi
   libiconv
   turbojpeg-static
-  libmicrohttpd.dll
+  libmicrohttpd-dll
   freetype246MT
   sqlite3
   liblzo2
   dnssd
   zlib
-  libsamplerate-0
 )
 
 set(non_link_libs
@@ -80,7 +80,7 @@ foreach(lib ${external_libs})
 endforeach()
 
 foreach(lib ${non_link_libs})
-  plex_find_library(${lib} 0 1 ${dependdir}/lib 0)
+  plex_find_library(${lib} 0 1 ${dependdir}/lib 2)
 endforeach()
 
 foreach(lib ${system_libs})

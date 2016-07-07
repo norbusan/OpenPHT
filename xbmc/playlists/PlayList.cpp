@@ -462,13 +462,13 @@ bool CPlayList::Expand(int position)
 {
   CFileItemPtr item = m_vecItems[position];
 #ifndef __PLEX__
-  std::auto_ptr<CPlayList> playlist (CPlayListFactory::Create(*item.get()));
+  std::unique_ptr<CPlayList> playlist(CPlayListFactory::Create(*item.get()));
 #else
-  std::auto_ptr<CPlayList> playlist;
+  std::unique_ptr<CPlayList> playlist;
 
   try
   {
-    playlist = std::auto_ptr<CPlayList>(CPlayListFactory::Create(*item.get()));
+    playlist = std::unique_ptr<CPlayList>(CPlayListFactory::Create(*item.get()));
   }
   catch (CRedirectException* ex)
   {

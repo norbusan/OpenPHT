@@ -20,11 +20,14 @@
  *
  */
 
-#include "cores/AudioEngine/AEAudioFormat.h"
-#include "DllAvCodec.h"
-#include "DllAvFormat.h"
-#include "DllAvUtil.h"
-#include "DllSwResample.h"
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
+
+extern "C" {
+#include "libavcodec/avcodec.h"
+#include "libavformat/avformat.h"
+#include "libavutil/avutil.h"
+#include "libswresample/swresample.h"
+}
 
 #include "DVDStreamInfo.h"
 #include "linux/PlatformDefs.h"
@@ -60,8 +63,6 @@ protected:
   int   m_iBufferOutputUsed;
   int   m_iBufferOutputAlloced;
 
-  bool m_bOpenedCodec;
-
   int     m_channels;
   CAEChannelInfo m_channelLayout;
   bool m_bFirstFrame;
@@ -69,7 +70,4 @@ protected:
   bool m_bNoConcatenate;
   unsigned int  m_frameSize;
   double m_dts, m_pts;
-  DllAvCodec m_dllAvCodec;
-  DllAvUtil m_dllAvUtil;
-  DllSwResample m_dllSwResample;
 };

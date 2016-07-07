@@ -21,12 +21,14 @@
  */
 
 #include "DVDDemux.h"
-#include "DllAvFormat.h"
-#include "DllAvCodec.h"
-#include "DllAvUtil.h"
-
 #include "threads/CriticalSection.h"
 #include "threads/SystemClock.h"
+#include <map>
+#include <vector>
+
+extern "C" {
+#include "libavformat/avformat.h"
+}
 
 class CDVDDemuxFFmpeg;
 class CURL;
@@ -78,8 +80,9 @@ public:
 
 };
 
-#define FFMPEG_FILE_BUFFER_SIZE   32768 // default reading size for ffmpeg
 #define FFMPEG_DVDNAV_BUFFER_SIZE 2048  // for dvd's
+
+struct StereoModeConversionMap;
 
 class CDVDDemuxFFmpeg : public CDVDDemux
 {
@@ -87,7 +90,7 @@ public:
   CDVDDemuxFFmpeg();
   virtual ~CDVDDemuxFFmpeg();
 
-  bool Open(CDVDInputStream* pInput);
+  bool Open(CDVDInputStream* pInput, bool streaminfo = true, bool fileinfo = false);
   void Dispose();
   void Reset();
   void Flush();
@@ -106,18 +109,16 @@ public:
   bool SeekChapter(int chapter, double* startpts = NULL);
   int GetChapterCount();
   int GetChapter();
-  void GetChapterName(std::string& strChapterName);
-  virtual void GetStreamCodecName(int iStreamId, CStdString &strName);
+  void GetChapterName(std::string& strChapterName, int chapterIdx=-1);
+  int64_t GetChapterPos(int chapterIdx=-1);
+  virtual void GetStreamCodecName(int iStreamId, std::string &strName);
+  virtual void GetIcyMetadataHeaders(std::string &strMetadata);
+  virtual void GetIcyMetadataPacket(std::string &strMetadata);
 
   bool Aborted();
 
   AVFormatContext* m_pFormatContext;
   CDVDInputStream* m_pInput;
-
-  /* PLEX */
-  int GetStreamBitrate();
-  static CStdString GetErrorString(int error);
-  /* END PLEX */
 
 protected:
   friend class CDemuxStreamAudioFFmpeg;
@@ -125,28 +126,50 @@ protected:
   friend class CDemuxStreamSubtitleFFmpeg;
 
   int ReadFrame(AVPacket *packet);
-  void AddStream(int iId);
+  CDemuxStream* AddStream(int iId);
+  void AddStream(int iId, CDemuxStream* stream);
+  CDemuxStream* GetStreamInternal(int iStreamId);
+  void CreateStreams(unsigned int program = UINT_MAX);
+  void DisposeStreams();
+  void ParsePacket(AVPacket *pkt);
+  bool IsVideoReady();
+  void ResetVideoStreams();
 
   AVDictionary *GetFFMpegOptionsFromURL(const CURL &url);
   double ConvertTimestamp(int64_t pts, int den, int num);
   void UpdateCurrentPTS();
+  bool IsProgramChange();
+
+  std::string GetStereoModeFromMetadata(AVDictionary *pMetadata);
+  std::string ConvertCodecToInternalStereoMode(const std::string &mode, const StereoModeConversionMap *conversionMap);
+
+  void GetL16Parameters(int &channels, int &samplerate);
+  double SelectAspect(AVStream* st, bool& forced);
 
   CCriticalSection m_critSection;
-  #define MAX_STREAMS 100
-  CDemuxStream* m_streams[MAX_STREAMS]; // maximum number of streams that ffmpeg can handle
+  std::map<int, CDemuxStream*> m_streams;
+  std::vector<std::map<int, CDemuxStream*>::iterator> m_stream_index;
 
   AVIOContext* m_ioContext;
 
-  DllAvFormat m_dllAvFormat;
-  DllAvCodec  m_dllAvCodec;
-  DllAvUtil   m_dllAvUtil;
-
-  double   m_iCurrentPts; // used for stream length estimation
+  double   m_currentPts; // used for stream length estimation
   bool     m_bMatroska;
   bool     m_bAVI;
   int      m_speed;
   unsigned m_program;
   XbmcThreads::EndTime  m_timeout;
+
+  // Due to limitations of ffmpeg, we only can detect a program change
+  // with a packet. This struct saves the packet for the next read and
+  // signals STREAMCHANGE to player
+  struct
+  {
+    AVPacket pkt;       // packet ffmpeg returned
+    int      result;    // result from av_read_packet
+  }m_pkt;
+
+  bool m_streaminfo;
+  bool m_checkvideo;
 
   /* PLEX */
   bool m_bPlexTranscode;

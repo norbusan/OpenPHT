@@ -33,9 +33,10 @@ public:
   // Required overrides
   virtual bool Open(CDVDStreamInfo &hints, CDVDCodecOptions &options);
   virtual void Dispose(void);
-  virtual int  Decode(BYTE *pData, int iSize, double dts, double pts);
+  virtual int  Decode(uint8_t *pData, int iSize, double dts, double pts);
   virtual void Reset(void);
   virtual bool GetPicture(DVDVideoPicture *pDvdVideoPicture);
+  virtual bool ClearPicture(DVDVideoPicture* pDvdVideoPicture);
   virtual void SetDropState(bool bDrop);
   virtual const char* GetName(void) { return (const char*)m_pFormatName; }
   
@@ -46,8 +47,8 @@ protected:
 
   // bitstream to bytestream (Annex B) conversion support.
   bool bitstream_convert_init(void *in_extradata, int in_extrasize);
-  bool bitstream_convert(BYTE* pData, int iSize, uint8_t **poutbuf, int *poutbuf_size);
-  void bitstream_alloc_and_copy( uint8_t **poutbuf, int *poutbuf_size,
+  bool bitstream_convert(uint8_t* pData, int iSize, uint8_t **poutbuf, int *poutbuf_size);
+  static void bitstream_alloc_and_copy( uint8_t **poutbuf, int *poutbuf_size,
     const uint8_t *sps_pps, uint32_t sps_pps_size, const uint8_t *in, uint32_t in_size);
 
   typedef struct omx_bitstream_ctx {
@@ -55,6 +56,15 @@ protected:
       uint8_t  first_idr;
       uint8_t *sps_pps_data;
       uint32_t size;
+
+      omx_bitstream_ctx()
+      {
+        length_size = 0;
+        first_idr = 0;
+        sps_pps_data = NULL;
+        size = 0;
+      }
+
   } omx_bitstream_ctx;
 
   uint32_t          m_sps_pps_size;

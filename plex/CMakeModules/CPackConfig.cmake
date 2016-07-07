@@ -38,9 +38,7 @@ set(CPACK_RESOURCE_FILE_LICENSE ${root}/LICENSE.GPL)
 set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
 
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-  "IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2012_x86.exe\\\" 0 +2
-   ExecWait \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2012_x86.exe /q /norestart\\\"
-   IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2013_x86.exe\\\" 0 +2
+  "IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2013_x86.exe\\\" 0 +2
    ExecWait \\\"$INSTDIR\\\\Dependencies\\\\vcredist_2013_x86.exe /q /norestart\\\"
    IfFileExists \\\"$INSTDIR\\\\Dependencies\\\\dxsetup\\\\dxsetup.exe\\\" 0 +2
    ExecWait \\\"$INSTDIR\\\\Dependencies\\\\dxsetup\\\\dxsetup.exe /silent\\\"

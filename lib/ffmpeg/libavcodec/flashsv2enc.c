@@ -48,6 +48,7 @@
 
 #include "libavutil/imgutils.h"
 #include "avcodec.h"
+#include "internal.h"
 #include "put_bits.h"
 #include "bytestream.h"
 
@@ -86,10 +87,12 @@ typedef struct FlashSV2Context {
     AVCodecContext *avctx;
     uint8_t *current_frame;
     uint8_t *key_frame;
-    AVFrame frame;
     uint8_t *encbuffer;
     uint8_t *keybuffer;
     uint8_t *databuffer;
+
+    uint8_t *blockbuffer;
+    int blockbuffer_size;
 
     Block *frame_blocks;
     Block *key_blocks;
@@ -126,6 +129,7 @@ static av_cold void cleanup(FlashSV2Context * s)
     av_freep(&s->encbuffer);
     av_freep(&s->keybuffer);
     av_freep(&s->databuffer);
+    av_freep(&s->blockbuffer);
     av_freep(&s->current_frame);
     av_freep(&s->key_frame);
 
@@ -188,7 +192,12 @@ static av_cold int flashsv2_encode_init(AVCodecContext * avctx)
 
     if ((avctx->width > 4095) || (avctx->height > 4095)) {
         av_log(avctx, AV_LOG_ERROR,
-               "Input dimensions too large, input must be max 4096x4096 !\n");
+               "Input dimensions too large, input must be max 4095x4095 !\n");
+        return -1;
+    }
+    if ((avctx->width < 16) || (avctx->height < 16)) {
+        av_log(avctx, AV_LOG_ERROR,
+               "Input dimensions too small, input must be at least 16x16 !\n");
         return -1;
     }
 
@@ -204,6 +213,11 @@ static av_cold int flashsv2_encode_init(AVCodecContext * avctx)
     s->block_width  = (s->image_width /  12) & ~15;
     s->block_height = (s->image_height / 12) & ~15;
 
+    if(!s->block_width)
+        s->block_width = 1;
+    if(!s->block_height)
+        s->block_height = 1;
+
     s->rows = (s->image_height + s->block_height - 1) / s->block_height;
     s->cols = (s->image_width +  s->block_width -  1) / s->block_width;
 
@@ -217,6 +231,9 @@ static av_cold int flashsv2_encode_init(AVCodecContext * avctx)
     s->key_frame     = av_mallocz(s->frame_size);
     s->frame_blocks  = av_mallocz(s->blocks_size);
     s->key_blocks    = av_mallocz(s->blocks_size);
+
+    s->blockbuffer      = NULL;
+    s->blockbuffer_size = 0;
 
     init_blocks(s, s->frame_blocks, s->encbuffer, s->databuffer);
     init_blocks(s, s->key_blocks,   s->keybuffer, 0);
@@ -251,7 +268,7 @@ static int new_key_frame(FlashSV2Context * s)
         s->key_blocks[i].sl_end   = 0;
         s->key_blocks[i].data     = 0;
     }
-    FFSWAP(uint8_t * , s->keybuffer, s->encbuffer);
+    memcpy(s->keybuffer, s->encbuffer, s->frame_size);
 
     return 0;
 }
@@ -531,13 +548,14 @@ static int encode_15_7(Palette * palette, Block * b, const uint8_t * src,
     return b->enc_size;
 }
 
-static int encode_block(Palette * palette, Block * b, Block * prev,
-                        const uint8_t * src, int stride, int comp, int dist,
-                        int keyframe)
+static int encode_block(FlashSV2Context *s, Palette * palette, Block * b,
+                        Block * prev, const uint8_t * src, int stride, int comp,
+                        int dist, int keyframe)
 {
     unsigned buf_size = b->width * b->height * 6;
-    uint8_t buf[buf_size];
+    uint8_t *buf = s->blockbuffer;
     int res;
+
     if (b->flags & COLORSPACE_15_7) {
         encode_15_7(palette, b, src, stride, dist);
     } else {
@@ -615,21 +633,20 @@ static int encode_all_blocks(FlashSV2Context * s, int keyframe)
         for (col = 0; col < s->cols; col++) {
             b = s->frame_blocks + (row * s->cols + col);
             prev = s->key_blocks + (row * s->cols + col);
+            b->flags = s->use15_7 ? COLORSPACE_15_7 : 0;
             if (keyframe) {
                 b->start = 0;
                 b->len = b->height;
-                b->flags = s->use15_7 ? COLORSPACE_15_7 : 0;
             } else if (!b->dirty) {
                 b->start = 0;
                 b->len = 0;
                 b->data_size = 0;
-                b->flags = s->use15_7 ? COLORSPACE_15_7 : 0;
                 continue;
-            } else {
-                b->flags = s->use15_7 ? COLORSPACE_15_7 | HAS_DIFF_BLOCKS : HAS_DIFF_BLOCKS;
+            } else if (b->start != 0 || b->len != b->height) {
+                b->flags |= HAS_DIFF_BLOCKS;
             }
             data = s->current_frame + s->image_width * 3 * s->block_height * row + s->block_width * col * 3;
-            res = encode_block(&s->palette, b, prev, data, s->image_width * 3, s->comp, s->dist, keyframe);
+            res = encode_block(s, &s->palette, b, prev, data, s->image_width * 3, s->comp, s->dist, keyframe);
 #ifndef FLASHSV2_DUMB
             if (b->dirty)
                 s->diff_blocks++;
@@ -715,7 +732,11 @@ static void recommend_keyframe(FlashSV2Context * s, int *keyframe)
 #endif
 }
 
+#ifndef FLASHSV2_DUMB
 static const double block_size_fraction = 1.0 / 300;
+static const double use15_7_threshold = 8192;
+static const double color15_7_factor = 100;
+#endif
 static int optimum_block_width(FlashSV2Context * s)
 {
 #ifndef FLASHSV2_DUMB
@@ -740,8 +761,6 @@ static int optimum_block_height(FlashSV2Context * s)
 #endif
 }
 
-static const double use15_7_threshold = 8192;
-
 static int optimum_use15_7(FlashSV2Context * s)
 {
 #ifndef FLASHSV2_DUMB
@@ -756,8 +775,6 @@ static int optimum_use15_7(FlashSV2Context * s)
     return s->avctx->global_quality == 0;
 #endif
 }
-
-static const double color15_7_factor = 100;
 
 static int optimum_dist(FlashSV2Context * s)
 {
@@ -779,16 +796,18 @@ static int reconfigure_at_keyframe(FlashSV2Context * s, const uint8_t * image,
 {
     int update_palette = 0;
     int res;
-    s->block_width = optimum_block_width(s);
-    s->block_height = optimum_block_height(s);
+    int block_width  = optimum_block_width (s);
+    int block_height = optimum_block_height(s);
 
-    s->rows = (s->image_height + s->block_height - 1) / s->block_height;
-    s->cols = (s->image_width +  s->block_width -  1) / s->block_width;
+    s->rows = (s->image_height + block_height - 1) / block_height;
+    s->cols = (s->image_width  + block_width  - 1) / block_width;
 
-    if (s->rows * s->cols != s->blocks_size / sizeof(Block)) {
+    if (block_width != s->block_width || block_height != s->block_height) {
+        s->block_width  = block_width;
+        s->block_height = block_height;
         if (s->rows * s->cols > s->blocks_size / sizeof(Block)) {
-            s->frame_blocks = av_realloc(s->frame_blocks, s->rows * s->cols * sizeof(Block));
-            s->key_blocks = av_realloc(s->key_blocks, s->cols * s->rows * sizeof(Block));
+            s->frame_blocks = av_realloc_array(s->frame_blocks, s->rows, s->cols * sizeof(Block));
+            s->key_blocks = av_realloc_array(s->key_blocks, s->cols, s->rows * sizeof(Block));
             if (!s->frame_blocks || !s->key_blocks) {
                 av_log(s->avctx, AV_LOG_ERROR, "Memory allocation failed.\n");
                 return -1;
@@ -798,6 +817,11 @@ static int reconfigure_at_keyframe(FlashSV2Context * s, const uint8_t * image,
         init_blocks(s, s->frame_blocks, s->encbuffer, s->databuffer);
         init_blocks(s, s->key_blocks, s->keybuffer, 0);
 
+        av_fast_malloc(&s->blockbuffer, &s->blockbuffer_size, block_width * block_height * 6);
+        if (!s->blockbuffer) {
+            av_log(s->avctx, AV_LOG_ERROR, "Could not allocate block buffer.\n");
+            return AVERROR(ENOMEM);
+        }
     }
 
     s->use15_7 = optimum_use15_7(s);
@@ -823,16 +847,15 @@ static int reconfigure_at_keyframe(FlashSV2Context * s, const uint8_t * image,
     return 0;
 }
 
-static int flashsv2_encode_frame(AVCodecContext * avctx, uint8_t * buf,
-                                 int buf_size, void *data)
+static int flashsv2_encode_frame(AVCodecContext *avctx, AVPacket *pkt,
+                                 const AVFrame *p, int *got_packet)
 {
     FlashSV2Context *const s = avctx->priv_data;
-    AVFrame *pict = data;
-    AVFrame *const p = &s->frame;
     int res;
     int keyframe = 0;
 
-    *p = *pict;
+    if ((res = ff_alloc_packet2(avctx, pkt, s->frame_size + AV_INPUT_BUFFER_MIN_SIZE, 0)) < 0)
+        return res;
 
     /* First frame needs to be a keyframe */
     if (avctx->frame_number == 0)
@@ -842,12 +865,6 @@ static int flashsv2_encode_frame(AVCodecContext * avctx, uint8_t * buf,
     if (avctx->gop_size > 0) {
         if (avctx->frame_number >= s->last_key_frame + avctx->gop_size)
             keyframe = 1;
-    }
-
-    if (buf_size < s->frame_size) {
-        //Conservative upper bound check for compressed data
-        av_log(avctx, AV_LOG_ERROR, "buf_size %d <  %d\n", buf_size, s->frame_size);
-        return -1;
     }
 
     if (!keyframe
@@ -866,22 +883,19 @@ static int flashsv2_encode_frame(AVCodecContext * avctx, uint8_t * buf,
     if (s->use15_7)
         s->dist = optimum_dist(s);
 
-    res = write_bitstream(s, p->data[0], p->linesize[0], buf, buf_size, keyframe);
+    res = write_bitstream(s, p->data[0], p->linesize[0], pkt->data, pkt->size, keyframe);
 
     if (keyframe) {
         new_key_frame(s);
-        p->pict_type = AV_PICTURE_TYPE_I;
-        p->key_frame = 1;
         s->last_key_frame = avctx->frame_number;
+        pkt->flags |= AV_PKT_FLAG_KEY;
         av_log(avctx, AV_LOG_DEBUG, "Inserting key frame at frame %d\n", avctx->frame_number);
-    } else {
-        p->pict_type = AV_PICTURE_TYPE_P;
-        p->key_frame = 0;
     }
 
-    avctx->coded_frame = p;
+    pkt->size = res;
+    *got_packet = 1;
 
-    return res;
+    return 0;
 }
 
 static av_cold int flashsv2_encode_end(AVCodecContext * avctx)
@@ -895,13 +909,12 @@ static av_cold int flashsv2_encode_end(AVCodecContext * avctx)
 
 AVCodec ff_flashsv2_encoder = {
     .name           = "flashsv2",
+    .long_name      = NULL_IF_CONFIG_SMALL("Flash Screen Video Version 2"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_FLASHSV2,
+    .id             = AV_CODEC_ID_FLASHSV2,
     .priv_data_size = sizeof(FlashSV2Context),
     .init           = flashsv2_encode_init,
-    .encode         = flashsv2_encode_frame,
+    .encode2        = flashsv2_encode_frame,
     .close          = flashsv2_encode_end,
-    .pix_fmts = (enum PixelFormat[]) {PIX_FMT_BGR24, PIX_FMT_NONE},
-    .long_name = NULL_IF_CONFIG_SMALL("Flash Screen Video Version 2"),
-    .capabilities   =  CODEC_CAP_EXPERIMENTAL,
+    .pix_fmts       = (const enum AVPixelFormat[]){ AV_PIX_FMT_BGR24, AV_PIX_FMT_NONE },
 };

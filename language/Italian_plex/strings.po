@@ -268,7 +268,7 @@ msgstr "Plex/HT necessita di essere riavviato per cambiare"
 
 msgctxt "#15150"
 msgid "Use library artwork backgrounds"
-msgstr ""
+msgstr "Utilizza libreria artwork come sfondo"
 
 
 #empty strings from id 15151 to 15204
@@ -360,12 +360,12 @@ msgstr "Abilita allarme riserva batteria"
 
 msgctxt "#18101"
 msgid "Theme music volume"
-msgstr ""
+msgstr "Volume musica dei temi"
 
 
 msgctxt "#18102"
 msgid "Enable TV theme music"
-msgstr ""
+msgstr "Abilita musica temi TV "
 
 
 msgctxt "#18103"
@@ -415,12 +415,12 @@ msgstr "Video Avanzate"
 
 msgctxt "#18112"
 msgid "Logging"
-msgstr ""
+msgstr "Registrati"
 
 
 msgctxt "#18113"
 msgid "Theme music"
-msgstr ""
+msgstr "Musica Tema"
 
 
 msgctxt "#18114"
@@ -532,7 +532,7 @@ msgstr "Aggiorna canale"
 
 msgctxt "#40003"
 msgid "Stable"
-msgstr ""
+msgstr "Stabile"
 
 
 msgctxt "#40004"
@@ -572,12 +572,12 @@ msgstr "Versione corrente"
 
 msgctxt "#40028"
 msgid "Update Available!"
-msgstr ""
+msgstr "Aggiornamento Disponibile!"
 
 
 msgctxt "#40030"
 msgid "Downloading update %d%%..."
-msgstr ""
+msgstr "Scarico aggiornamento %d%%..."
 
 
 #empty strings from id 40029 to 40099
@@ -927,7 +927,7 @@ msgstr "Password"
 
 msgctxt "#44002"
 msgid "Use PIN"
-msgstr ""
+msgstr "Utilizza PIN"
 
 
 msgctxt "#44003"
@@ -967,7 +967,7 @@ msgstr "Contenuto Condiviso"
 
 msgctxt "#44021"
 msgid "Watch Later"
-msgstr ""
+msgstr "Guarda Dopo"
 
 
 msgctxt "#44022"
@@ -992,12 +992,12 @@ msgstr "Pulisci filtri"
 
 msgctxt "#44100"
 msgid "Sign in to Plex"
-msgstr ""
+msgstr "Loggati a Plex"
 
 
 msgctxt "#44101"
 msgid "From your computer go to http://plex.tv/pin"
-msgstr ""
+msgstr "Dal tuo computer vai a http://plex.tv/pin"
 
 
 msgctxt "#44102"
@@ -1057,7 +1057,7 @@ msgstr ""
 
 msgctxt "#44401"
 msgid "Processing"
-msgstr ""
+msgstr "In Lavorazione"
 
 
 msgctxt "#44402"
@@ -1077,7 +1077,7 @@ msgstr ""
 
 msgctxt "#44405"
 msgid "Progress"
-msgstr ""
+msgstr "Progresso"
 
 
 msgctxt "#44406"
@@ -1194,7 +1194,7 @@ msgstr ""
 
 msgctxt "#52102"
 msgid "Channels"
-msgstr ""
+msgstr "Canali"
 
 
 msgctxt "#52201"

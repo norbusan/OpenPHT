@@ -55,8 +55,8 @@
 		</control>
 	</include>
 	<include name="ListItemTitle1">
-		<posx>95</posx>
-		<width>100</width>
+		<posx>100</posx>
+		<width>116</width>
 		<align>center</align>
 		<aligny>center</aligny>
 		<scroll>false</scroll>
@@ -65,8 +65,8 @@
 		<shadowcolor>FF222222</shadowcolor>
 	</include>
 	<include name="ListItemTitleWide">
-		<posx>133</posx>
-		<width>160</width>
+		<posx>135</posx>
+		<width>186</width>
 		<align>center</align>
 		<aligny>center</aligny>
 		<scroll>false</scroll>
@@ -289,6 +289,13 @@
 			<label>$INFO[ListItem.Artist]</label>
 		</control>
 	</include>
+	<include name="ListItemSquareDate">
+		<control type="label">
+			<posy>190</posy>
+			<include>ListItemTitle1</include>
+			<label>$INFO[ListItem.Date]</label>
+		</control>
+	</include>
 	<include name="ListItemSquareDimmer">
 		<posx>37</posx>
 		<posy>50</posy>
@@ -369,6 +376,14 @@
 			<include>ListItemTitleWide</include>
 			<textcolor>FF999999</textcolor>
 			<label>$INFO[ListItem.Property(Recommender)]$INFO[ListItem.Property(sourceTitle), [COLOR=orange]&#xB7;[/COLOR] ]</label>
+		</control>
+	</include>
+	<include name="ListItemWideDate">
+		<control type="label">
+			<posy>182</posy>
+			<include>ListItemTitleWide</include>
+			<textcolor>FF999999</textcolor>
+			<label>$INFO[ListItem.Date]</label>
 		</control>
 	</include>
 	<include name="ListItemWideDimmer">
@@ -626,11 +641,11 @@
 						<posy>129</posy>
 						<width>860</width>
 						<height>330</height>
-						<itemlayout width="139" height="330">
+						<itemlayout width="139" height="330" condition="!Container(11001).ListItem.Type(clip) | Skin.HasSetting(HomeVideosPortrait)">
 							<!-- movie & episode when both lists are visible -->
 							<control type="group">
 								<posy>-3</posy>
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie)] + Control.IsVisible(11000)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)]] + Control.IsVisible(11000)</visible>
 								<animation effect="fade" start="100" end="50" time="300" condition="ControlGroup(7001).HasFocus">Conditional</animation>
 								<control type="group">
 									<include>ListItemPoster</include>
@@ -646,7 +661,7 @@
 							<!-- movie & episode when only this list is visible -->
 							<control type="group">
 								<posy>100</posy>
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie)] + !Control.IsVisible(11000)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)]] + !Control.IsVisible(11000)</visible>
 								<animation effect="fade" start="100" end="50" time="300" condition="ControlGroup(7001).HasFocus">Conditional</animation>
 								<control type="group">
 									<include>ListItemPoster</include>
@@ -660,20 +675,66 @@
 								</control>
 							</control>
 						</itemlayout>
-						<focusedlayout width="139" height="330">
+						<focusedlayout width="139" height="330" condition="!Container(11001).ListItem.Type(clip) | Skin.HasSetting(HomeVideosPortrait)">
 							<!-- movie & episode when both lists are visible -->
 							<control type="group">
 								<posy>-3</posy>
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie)] + Control.IsVisible(11000)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)]] + Control.IsVisible(11000)</visible>
 								<include>ListItemPoster</include>
 								<include>ListItemPosterSelectedBorder</include>
 							</control>
 							<!-- movie & episode when only this list is visible -->
 							<control type="group">
 								<posy>100</posy>
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie)] + !Control.IsVisible(11000)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)]] + !Control.IsVisible(11000)</visible>
 								<include>ListItemPoster</include>
 								<include>ListItemPosterSelectedBorder</include>
+							</control>
+						</focusedlayout>
+						<itemlayout width="211" height="230" condition="Container(11001).ListItem.Type(clip) + !Skin.HasSetting(HomeVideosPortrait)">
+							<!-- when both lists are visible -->
+							<control type="group">
+								<visible>Control.IsVisible(11000)</visible>
+								<posy>-3</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+								<control type="image">
+									<visible>ControlGroup(7005).HasFocus</visible>
+									<include>ListItemWideDimmer</include>
+								</control>
+							</control>
+							<!-- when only this list is visible -->
+							<control type="group">
+								<visible>!Control.IsVisible(11000)</visible>
+								<posy>100</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+							</control>
+						</itemlayout>
+						<focusedlayout width="211" height="230" condition="Container(11001).ListItem.Type(clip) + !Skin.HasSetting(HomeVideosPortrait)">
+							<!-- when both lists are visible -->
+							<control type="group">
+								<visible>Control.IsVisible(11000)</visible>
+								<posy>-3</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+								<include>ListItemWideSelectedBorder</include>
+							</control>
+							<!-- when only this list is visible -->
+							<control type="group">
+								<visible>!Control.IsVisible(11000)</visible>
+								<posy>100</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+								<include>ListItemWideSelectedBorder</include>
 							</control>
 						</focusedlayout>
 					</control>
@@ -694,7 +755,7 @@
 						<posy>6</posy>
 						<width>860</width>
 						<height>330</height>
-						<itemlayout width="139" height="230">
+						<itemlayout width="139" height="230" condition="!Container(11000).ListItem.Type(clip) | Skin.HasSetting(HomeVideosPortrait)">
 							<!-- album -->
 							<control type="group">
 								<visible>ListItem.Type(album)</visible>
@@ -708,12 +769,13 @@
 								<visible>ListItem.Type(photo)</visible>
 								<include>ListItemSquareCard</include>
 								<include>ListItemSquare</include>
+								<include>ListItemSquareDate</include>
 								<include>ListItemSquareTitle</include>
 							</control>
 							<!-- movie & episode when both lists are visible -->
 							<control type="group">
 								<posy>100</posy>
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | ListItem.Type(season)] + Control.IsVisible(11001)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)] | ListItem.Type(season)] + Control.IsVisible(11001)</visible>
 								<animation effect="fade" start="100" end="50" time="300" condition="ControlGroup(7002).HasFocus">Conditional</animation>
 								<control type="group">
 									<include>ListItemPoster</include>
@@ -733,7 +795,7 @@
 							</control>
 							<!-- movie & episode when only this list is visible -->
 							<control type="group">
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | ListItem.Type(season)] + !Control.IsVisible(11001)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)] | ListItem.Type(season)] + !Control.IsVisible(11001)</visible>
 								<control type="group">
 									<include>ListItemPoster</include>
 								</control>
@@ -751,7 +813,7 @@
 								</control>
 							</control>
 						</itemlayout>
-						<focusedlayout width="139" height="230">
+						<focusedlayout width="139" height="230" condition="!Container(11000).ListItem.Type(clip) | Skin.HasSetting(HomeVideosPortrait)">
 							<animation effect="fade" start="100" end="50" time="300" condition="ControlGroup(7002).HasFocus">Conditional</animation>
 							<!-- album -->
 							<control type="group">
@@ -767,21 +829,68 @@
 								<visible>ListItem.Type(photo)</visible>
 								<include>ListItemSquareCard</include>
 								<include>ListItemSquare</include>
+								<include>ListItemSquareDate</include>
 								<include>ListItemSquareTitle</include>
 								<include>ListItemSquareSelectedBorder</include>
 							</control>
 							<!-- movie & episode when both lists are visible -->
 							<control type="group">
 								<posy>100</posy>
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | ListItem.Type(season)] + Control.IsVisible(11001)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)] | ListItem.Type(season)] + Control.IsVisible(11001)</visible>
 								<include>ListItemPoster</include>
 								<include>ListItemPosterSelectedBorder</include>
 							</control>
 							<!-- tv show episode when  only this list is visible -->
 							<control type="group">
-								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | ListItem.Type(season)] + !Control.IsVisible(11001)</visible>
+								<visible>[ListItem.Type(episode) | ListItem.Type(movie) | [ListItem.Type(clip) + Skin.HasSetting(HomeVideosPortrait)] | ListItem.Type(season)] + !Control.IsVisible(11001)</visible>
 								<include>ListItemPoster</include>
 								<include>ListItemPosterSelectedBorder</include>
+							</control>
+						</focusedlayout>
+						<itemlayout width="211" height="230" condition="Container(11000).ListItem.Type(clip) + !Skin.HasSetting(HomeVideosPortrait)">
+							<!-- when both lists are visible -->
+							<control type="group">
+								<visible>Control.IsVisible(11001)</visible>
+								<posy>100</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+								<control type="image">
+									<visible>ControlGroup(7003).HasFocus</visible>
+									<include>ListItemWideDimmer</include>
+								</control>
+							</control>
+							<!-- when only this list is visible -->
+							<control type="group">
+								<visible>!Control.IsVisible(11001)</visible>
+								<posy>0</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+							</control>
+						</itemlayout>
+						<focusedlayout width="211" height="230" condition="Container(11000).ListItem.Type(clip) + !Skin.HasSetting(HomeVideosPortrait)">
+							<!-- when both lists are visible -->
+							<control type="group">
+								<visible>Control.IsVisible(11001)</visible>
+								<posy>100</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+								<include>ListItemWideSelectedBorder</include>
+							</control>
+							<!-- when only this list is visible -->
+							<control type="group">
+								<visible>!Control.IsVisible(11001)</visible>
+								<posy>0</posy>
+								<include>ListItemWideCard</include>
+								<include>ListItemWide</include>
+								<include>ListItemWideDate</include>
+								<include>ListItemWideTitle</include>
+								<include>ListItemWideSelectedBorder</include>
 							</control>
 						</focusedlayout>
 					</control>
@@ -832,7 +941,7 @@
 							<!-- when only this list is visible -->
 							<control type="group">
 								<visible>!Control.IsVisible(11004)</visible>
-								<posy>103</posy>
+								<posy>102</posy>
 								<visible>ListItem.Type(clip)</visible>
 								<include>ListItemWideCard</include>
 								<include>ListItemWide</include>
@@ -855,7 +964,7 @@
 							<!-- when only this list is visible -->
 							<control type="group">
 								<visible>!Control.IsVisible(11004)</visible>
-								<posy>108</posy>
+								<posy>102</posy>
 								<visible>ListItem.Type(clip)</visible>
 								<include>ListItemWideCard</include>
 								<include>ListItemWide</include>

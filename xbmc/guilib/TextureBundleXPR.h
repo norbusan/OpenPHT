@@ -20,9 +20,10 @@
  *
  */
 
+#include <map>
 #include "utils/StdString.h"
 #include <stdint.h>
-#include <map>
+#include <vector>
 
 class CAutoTexBuffer;
 class CBaseTexture;

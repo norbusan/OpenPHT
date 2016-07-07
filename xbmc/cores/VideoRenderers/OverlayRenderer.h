@@ -23,6 +23,7 @@
 #pragma once
 
 #include "threads/CriticalSection.h"
+#include "BaseRenderer.h"
 
 #include <vector>
 
@@ -50,6 +51,7 @@ namespace OVERLAY {
     virtual COverlay* Acquire();
     virtual long      Release();
     virtual void      Render(SRenderState& state) = 0;
+    virtual void      PrepareRender() {};
 
     enum EType
     { TYPE_NONE
@@ -65,6 +67,7 @@ namespace OVERLAY {
 
     enum EPosition
     { POSITION_ABSOLUTE
+    , POSITION_ABSOLUTE_SCREEN
     , POSITION_RELATIVE
     } m_pos;
 
@@ -92,12 +95,13 @@ namespace OVERLAY {
      CRenderer();
     ~CRenderer();
 
-    void AddOverlay(CDVDOverlay* o, double pts);
-    void AddOverlay(COverlay*    o, double pts);
+    void AddOverlay(CDVDOverlay* o, double pts, int index);
+    void AddOverlay(COverlay*    o, double pts, int index);
     void AddCleanup(COverlay*    o);
-    void Flip();
-    void Render();
+    void Render(int idx);
     void Flush();
+    void Release(int idx);
+    bool HasOverlay(int idx);
 
   protected:
 
@@ -117,7 +121,7 @@ namespace OVERLAY {
     typedef std::vector<COverlay*>  COverlayV;
     typedef std::vector<SElement>   SElementV;
 
-    void      Render(COverlay* o);
+    void      Render(COverlay* o, float adjust_height);
     COverlay* Convert(CDVDOverlay* o, double pts);
     COverlay* Convert(CDVDOverlaySSA* o, double pts);
 
@@ -125,9 +129,7 @@ namespace OVERLAY {
     void      Release(SElementV& list);
 
     CCriticalSection m_section;
-    SElementV        m_buffers[2];
-    int              m_decode;
-    int              m_render;
+    SElementV        m_buffers[NUM_BUFFERS];
 
     COverlayV        m_cleanup;
   };

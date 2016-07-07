@@ -1,4 +1,5 @@
 add_subdirectory(dialogs)
+add_subdirectory(videosync)
 add_subdirectory(windows)
 
 find_all_sources(. video_SRCS)

@@ -122,7 +122,7 @@ bool CGUIWindowMusicSongs::OnMessage(CGUIMessage& message)
       }
       else if (iControl == CONTROL_BTNREC)
       {
-        if (g_application.IsPlayingAudio() )
+        if (g_application.m_pPlayer->IsPlayingAudio() )
         {
           if (g_application.m_pPlayer->CanRecord() )
           {
@@ -213,7 +213,7 @@ void CGUIWindowMusicSongs::UpdateButtons()
 {
   CGUIWindowMusicBase::UpdateButtons();
 
-  bool bIsPlaying = g_application.IsPlayingAudio();
+  bool bIsPlaying = g_application.m_pPlayer->IsPlayingAudio();
   bool bCanRecord = false;
   bool bIsRecording = false;
 

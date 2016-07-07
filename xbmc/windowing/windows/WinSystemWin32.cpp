@@ -20,13 +20,16 @@
 
 #include "WinSystemWin32.h"
 #include "WinEventsWin32.h"
-#include "settings/Settings.h"
 #include "resource.h"
-#include "settings/GUISettings.h"
+#include "guilib/gui3d.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/GUISettings.h"
+#include "settings/Settings.h"
 #include "utils/log.h"
+#include "utils/CharsetConverter.h"
+#include "utils/SystemInfo.h"
 
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 #include <tpcshrd.h>
 
 CWinSystemWin32::CWinSystemWin32()
@@ -91,7 +94,7 @@ bool CWinSystemWin32::CreateNewWindow(const CStdString& name, bool fullScreen, R
   // Register the windows class
   WNDCLASS wndClass;
   wndClass.style = CS_OWNDC; // For OpenGL
-  wndClass.lpfnWndProc = CWinEvents::WndProc;
+  wndClass.lpfnWndProc = CWinEventsWin32::WndProc;
   wndClass.cbClsExtra = 0;
   wndClass.cbWndExtra = 0;
   wndClass.hInstance = m_hInstance;
@@ -266,11 +269,18 @@ bool CWinSystemWin32::ResizeWindow(int newWidth, int newHeight, int newLeft, int
 
 void CWinSystemWin32::NotifyAppFocusChange(bool bGaining)
 {
-  if (m_bFullScreen && bGaining) //bump ourselves to top
+  if (m_bFullScreen && bGaining)
+  {
     SetWindowPos(m_hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW);
+  }
 }
 
 bool CWinSystemWin32::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays)
+{
+  return SetFullScreenEx(fullScreen, res, blankOtherDisplays, false);
+}
+
+bool CWinSystemWin32::SetFullScreenEx(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays, bool forceResChange)
 {
   m_IsAlteringWindow = true;
 
@@ -306,7 +316,7 @@ bool CWinSystemWin32::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool 
   m_bBlankOtherDisplay = blankOtherDisplays;
 
   if (fullScreen && g_guiSettings.GetBool("videoscreen.fakefullscreen"))
-    ChangeResolution(res);
+    ChangeResolution(res, forceResChange);
 
   ResizeInternal(forceResize);
 
@@ -331,14 +341,24 @@ void CWinSystemWin32::RestoreDesktopResolution(int screen)
   ChangeResolution(g_settings.m_ResInfo[resIdx]);
 }
 
-const MONITOR_DETAILS &CWinSystemWin32::GetMonitor(int screen) const
+const MONITOR_DETAILS* CWinSystemWin32::GetMonitor(int screen) const
 {
   for (unsigned int monitor = 0; monitor < m_MonitorsInfo.size(); monitor++)
     if (m_MonitorsInfo[monitor].ScreenNumber == screen)
-      return m_MonitorsInfo[monitor];
+      return &m_MonitorsInfo[monitor];
 
   // What to do if monitor is not found? Not sure... use the primary screen as a default value.
-  return m_MonitorsInfo[m_nPrimary];
+  if (m_nPrimary >= 0 && static_cast<size_t>(m_nPrimary) < m_MonitorsInfo.size())
+  {
+    CLog::Log(LOGDEBUG, "%s : no monitor found for screen %i, "
+                      "will use primary screen %i", __FUNCTION__, screen, m_nPrimary);
+    return &m_MonitorsInfo[m_nPrimary];
+  }
+  else
+  {
+    CLog::Log(LOGERROR, "%s : no monitor found for screen %i", __FUNCTION__, screen);
+    return nullptr;
+  }
 }
 
 int CWinSystemWin32::GetCurrentScreen()
@@ -353,12 +373,17 @@ int CWinSystemWin32::GetCurrentScreen()
 
 RECT CWinSystemWin32::ScreenRect(int screen)
 {
-  const MONITOR_DETAILS &details = GetMonitor(screen);
+  const MONITOR_DETAILS* details = GetMonitor(screen);
 
-  DEVMODE sDevMode;
-  ZeroMemory(&sDevMode, sizeof(DEVMODE));
-  sDevMode.dmSize = sizeof(DEVMODE);
-  if(!EnumDisplaySettings(details.DeviceName, ENUM_CURRENT_SETTINGS, &sDevMode))
+  if (!details)
+  {
+    CLog::Log(LOGERROR, "%s : no monitor found for screen %i", __FUNCTION__, screen);
+  }
+
+  DEVMODEW sDevMode;
+  ZeroMemory(&sDevMode, sizeof(sDevMode));
+  sDevMode.dmSize = sizeof(sDevMode);
+  if(!EnumDisplaySettingsW(details->DeviceNameW.c_str(), ENUM_CURRENT_SETTINGS, &sDevMode))
     CLog::Log(LOGERROR, "%s : EnumDisplaySettings failed with %d", __FUNCTION__, GetLastError());
 
   RECT rc;
@@ -438,23 +463,27 @@ bool CWinSystemWin32::ResizeInternal(bool forceRefresh)
   return true;
 }
 
-bool CWinSystemWin32::ChangeResolution(RESOLUTION_INFO res)
+bool CWinSystemWin32::ChangeResolution(RESOLUTION_INFO res, bool forceChange /*= false*/)
 {
-  const MONITOR_DETAILS &details = GetMonitor(res.iScreen);
+  const MONITOR_DETAILS* details = GetMonitor(res.iScreen);
 
-  DEVMODE sDevMode;
-  ZeroMemory(&sDevMode, sizeof(DEVMODE));
-  sDevMode.dmSize = sizeof(DEVMODE);
+  if (!details)
+    return false;
+
+  DEVMODEW sDevMode;
+  ZeroMemory(&sDevMode, sizeof(sDevMode));
+  sDevMode.dmSize = sizeof(sDevMode);
 
   // If we can't read the current resolution or any detail of the resolution is different than res
-  if (!EnumDisplaySettings(details.DeviceName, ENUM_CURRENT_SETTINGS, &sDevMode) ||
+  if (!EnumDisplaySettingsW(details->DeviceNameW.c_str(), ENUM_CURRENT_SETTINGS, &sDevMode) ||
       sDevMode.dmPelsWidth != res.iWidth || sDevMode.dmPelsHeight != res.iHeight ||
       sDevMode.dmDisplayFrequency != (int)res.fRefreshRate ||
       ((sDevMode.dmDisplayFlags & DM_INTERLACED) && !(res.dwFlags & D3DPRESENTFLAG_INTERLACED)) ||
-      (!(sDevMode.dmDisplayFlags & DM_INTERLACED) && (res.dwFlags & D3DPRESENTFLAG_INTERLACED)) )
+      (!(sDevMode.dmDisplayFlags & DM_INTERLACED) && (res.dwFlags & D3DPRESENTFLAG_INTERLACED)) 
+      || forceChange)
   {
-    ZeroMemory(&sDevMode, sizeof(DEVMODE));
-    sDevMode.dmSize = sizeof(DEVMODE);
+    ZeroMemory(&sDevMode, sizeof(sDevMode));
+    sDevMode.dmSize = sizeof(sDevMode);
     sDevMode.dmDriverExtra = 0;
     sDevMode.dmPelsWidth = res.iWidth;
     sDevMode.dmPelsHeight = res.iHeight;
@@ -462,19 +491,61 @@ bool CWinSystemWin32::ChangeResolution(RESOLUTION_INFO res)
     sDevMode.dmDisplayFlags = (res.dwFlags & D3DPRESENTFLAG_INTERLACED) ? DM_INTERLACED : 0;
     sDevMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY | DM_DISPLAYFLAGS;
 
-    // CDS_FULLSCREEN is for temporary fullscreen mode and prevents icons and windows from moving
-    // to fit within the new dimensions of the desktop
-    LONG rc = ChangeDisplaySettingsEx(details.DeviceName, &sDevMode, NULL, CDS_FULLSCREEN, NULL);
-    if (rc != DISP_CHANGE_SUCCESSFUL)
+    LONG rc = DISP_CHANGE_SUCCESSFUL;
+    bool bResChanged = false;
+
+    // Windows 8 refresh rate workaround for 24.0, 48.0 and 60.0 Hz
+    if (CSysInfo::IsWindowsVersionAtLeast(CSysInfo::WindowsVersionWin8) && (res.fRefreshRate == 24.0 || res.fRefreshRate == 48.0 || res.fRefreshRate == 60.0))
     {
-      CLog::Log(LOGERROR, "%s : ChangeDisplaySettingsEx failed with %d", __FUNCTION__, rc);
-      return false;
+      CLog::Log(LOGDEBUG, "%s : Using Windows 8+ workaround for refresh rate %d Hz", __FUNCTION__, (int)res.fRefreshRate);
+
+      // Get current resolution stored in registry
+      DEVMODEW sDevModeRegistry;
+      ZeroMemory(&sDevModeRegistry, sizeof(sDevModeRegistry));
+      sDevModeRegistry.dmSize = sizeof(sDevModeRegistry);
+      if (EnumDisplaySettingsW(details->DeviceNameW.c_str(), ENUM_REGISTRY_SETTINGS, &sDevModeRegistry))
+      {
+        // Set requested mode in registry without actually changing resolution
+        rc = ChangeDisplaySettingsExW(details->DeviceNameW.c_str(), &sDevMode, NULL, CDS_UPDATEREGISTRY | CDS_NORESET, NULL);
+        if (rc == DISP_CHANGE_SUCCESSFUL)
+        {
+          // Change resolution based on registry setting
+          rc = ChangeDisplaySettingsExW(details->DeviceNameW.c_str(), NULL, NULL, CDS_FULLSCREEN, NULL);
+          if (rc == DISP_CHANGE_SUCCESSFUL)
+            bResChanged = true;
+          else
+            CLog::Log(LOGERROR, "%s : ChangeDisplaySettingsEx (W8+ change resolution) failed with %d, using fallback", __FUNCTION__, rc);
+
+          // Restore registry with original values
+          sDevModeRegistry.dmSize = sizeof(sDevModeRegistry);
+          sDevModeRegistry.dmDriverExtra = 0;
+          sDevModeRegistry.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY | DM_DISPLAYFLAGS;
+          rc = ChangeDisplaySettingsExW(details->DeviceNameW.c_str(), &sDevModeRegistry, NULL, CDS_UPDATEREGISTRY | CDS_NORESET, NULL);
+          if (rc != DISP_CHANGE_SUCCESSFUL)
+            CLog::Log(LOGERROR, "%s : ChangeDisplaySettingsEx (W8+ restore registry) failed with %d", __FUNCTION__, rc);
+        }
+        else
+          CLog::Log(LOGERROR, "%s : ChangeDisplaySettingsEx (W8+ set registry) failed with %d, using fallback", __FUNCTION__, rc);
+      }
+      else
+        CLog::Log(LOGERROR, "%s : Unable to retrieve registry settings for Windows 8+ workaround, using fallback", __FUNCTION__);
     }
-    else
+
+    // Standard resolution change/fallback for Windows 8+ workaround
+    if (!bResChanged)
     {
-      return true;
+      // CDS_FULLSCREEN is for temporary fullscreen mode and prevents icons and windows from moving
+      // to fit within the new dimensions of the desktop
+      rc = ChangeDisplaySettingsExW(details->DeviceNameW.c_str(), &sDevMode, NULL, CDS_FULLSCREEN, NULL);
+      if (rc == DISP_CHANGE_SUCCESSFUL)
+        bResChanged = true;
+      else
+        CLog::Log(LOGERROR, "%s : ChangeDisplaySettingsEx failed with %d", __FUNCTION__, rc);
     }
+
+    return bResChanged;
   }
+
   // nothing to do, return success
   return true;
 }
@@ -528,7 +599,7 @@ void CWinSystemWin32::UpdateResolutions()
 
         RESOLUTION_INFO res;
         UpdateDesktopResolution(res, xbmcmonitor++, w, h, refreshRate, dwFlags);
-        g_settings.m_ResInfo.push_back(res);
+        g_settings.AddResolutionInfo(res);
         CLog::Log(LOGNOTICE, "Secondary mode: %s", res.strMode.c_str());
       }
     }
@@ -539,10 +610,10 @@ void CWinSystemWin32::UpdateResolutions()
   {
     for(int mode = 0;; mode++)
     {
-      DEVMODE devmode;
+      DEVMODEW devmode;
       ZeroMemory(&devmode, sizeof(devmode));
       devmode.dmSize = sizeof(devmode);
-      if(EnumDisplaySettings(m_MonitorsInfo[monitor].DeviceName, mode, &devmode) == 0)
+      if(EnumDisplaySettingsW(m_MonitorsInfo[monitor].DeviceNameW.c_str(), mode, &devmode) == 0)
         break;
       if(devmode.dmBitsPerPel != 32)
         continue;
@@ -565,6 +636,7 @@ void CWinSystemWin32::UpdateResolutions()
 void CWinSystemWin32::AddResolution(const RESOLUTION_INFO &res)
 {
   for (unsigned int i = 0; i < g_settings.m_ResInfo.size(); i++)
+  {
     if (g_settings.m_ResInfo[i].iScreen      == res.iScreen &&
         g_settings.m_ResInfo[i].iWidth       == res.iWidth &&
         g_settings.m_ResInfo[i].iHeight      == res.iHeight &&
@@ -573,32 +645,33 @@ void CWinSystemWin32::AddResolution(const RESOLUTION_INFO &res)
         g_settings.m_ResInfo[i].fRefreshRate == res.fRefreshRate &&
         g_settings.m_ResInfo[i].dwFlags      == res.dwFlags)
       return; // already have this resolution
+  }
 
-  g_settings.m_ResInfo.push_back(res);
+  g_settings.AddResolutionInfo(res);
 }
 
 bool CWinSystemWin32::UpdateResolutionsInternal()
 {
 
-  DISPLAY_DEVICE ddAdapter;
+  DISPLAY_DEVICEW ddAdapter;
   ZeroMemory(&ddAdapter, sizeof(ddAdapter));
   ddAdapter.cb = sizeof(ddAdapter);
   DWORD adapter = 0;
 
-  while (EnumDisplayDevices(NULL, adapter, &ddAdapter, 0))
+  while (EnumDisplayDevicesW(NULL, adapter, &ddAdapter, 0))
   {
     // Exclude displays that are not part of the windows desktop. Using them is too different: no windows,
     // direct access with GDI CreateDC() or DirectDraw for example. So it may be possible to play video, but GUI?
     if (!(ddAdapter.StateFlags & DISPLAY_DEVICE_MIRRORING_DRIVER) && (ddAdapter.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP))
     {
-      DISPLAY_DEVICE ddMon;
+      DISPLAY_DEVICEW ddMon;
       ZeroMemory(&ddMon, sizeof(ddMon));
       ddMon.cb = sizeof(ddMon);
       bool foundScreen = false;
       DWORD screen = 0;
 
       // Just look for the first active output, we're actually only interested in the information at the adapter level.
-      while (EnumDisplayDevices(ddAdapter.DeviceName, screen, &ddMon, 0))
+      while (EnumDisplayDevicesW(ddAdapter.DeviceName, screen, &ddMon, 0))
       {
         if (ddMon.StateFlags & (DISPLAY_DEVICE_ACTIVE | DISPLAY_DEVICE_ATTACHED))
         {
@@ -612,33 +685,35 @@ bool CWinSystemWin32::UpdateResolutionsInternal()
       // Remoting returns no screens. Handle with a dummy screen.
       if (!foundScreen && screen == 0)
       {
-        lstrcpy(ddMon.DeviceString, _T("Dummy Monitor")); // safe: large static array
+        lstrcpyW(ddMon.DeviceString, L"Dummy Monitor"); // safe: large static array
         foundScreen = true;
       }
 
       if (foundScreen)
       {
-        CLog::Log(LOGNOTICE, "Found screen: %s on %s, adapter %d.", ddMon.DeviceString, ddAdapter.DeviceString, adapter);
+        CStdString monitorStr, adapterStr;
+        g_charsetConverter.wToUTF8(ddMon.DeviceString, monitorStr);
+        g_charsetConverter.wToUTF8(ddAdapter.DeviceString, adapterStr);
+        CLog::Log(LOGNOTICE, "Found screen: %s on %s, adapter %d.", monitorStr.c_str(), adapterStr.c_str(), adapter);
 
         // get information about the display's current position and display mode
         // TODO: for Windows 7/Server 2008 and up, Microsoft recommends QueryDisplayConfig() instead, the API used by the control panel.
-        DEVMODE dm;
+        DEVMODEW dm;
         ZeroMemory(&dm, sizeof(dm));
         dm.dmSize = sizeof(dm);
-        if (EnumDisplaySettingsEx(ddAdapter.DeviceName, ENUM_CURRENT_SETTINGS, &dm, 0) == FALSE)
-          EnumDisplaySettingsEx(ddAdapter.DeviceName, ENUM_REGISTRY_SETTINGS, &dm, 0);
+        if (EnumDisplaySettingsExW(ddAdapter.DeviceName, ENUM_CURRENT_SETTINGS, &dm, 0) == FALSE)
+          EnumDisplaySettingsExW(ddAdapter.DeviceName, ENUM_REGISTRY_SETTINGS, &dm, 0);
 
         // get the monitor handle and workspace
         HMONITOR hm = 0;
         POINT pt = { dm.dmPosition.x, dm.dmPosition.y };
         hm = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
 
-        MONITOR_DETAILS md;
-        memset(&md, 0, sizeof(MONITOR_DETAILS));
+        MONITOR_DETAILS md = {};
 
-        strcpy(md.MonitorName, ddMon.DeviceString);
-        strcpy(md.CardName, ddAdapter.DeviceString);
-        strcpy(md.DeviceName, ddAdapter.DeviceName);
+        md.MonitorNameW = ddMon.DeviceString;
+        md.CardNameW = ddAdapter.DeviceString;
+        md.DeviceNameW = ddAdapter.DeviceName;
 
         // width x height @ x,y - bpp - refresh rate
         // note that refresh rate information is not available on Win9x

@@ -1,0 +1,14 @@
+NEW:
+  - Make seek steps configurable in advancedsetting.xml (RasPlex/OpenPHT#92)
+  - Allow dca audio codec when dts-hd or ac3 transcode is selected
+  - Add preference option for hevc direct play
+  - Add preference option for scanning localhost for server
+  - Add support for mceusb_hauppauge remotes (thanks @anythingtechaus)
+  - Improved Italian translation for the default skin (thanks @NicolaIsotta)
+
+FIXES:
+  - Fix parse of PMS 1.0.0+ version (RasPlex/OpenPHT#94, RasPlex/RasPlex#514)
+  - Fix empty line in video setting (RasPlex/OpenPHT#84)
+  - Fix issue with some watch later and recommended videos
+  - Fix auto-close of stereoscopic selection dialog
+  - Fix jumping watch later in default skin

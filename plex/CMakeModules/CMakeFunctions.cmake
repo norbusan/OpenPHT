@@ -126,9 +126,9 @@ macro(plex_find_library lib framework nodefaultpath searchpath addtolinklist)
       set(HAVE_LIB${LIBN} 1 CACHE string "the HAVE_LIBX variable")      
       mark_as_advanced(FORCE CONFIG_LIBRARY_${LIBN} HAVE_LIB${LIBN} ${LIBN}_SONAME LIB${LIBNAME}_SONAME)
     
-      if(${addtolinklist})
+      if(${addtolinklist} EQUAL 1)
         list(APPEND CONFIG_PLEX_LINK_LIBRARIES ${l})
-      else()
+      elseif(${addtolinklist} EQUAL 0)
         list(APPEND CONFIG_PLEX_INSTALL_LIBRARIES ${REALNAME})
       endif()
       
@@ -166,9 +166,9 @@ macro(plex_find_package package required addtolinklist)
 
     set(CONFIG_LIBRARY_${PKG_UPPER_NAME} ${PKG_LIB})
 
-    if(${addtolinklist})
+    if(${addtolinklist} EQUAL 1)
       list(APPEND CONFIG_PLEX_LINK_LIBRARIES ${PKG_LIB})
-    else()
+    elseif(${addtolinklist} EQUAL 0)
       list(APPEND CONFIG_PLEX_INSTALL_LIBRARIES ${PKG_LIB})
     endif()
 

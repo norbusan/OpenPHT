@@ -371,7 +371,7 @@ void XBPyThread::Process()
     }
     if(old != s)
     {
-      CLog::Log(LOGINFO, "Scriptresult: Waiting on thread %"PRIu64, (uint64_t)s->thread_id);
+      CLog::Log(LOGINFO, "Scriptresult: Waiting on thread %" PRIu64, (uint64_t)s->thread_id);
       old = s;
     }
 

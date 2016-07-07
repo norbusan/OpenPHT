@@ -274,6 +274,7 @@ namespace XBMCAddon
     void WindowXML::clearList()
     {
       TRACE;
+      LOCKGUI;
       A(ClearFileItems());
 
       A(m_viewControl).SetItems(*(A(m_vecItems)));

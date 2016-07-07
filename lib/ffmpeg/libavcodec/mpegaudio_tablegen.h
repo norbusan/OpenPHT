@@ -25,6 +25,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include "libavutil/attributes.h"
 
 #define TABLE_4_3_SIZE (8191 + 16)*4
 #if CONFIG_HARDCODED_TABLES
@@ -39,15 +40,17 @@ static float exp_table_float[512];
 static float expval_table_float[512][16];
 
 #define FRAC_BITS 23
+#define IMDCT_SCALAR 1.759
 
-static void mpegaudio_tableinit(void)
+static av_cold void mpegaudio_tableinit(void)
 {
     int i, value, exponent;
     for (i = 1; i < TABLE_4_3_SIZE; i++) {
         double value = i / 4;
         double f, fm;
         int e, m;
-        f  = value * cbrtf(value) * pow(2, (i & 3) * 0.25);
+        /* cbrtf() isn't available on all systems, so we use powf(). */
+        f  = value / IMDCT_SCALAR * pow(value, 1.0 / 3.0) * pow(2, (i & 3) * 0.25);
         fm = frexp(f, &e);
         m  = (uint32_t)(fm * (1LL << 31) + 0.5);
         e += FRAC_BITS - 31 + 5 - 100;
@@ -58,8 +61,10 @@ static void mpegaudio_tableinit(void)
     }
     for (exponent = 0; exponent < 512; exponent++) {
         for (value = 0; value < 16; value++) {
-            double f = (double)value * cbrtf(value) * pow(2, (exponent - 400) * 0.25 + FRAC_BITS + 5);
-            expval_table_fixed[exponent][value] = llrint(f);
+            /* cbrtf() isn't available on all systems, so we use powf(). */
+            double f = (double)value * pow(value, 1.0 / 3.0) * pow(2, (exponent - 400) * 0.25 + FRAC_BITS + 5) / IMDCT_SCALAR;
+            /* llrint() isn't always available, so round and cast manually. */
+            expval_table_fixed[exponent][value] = (long long int) (f < 0xFFFFFFFF ? floor(f + 0.5) : 0xFFFFFFFF);
             expval_table_float[exponent][value] = f;
         }
         exp_table_fixed[exponent] = expval_table_fixed[exponent][1];

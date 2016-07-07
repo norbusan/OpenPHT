@@ -21,6 +21,8 @@
  *
  */
 
+#include <string>
+
 #define RENDER_FLAG_BOT         0x01
 #define RENDER_FLAG_TOP         0x02
 #define RENDER_FLAG_BOTH (RENDER_FLAG_BOT | RENDER_FLAG_TOP)
@@ -48,7 +50,6 @@
 
 #define CONF_FLAGS_YUV_FULLRANGE 0x08
 #define CONF_FLAGS_FULLSCREEN    0x10
-#define CONF_FLAGS_RGB           0x20
 
 /* defines color primaries */
 #define CONF_FLAGS_COLPRI_MASK(a) ((a) & 0xe0)
@@ -71,7 +72,25 @@
 #define CONF_FLAGS_TRC_GAMMA28    0x0c00
 
 /* defines 3d modes */
-#define CONF_FLAGS_FORMAT_SBS     0x001000
-#define CONF_FLAGS_FORMAT_TB      0x002000
+#define CONF_FLAGS_STEREO_MODE_MASK(a) ((a) & 0x007000)
+#define CONF_FLAGS_STEREO_MODE_SBS     0x001000
+#define CONF_FLAGS_STEREO_MODE_TAB     0x002000
+
+#define CONF_FLAGS_STEREO_CADENCE(a) ((a) & 0x008000)
+#define CONF_FLAGS_STEREO_CADANCE_LEFT_RIGHT 0x000000
+#define CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT 0x008000
+
+
+
+namespace RenderManager {
+
+  unsigned int GetFlagsColorMatrix(unsigned int color_matrix, unsigned width, unsigned height);
+  unsigned int GetFlagsChromaPosition(unsigned int chroma_position);
+  unsigned int GetFlagsColorPrimaries(unsigned int color_primaries);
+  unsigned int GetFlagsColorTransfer(unsigned int color_transfer);
+  unsigned int GetStereoModeFlags(const std::string& mode);
+  std::string  GetStereoModeInvert(const std::string& mode);
+
+}
 
 #endif

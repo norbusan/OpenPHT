@@ -24,10 +24,16 @@
  * samplerate conversion for both audio and video
  */
 
+#include <string.h>
+
 #include "avcodec.h"
 #include "audioconvert.h"
 #include "libavutil/opt.h"
+#include "libavutil/mem.h"
 #include "libavutil/samplefmt.h"
+
+#if FF_API_AVCODEC_RESAMPLE
+FF_DISABLE_DEPRECATION_WARNINGS
 
 #define MAX_CHANNELS 8
 
@@ -285,12 +291,6 @@ int audio_resample(ReSampleContext *s, short *output, short *input, int nb_sampl
     short *output_bak = NULL;
     int lenout;
 
-    if (s->input_channels == s->output_channels && s->ratio == 1.0 && 0) {
-        /* nothing to do */
-        memcpy(output, input, nb_samples * s->input_channels * sizeof(short));
-        return nb_samples;
-    }
-
     if (s->sample_fmt[0] != AV_SAMPLE_FMT_S16) {
         int istride[1] = { s->sample_size[0] };
         int ostride[1] = { 2 };
@@ -323,11 +323,13 @@ int audio_resample(ReSampleContext *s, short *output, short *input, int nb_sampl
     lenout= 2*s->output_channels*nb_samples * s->ratio + 16;
 
     if (s->sample_fmt[1] != AV_SAMPLE_FMT_S16) {
+        int out_size = lenout * av_get_bytes_per_sample(s->sample_fmt[1]) *
+                       s->output_channels;
         output_bak = output;
 
-        if (!s->buffer_size[1] || s->buffer_size[1] < 2*lenout) {
+        if (!s->buffer_size[1] || s->buffer_size[1] < out_size) {
             av_free(s->buffer[1]);
-            s->buffer_size[1] = 2*lenout;
+            s->buffer_size[1] = out_size;
             s->buffer[1] = av_malloc(s->buffer_size[1]);
             if (!s->buffer[1]) {
                 av_log(s->resample_context, AV_LOG_ERROR, "Could not allocate buffer\n");
@@ -340,10 +342,17 @@ int audio_resample(ReSampleContext *s, short *output, short *input, int nb_sampl
 
     /* XXX: move those malloc to resample init code */
     for (i = 0; i < s->filter_channels; i++) {
-        bufin[i] = av_malloc((nb_samples + s->temp_len) * sizeof(short));
+        bufin[i] = av_malloc_array((nb_samples + s->temp_len), sizeof(short));
+        bufout[i] = av_malloc_array(lenout, sizeof(short));
+
+        if (!bufin[i] || !bufout[i]) {
+            av_log(s->resample_context, AV_LOG_ERROR, "Could not allocate buffer\n");
+            nb_samples1 = 0;
+            goto fail;
+        }
+
         memcpy(bufin[i], s->temp[i], s->temp_len * sizeof(short));
         buftmp2[i] = bufin[i] + s->temp_len;
-        bufout[i] = av_malloc(lenout * sizeof(short));
     }
 
     if (s->input_channels == 2 && s->output_channels == 1) {
@@ -377,7 +386,7 @@ int audio_resample(ReSampleContext *s, short *output, short *input, int nb_sampl
         nb_samples1 = av_resample(s->resample_context, buftmp3[i], bufin[i],
                                   &consumed, nb_samples, lenout, is_last);
         s->temp_len = nb_samples - consumed;
-        s->temp[i] = av_realloc(s->temp[i], s->temp_len * sizeof(short));
+        s->temp[i] = av_realloc_array(s->temp[i], s->temp_len, sizeof(short));
         memcpy(s->temp[i], bufin[i] + consumed, s->temp_len * sizeof(short));
     }
 
@@ -399,11 +408,12 @@ int audio_resample(ReSampleContext *s, short *output, short *input, int nb_sampl
         if (av_audio_convert(s->convert_ctx[1], obuf, ostride,
                              ibuf, istride, nb_samples1 * s->output_channels) < 0) {
             av_log(s->resample_context, AV_LOG_ERROR,
-                   "Audio sample format convertion failed\n");
+                   "Audio sample format conversion failed\n");
             return 0;
         }
     }
 
+fail:
     for (i = 0; i < s->filter_channels; i++) {
         av_free(bufin[i]);
         av_free(bufout[i]);
@@ -424,3 +434,6 @@ void audio_resample_close(ReSampleContext *s)
     av_audio_convert_free(s->convert_ctx[1]);
     av_free(s);
 }
+
+FF_ENABLE_DEPRECATION_WARNINGS
+#endif

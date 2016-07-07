@@ -88,11 +88,24 @@ bool CRenderSystemGLES::InitRenderSystem()
   }
   
   // Get our driver vendor and renderer
-  m_RenderVendor = (const char*) glGetString(GL_VENDOR);
-  m_RenderRenderer = (const char*) glGetString(GL_RENDERER);
+  const char *tmpVendor = (const char*) glGetString(GL_VENDOR);
+  m_RenderVendor.clear();
+  if (tmpVendor != NULL)
+    m_RenderVendor = tmpVendor;
+
+  const char *tmpRenderer = (const char*) glGetString(GL_RENDERER);
+  m_RenderRenderer.clear();
+  if (tmpRenderer != NULL)
+    m_RenderRenderer = tmpRenderer;
 
   m_RenderExtensions  = " ";
-  m_RenderExtensions += (const char*) glGetString(GL_EXTENSIONS);
+
+  const char *tmpExtensions = (const char*) glGetString(GL_EXTENSIONS);
+  if (tmpExtensions != NULL)
+  {
+    m_RenderExtensions += tmpExtensions;
+  }
+
   m_RenderExtensions += " ";
 
   LogGraphicsInfo();
@@ -140,7 +153,7 @@ bool CRenderSystemGLES::ResetRenderSystem(int width, int height, bool fullScreen
   glEnable(GL_SCISSOR_TEST); 
 
   glMatrixProject.Clear();
-  glMatrixModview->LoadIdentity();
+  glMatrixProject->LoadIdentity();
   glMatrixProject->Ortho(0.0f, width-1, height-1, 0.0f, -1.0f, 1.0f);
   glMatrixProject.Load();
 
@@ -245,7 +258,7 @@ bool CRenderSystemGLES::IsExtSupported(const char* extension)
   }
   else
   {
-    CStdString name;
+    std::string name;
     name  = " ";
     name += extension;
     name += " ";
@@ -388,7 +401,7 @@ void CRenderSystemGLES::ApplyStateBlock()
   glClear(GL_DEPTH_BUFFER_BIT);
 }
 
-void CRenderSystemGLES::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight)
+void CRenderSystemGLES::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor)
 { 
   if (!m_bRenderCreated)
     return;
@@ -401,7 +414,7 @@ void CRenderSystemGLES::SetCameraPosition(const CPoint &camera, int screenWidth,
   float h = (float)m_viewPort[3]*0.5f;
 
   glMatrixModview->LoadIdentity();
-  glMatrixModview->Translatef(-(w + offset.x), +(h + offset.y), 0);
+  glMatrixModview->Translatef(-(w + offset.x - stereoFactor), +(h + offset.y), 0);
   glMatrixModview->LookAt(0.0, 0.0, -2.0*h, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0);
   glMatrixModview.Load();
 
@@ -526,6 +539,28 @@ void CRenderSystemGLES::SetViewPort(CRect& viewPort)
   m_viewPort[1] = m_height - viewPort.y1 - viewPort.Height();
   m_viewPort[2] = viewPort.Width();
   m_viewPort[3] = viewPort.Height();
+}
+
+bool CRenderSystemGLES::ScissorsCanEffectClipping()
+{
+  if (m_pGUIshader[m_method])
+    return m_pGUIshader[m_method]->HardwareClipIsPossible();
+
+  return false;
+}
+
+CRect CRenderSystemGLES::ClipRectToScissorRect(const CRect &rect)
+{
+  if (!m_pGUIshader[m_method])
+    return CRect();
+  float xFactor = m_pGUIshader[m_method]->GetClipXFactor();
+  float xOffset = m_pGUIshader[m_method]->GetClipXOffset();
+  float yFactor = m_pGUIshader[m_method]->GetClipYFactor();
+  float yOffset = m_pGUIshader[m_method]->GetClipYOffset();
+  return CRect(rect.x1 * xFactor + xOffset,
+               rect.y1 * yFactor + yOffset,
+               rect.x2 * xFactor + xOffset,
+               rect.y2 * yFactor + yOffset);
 }
 
 void CRenderSystemGLES::SetScissors(const CRect &rect)
@@ -681,6 +716,19 @@ GLint CRenderSystemGLES::GUIShaderGetBrightness()
     return m_pGUIshader[m_method]->GetBrightnessLoc();
 
   return -1;
+}
+
+bool CRenderSystemGLES::SupportsStereo(RENDER_STEREO_MODE mode) const
+{
+  switch(mode)
+  {
+    case RENDER_STEREO_MODE_INTERLACED:
+      if (g_sysinfo.HasHW3DInterlaced())
+        return true;
+
+    default:
+      return CRenderSystemBase::SupportsStereo(mode);
+  }
 }
 
 GLint CRenderSystemGLES::GUIShaderGetModel()

@@ -5,20 +5,20 @@
  * Copyright (c) 2009 Kenan Gillet
  * Copyright (c) 2010 Martin Storsjo
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -27,12 +27,12 @@
 
 #include <stdint.h>
 #include "avcodec.h"
+#include "g722dsp.h"
 
 #define PREV_SAMPLES_BUF_SIZE 1024
 
-typedef struct {
+typedef struct G722Context {
     const AVClass *class;
-    AVFrame frame;
     int     bits_per_codeword;
     int16_t prev_samples[PREV_SAMPLES_BUF_SIZE]; ///< memory of past decoded samples
     int     prev_samples_pos;        ///< the number of values in prev_samples
@@ -62,6 +62,8 @@ typedef struct {
         int value;
         int prev;
     } *paths[2];
+
+    G722DSPContext dsp;
 } G722Context;
 
 extern const int16_t ff_g722_high_inv_quant[4];
@@ -72,7 +74,5 @@ void ff_g722_update_low_predictor(struct G722Band *band, const int ilow);
 
 void ff_g722_update_high_predictor(struct G722Band *band, const int dhigh,
                                    const int ihigh);
-
-void ff_g722_apply_qmf(const int16_t *prev_samples, int *xout1, int *xout2);
 
 #endif /* AVCODEC_G722_H */

@@ -387,7 +387,7 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
         if (!pSlideShow) return ;
 
         // stop playing file
-        if (g_application.IsPlayingVideo()) g_application.StopPlaying();
+        if (g_application.m_pPlayer->IsPlayingVideo()) g_application.StopPlaying();
 
         if (g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO)
           g_windowManager.PreviousWindow();
@@ -435,7 +435,7 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
         CGUIWindowSlideShow *pSlideShow = (CGUIWindowSlideShow *)g_windowManager.GetWindow(WINDOW_SLIDESHOW);
         if (!pSlideShow) return ;
 
-        if (g_application.IsPlayingVideo())
+        if (g_application.m_pPlayer->IsPlayingVideo())
           g_application.StopPlaying();
 
         g_graphicsContext.Lock();
@@ -511,12 +511,12 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
         g_application.WakeUpScreenSaverAndDPMS();
 
         // stop playing file
-        if (g_application.IsPlaying()) g_application.StopPlaying();
+        if (g_application.m_pPlayer->IsPlaying()) g_application.StopPlaying();
       }
       break;
 
     case TMSG_MEDIA_PAUSE:
-      if (g_application.m_pPlayer)
+      if (g_application.m_pPlayer->HasPlayer())
       {
         g_application.ResetScreenSaver();
         g_application.WakeUpScreenSaverAndDPMS();
@@ -525,7 +525,16 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
       break;
 
     case TMSG_MEDIA_UNPAUSE:
-      if (g_application.IsPaused())
+      if (g_application.m_pPlayer->IsPausedPlayback())
+      {
+        g_application.ResetScreenSaver();
+        g_application.WakeUpScreenSaverAndDPMS();
+        g_application.m_pPlayer->Pause();
+      }
+      break;
+
+    case TMSG_MEDIA_PAUSE_IF_PLAYING:
+      if (g_application.m_pPlayer->IsPlaying() && !g_application.m_pPlayer->IsPaused())
       {
         g_application.ResetScreenSaver();
         g_application.WakeUpScreenSaverAndDPMS();
@@ -536,6 +545,26 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
     case TMSG_SWITCHTOFULLSCREEN:
       if( g_windowManager.GetActiveWindow() != WINDOW_FULLSCREEN_VIDEO )
         g_application.SwitchToFullScreen();
+      break;
+
+    case TMSG_SETVIDEORESOLUTION:
+      {
+        RESOLUTION res = (RESOLUTION)pMsg->dwParam1;
+        bool forceUpdate = pMsg->dwParam2 == 1 ? true : false;
+        g_graphicsContext.SetVideoResolution(res, forceUpdate);
+      }
+      break;
+
+    case TMSG_VIDEORESIZE:
+      {
+        XBMC_Event newEvent;
+        memset(&newEvent, 0, sizeof(newEvent));
+        newEvent.type = XBMC_VIDEORESIZE;
+        newEvent.resize.w = pMsg->dwParam1;
+        newEvent.resize.h = pMsg->dwParam2;
+        g_application.OnEvent(newEvent);
+        g_windowManager.MarkDirty();
+      }
       break;
 
     case TMSG_TOGGLEFULLSCREEN:
@@ -969,6 +998,18 @@ void CApplicationMessenger::MediaStop(bool bWait /* = true */, int playlistid /*
 void CApplicationMessenger::MediaPause()
 {
   ThreadMessage tMsg = {TMSG_MEDIA_PAUSE};
+  SendMessage(tMsg, true);
+}
+
+void CApplicationMessenger::MediaUnPause()
+{
+  ThreadMessage tMsg = {TMSG_MEDIA_UNPAUSE};
+  SendMessage(tMsg, true);
+}
+
+void CApplicationMessenger::MediaPauseIfPlaying()
+{
+  ThreadMessage tMsg = {TMSG_MEDIA_PAUSE_IF_PLAYING};
   SendMessage(tMsg, true);
 }
 

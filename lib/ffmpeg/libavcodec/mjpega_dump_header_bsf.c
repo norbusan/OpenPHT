@@ -38,13 +38,15 @@ static int mjpega_dump_header(AVBitStreamFilterContext *bsfc, AVCodecContext *av
     unsigned dqt = 0, dht = 0, sof0 = 0;
     int i;
 
-    if (avctx->codec_id != CODEC_ID_MJPEG) {
+    if (avctx->codec_id != AV_CODEC_ID_MJPEG) {
         av_log(avctx, AV_LOG_ERROR, "mjpega bitstream filter only applies to mjpeg codec\n");
         return 0;
     }
 
     *poutbuf_size = 0;
-    *poutbuf = av_malloc(buf_size + 44 + FF_INPUT_BUFFER_PADDING_SIZE);
+    *poutbuf = av_malloc(buf_size + 44 + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!*poutbuf)
+        return AVERROR(ENOMEM);
     poutbufp = *poutbuf;
     bytestream_put_byte(&poutbufp, 0xff);
     bytestream_put_byte(&poutbufp, SOI);
@@ -88,7 +90,6 @@ static int mjpega_dump_header(AVBitStreamFilterContext *bsfc, AVCodecContext *av
 }
 
 AVBitStreamFilter ff_mjpega_dump_header_bsf = {
-    "mjpegadump",
-    0,
-    mjpega_dump_header,
+    .name   = "mjpegadump",
+    .filter = mjpega_dump_header,
 };

@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "dsputil.h"
+#include "avcodec.h"
 #include "diracdsp.h"
 #include "libavcodec/x86/diracdsp_mmx.h"
 
@@ -28,7 +28,7 @@
       +3*((src)[-2*stride] + (src)[3*stride])                   \
       -1*((src)[-3*stride] + (src)[4*stride]) + 16) >> 5)
 
-static void dirac_hpel_filter(uint8_t *dsth, uint8_t *dstv, uint8_t *dstc, uint8_t *src,
+static void dirac_hpel_filter(uint8_t *dsth, uint8_t *dstv, uint8_t *dstc, const uint8_t *src,
                               int stride, int width, int height)
 {
     int x, y;
@@ -98,7 +98,7 @@ PIXOP_BILINEAR(avg, OP_AVG, 32)
             block += stride;                                            \
         }                                                               \
     }                                                                   \
-    static void biweight_dirac_pixels ## W ## _c(uint8_t *dst, uint8_t *src, int stride, int log2_denom, \
+    static void biweight_dirac_pixels ## W ## _c(uint8_t *dst, const uint8_t *src, int stride, int log2_denom, \
                                                  int weightd, int weights, int h) { \
         int x;                                                          \
         while (h--) {                                                   \
@@ -173,7 +173,7 @@ static void add_rect_clamped_c(uint8_t *dst, const uint16_t *src, int stride,
     c->PFX ## _dirac_pixels_tab[WIDTH>>4][2] = ff_ ## PFX ## _dirac_pixels ## WIDTH ## _l4_c; \
     c->PFX ## _dirac_pixels_tab[WIDTH>>4][3] = ff_ ## PFX ## _dirac_pixels ## WIDTH ## _bilinear_c
 
-void ff_diracdsp_init(DiracDSPContext *c)
+av_cold void ff_diracdsp_init(DiracDSPContext *c)
 {
     c->dirac_hpel_filter = dirac_hpel_filter;
     c->add_rect_clamped = add_rect_clamped_c;

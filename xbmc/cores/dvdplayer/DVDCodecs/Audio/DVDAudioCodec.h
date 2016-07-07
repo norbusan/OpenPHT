@@ -21,19 +21,47 @@
  */
 
 #include "system.h"
-#include "cores/AudioEngine/AEAudioFormat.h"
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
+#include "DVDClock.h"
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
 #endif
 #include <vector>
-#include "DllAvCodec.h"
+
+extern "C" {
+#include "libavcodec/avcodec.h"
+}
 
 struct AVStream;
 
 class CDVDStreamInfo;
 class CDVDCodecOption;
 class CDVDCodecOptions;
+
+typedef struct stDVDAudioFrame
+{
+  uint8_t*          data[16];
+  double            pts;
+  double            duration;
+  unsigned int      nb_frames;
+  unsigned int      framesize;
+  unsigned int      planes;
+
+  int               channel_count;
+  int               encoded_channel_count;
+  CAEChannelInfo    channel_layout;
+  enum AEDataFormat data_format;
+  int               bits_per_sample;
+  int               sample_rate;
+  int               encoded_sample_rate;
+  bool              passthrough;
+  enum AVAudioServiceType audio_service_type;
+  enum AVMatrixEncoding matrix_encoding;
+  int               profile;
+} DVDAudioFrame;
 
 class CDVDAudioCodec
 {
@@ -56,13 +84,44 @@ public:
    * returns bytes used or -1 on error
    *
    */
-  virtual int Decode(BYTE* pData, int iSize) = 0;
+  virtual int Decode(uint8_t* pData, int iSize) = 0;
 
   /*
-   * returns nr of bytes used or -1 on error
+   * returns nr of bytes in decode buffer
    * the data is valid until the next Decode call
    */
-  virtual int GetData(BYTE** dst) = 0;
+  virtual int GetData(uint8_t** dst) = 0;
+
+  /*
+   * the data is valid until the next Decode call
+   */
+  virtual void GetData(DVDAudioFrame &frame)
+  {
+    frame.nb_frames = 0;
+    frame.data_format           = GetDataFormat();
+    frame.channel_count         = GetChannels();
+    frame.framesize             = (CAEUtil::DataFormatToBits(frame.data_format) >> 3) * frame.channel_count;
+    if(frame.framesize == 0)
+      return;
+    frame.nb_frames             = GetData(frame.data)/frame.framesize;
+    frame.channel_layout        = GetChannelMap();
+    frame.channel_count         = GetChannels();
+    frame.planes                = AE_IS_PLANAR(frame.data_format) ? frame.channel_count : 1;
+    frame.encoded_channel_count = GetEncodedChannels();
+    frame.bits_per_sample       = CAEUtil::DataFormatToBits(frame.data_format);
+    frame.sample_rate           = GetSampleRate();
+    frame.encoded_sample_rate   = GetEncodedSampleRate();
+    frame.passthrough           = NeedPassthrough();
+    frame.pts                   = DVD_NOPTS_VALUE;
+    frame.matrix_encoding       = GetMatrixEncoding();
+    frame.audio_service_type    = GetAudioServiceType();
+    frame.profile               = GetProfile();
+    // compute duration.
+    if (frame.sample_rate)
+      frame.duration = ((double)frame.nb_frames * DVD_TIME_BASE) / frame.sample_rate;
+    else
+      frame.duration = 0.0;
+  }
 
   /*
    * resets the decoder
@@ -118,4 +177,19 @@ public:
    * should return amount of data decoded has buffered in preparation for next audio frame
    */
   virtual int GetBufferSize() { return 0; }
+
+  /*
+   * should return the ffmpeg matrix encoding type
+   */
+  virtual enum AVMatrixEncoding GetMatrixEncoding() { return AV_MATRIX_ENCODING_NONE; }
+
+  /*
+   * should return the ffmpeg audio service type
+   */
+  virtual enum AVAudioServiceType GetAudioServiceType() { return AV_AUDIO_SERVICE_TYPE_MAIN; }
+
+  /*
+   * should return the ffmpeg profile value
+   */
+  virtual int GetProfile() { return 0; }
 };

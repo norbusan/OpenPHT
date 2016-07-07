@@ -27,6 +27,7 @@
 #define PLAYLIST_VIDEO   1
 #define PLAYLIST_PICTURE 2
 
+class CAction;
 class CFileItem; typedef boost::shared_ptr<CFileItem> CFileItemPtr;
 class CFileItemList;
 
@@ -166,6 +167,9 @@ public:
   void Remove(int iPlaylist, int iPosition);
   void Swap(int iPlaylist, int indexItem1, int indexItem2);
 
+  bool IsSingleItemNonRepeatPlaylist() const;
+
+  bool OnAction(const CAction &action);
 protected:
   /*! \brief Returns true if the given is set to repeat all
    \param playlist Playlist to be query

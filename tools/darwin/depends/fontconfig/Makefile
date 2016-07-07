@@ -1,8 +1,9 @@
 include ../Makefile.include
+DEPS= Makefile lconv.patch
 
 # lib name, version
 LIBNAME=fontconfig
-VERSION=2.11.1
+VERSION=2.11.95
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.bz2
 
@@ -12,14 +13,14 @@ CONFIGURE=./configure --prefix=$(PREFIX) \
   --with-freetype-config=$(PREFIX)/bin/freetype-config \
   --disable-libxml2 --disable-docs
 
-LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/src/.libs/lib$(LIBNAME).dylib
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
@@ -28,9 +29,9 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
-	make -j $(MAKE_JOBS) -C $(SOURCE)
+	make -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

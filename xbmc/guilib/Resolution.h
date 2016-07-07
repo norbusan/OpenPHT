@@ -88,6 +88,7 @@ struct RESOLUTION_INFO
   int iScreen;
   int iWidth;
   int iHeight;
+  int iBlanking; /**< number of pixels of padding between stereoscopic frames */
   int iScreenWidth;
   int iScreenHeight;
   int iSubtitles;
@@ -98,14 +99,15 @@ struct RESOLUTION_INFO
   CStdString strOutput;
   CStdString strId;
 public:
-  RESOLUTION_INFO(int width = 1280, int height = 720, float aspect = 0, const CStdString &mode = "")
+  RESOLUTION_INFO(int width = 1280, int height = 720, float aspect = 0, const CStdString &mode = ""):
+    strMode(mode)
   {
     iWidth = width;
     iHeight = height;
+    iBlanking = 0;
     iScreenWidth = width;
     iScreenHeight = height;
     fPixelRatio = aspect ? ((float)width)/height / aspect : 1.0f;
-    strMode = mode;
     bFullScreen = true;
     fRefreshRate = 0;
     dwFlags = iSubtitles = iScreen = 0;
@@ -114,13 +116,17 @@ public:
   {
     return iWidth * fPixelRatio / iHeight;
   }
-  RESOLUTION_INFO(const RESOLUTION_INFO& res)
+  RESOLUTION_INFO(const RESOLUTION_INFO& res) :
+    Overscan(res.Overscan),
+    strMode(res.strMode),
+    strOutput(res.strOutput),
+    strId(res.strId)
   {
-    Overscan = res.Overscan; bFullScreen = res.bFullScreen;
+    bFullScreen = res.bFullScreen;
     iScreen = res.iScreen; iWidth = res.iWidth; iHeight = res.iHeight;
     iScreenWidth = res.iScreenWidth; iScreenHeight = res.iScreenHeight;
     iSubtitles = res.iSubtitles; dwFlags = res.dwFlags;
     fPixelRatio = res.fPixelRatio; fRefreshRate = res.fRefreshRate;
-    strMode = res.strMode; strOutput = res.strOutput; strId = res.strId;
+    iBlanking = res.iBlanking;
   }
 };

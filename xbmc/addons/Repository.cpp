@@ -222,7 +222,11 @@ bool CRepositoryUpdateJob::DoWork()
     if (addon && addons[i]->Version() > addon->Version() &&
         !database.IsAddonBlacklisted(addons[i]->ID(),addons[i]->Version().c_str()))
     {
+#ifndef __PLEX__
       if (g_settings.m_bAddonAutoUpdate || addon->Type() >= ADDON_VIZ_LIBRARY)
+#else
+      if (addon->Type() >= ADDON_VIZ_LIBRARY)
+#endif
       {
         CStdString referer;
         if (URIUtils::IsInternetStream(addons[i]->Path()))
@@ -234,7 +238,7 @@ bool CRepositoryUpdateJob::DoWork()
         else
           CAddonInstaller::Get().Install(addon->ID(), true, referer);
       }
-      else if (g_settings.m_bAddonNotifications)
+      else if (g_settings.m_bAddonNotifications && addon->IsInUse())
       {
         CGUIDialogKaiToast::QueueNotification(addon->Icon(),
                                               g_localizeStrings.Get(24061),

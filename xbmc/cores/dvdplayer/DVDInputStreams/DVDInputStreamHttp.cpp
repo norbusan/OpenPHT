@@ -91,13 +91,13 @@ void CDVDInputStreamHttp::Close()
   m_pFile = NULL;
 }
 
-int CDVDInputStreamHttp::Read(BYTE* buf, int buf_size)
+int CDVDInputStreamHttp::Read(uint8_t* buf, int buf_size)
 {
   unsigned int ret = 0;
   if (m_pFile) ret = m_pFile->Read(buf, buf_size);
   else return -1;
 
-  if( ret <= 0 ) m_eof = true;
+  if( ret == 0 ) m_eof = true;
 
   return (int)(ret & 0xFFFFFFFF);
 }

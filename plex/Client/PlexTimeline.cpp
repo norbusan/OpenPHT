@@ -100,7 +100,7 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
       options.AddOption("machineIdentifier", m_item->GetProperty("plexserver").asString());
     }
 
-    int player = g_application.IsPlayingAudio() ? PLAYLIST_MUSIC : PLAYLIST_VIDEO;
+    int player = g_application.m_pPlayer->IsPlayingAudio() ? PLAYLIST_MUSIC : PLAYLIST_VIDEO;
     int playlistLen = g_playlistPlayer.GetPlaylist(player).size();
     int playlistPos = g_playlistPlayer.GetCurrentSong();
 
@@ -144,7 +144,7 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
     if (controllable.size() > 0 && m_state != PLEX_MEDIA_STATE_STOPPED)
       options.AddOption("controllable", StringUtils::Join(controllable, ","));
 
-    if (g_application.IsPlaying() && m_state != PLEX_MEDIA_STATE_STOPPED)
+    if (g_application.m_pPlayer->IsPlaying() && m_state != PLEX_MEDIA_STATE_STOPPED)
     {
       options.AddOption("volume", g_application.GetVolume());
 
@@ -162,7 +162,7 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
 
       options.AddOption("mute", g_application.IsMuted() ? "1" : "0");
 
-      if (m_type == PLEX_MEDIA_TYPE_VIDEO && g_application.IsPlayingVideo())
+      if (m_type == PLEX_MEDIA_TYPE_VIDEO && g_application.m_pPlayer->IsPlayingVideo())
       {
         int subid = g_application.m_pPlayer->GetSubtitleVisible() ? g_application.m_pPlayer->GetSubtitlePlexID() : -1;
         options.AddOption("subtitleStreamID", subid);
@@ -197,7 +197,7 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
     else if (m_continuing)
       options.AddOption("continuing", "1");
 
-    if (g_application.IsPlaying() && g_application.m_pPlayer)
+    if (g_application.m_pPlayer->IsPlaying())
     {
       if (g_application.m_pPlayer->CanSeek() && !durationStr.empty())
         options.AddOption("seekRange", "0-" + durationStr);

@@ -25,24 +25,38 @@
 
 #include <stdint.h>
 #include <math.h>
+#include "libavutil/attributes.h"
+#include "libavcodec/aac_defines.h"
+
+#if USE_FIXED
+#define CBRT(x) (int)floor((x).f * 8192 + 0.5)
+#else
+#define CBRT(x) x.i
+#endif
 
 #if CONFIG_HARDCODED_TABLES
+#if USE_FIXED
+#define cbrt_tableinit_fixed()
+#include "libavcodec/cbrt_fixed_tables.h"
+#else
 #define cbrt_tableinit()
 #include "libavcodec/cbrt_tables.h"
+#endif
 #else
 static uint32_t cbrt_tab[1 << 13];
 
-static void cbrt_tableinit(void)
+static av_cold void AAC_RENAME(cbrt_tableinit)(void)
 {
     if (!cbrt_tab[(1<<13) - 1]) {
         int i;
+        /* cbrtf() isn't available on all systems, so we use powf(). */
         for (i = 0; i < 1<<13; i++) {
             union {
                 float f;
                 uint32_t i;
             } f;
-            f.f = cbrtf(i) * i;
-            cbrt_tab[i] = f.i;
+            f.f = pow(i, 1.0 / 3.0) * i;
+            cbrt_tab[i] = CBRT(f);
         }
     }
 }

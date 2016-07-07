@@ -20,10 +20,15 @@
 
 #ifndef _POWER_MANAGER_H_
 #define _POWER_MANAGER_H_
+
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "IPowerSyscall.h"
 
 // For systems without PowerSyscalls we have a NullObject
-class CNullPowerSyscall : public IPowerSyscall
+class CNullPowerSyscall : public CAbstractPowerSyscall
 {
 public:
   virtual bool Powerdown()    { return false; }

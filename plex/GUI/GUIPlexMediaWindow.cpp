@@ -659,7 +659,7 @@ bool CGUIPlexMediaWindow::GetDirectory(const CStdString &strDirectory, CFileItem
 
   bool ret = CGUIMediaWindow::GetDirectory(u.Get(), items);
 
-#ifndef TARGET_RASPBERRY_PI
+#ifndef TARGET_OPENELEC
   m_thumbCache.Load(items);
 #endif
 
@@ -985,6 +985,8 @@ void CGUIPlexMediaWindow::CheckPlexFilters(CFileItemList &list)
     list.SetProperty("hasAdvancedFilters", m_sectionFilter->hasAdvancedFilters() ? "yes" : "");
     list.SetProperty("primaryFilterActivated", m_sectionFilter->secondaryFiltersActivated() ? "" : "yes");
     list.SetProperty("secondaryFilterActivated", m_sectionFilter->hasActiveSecondaryFilters() ? "yes" : "");
+    list.SetProperty("currentSortOrder", m_sectionFilter->currentSortOrder());
+    list.SetProperty("currentSortOrderAscending", m_sectionFilter->currentSortOrderAscending() ? "yes" : "");
   }
 
   CFileItemPtr section = g_plexApplication.dataLoader->GetSection(m_sectionRoot);

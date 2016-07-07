@@ -31,19 +31,18 @@
 class CAESinkPi : public IAESink
 {
 public:
-  virtual const char *GetName() { return "PI"; }
+  virtual const char *GetName() { return "SinkPi"; }
 
   CAESinkPi();
   virtual ~CAESinkPi();
 
   virtual bool Initialize(AEAudioFormat &format, std::string &device);
   virtual void Deinitialize();
-  virtual bool IsCompatible(const AEAudioFormat format, const std::string device);
+  virtual bool IsCompatible(const AEAudioFormat &format, const std::string &device);
 
-  virtual double       GetDelay        ();
-  virtual double       GetCacheTime    ();
+  virtual void         GetDelay        (AEDelayStatus& status);
   virtual double       GetCacheTotal   ();
-  virtual unsigned int AddPackets      (uint8_t *data, unsigned int frames, bool hasAudio);
+  virtual unsigned int AddPackets      (uint8_t **data, unsigned int frames, unsigned int offset);
   virtual void         Drain           ();
 
   static void          EnumerateDevicesEx(AEDeviceInfoList &list, bool force = false);

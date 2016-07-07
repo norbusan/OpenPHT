@@ -28,7 +28,7 @@
 #include "ConvolutionKernels.h"
 #include "YUV2RGBShader.h"
 #include "win32/WIN32Util.h"
-#include "cores/dvdplayer/DVDCodecs/Video/DVDVideoCodec.h"
+#include "Util.h"
 
 CYUV2RGBMatrix::CYUV2RGBMatrix()
 {
@@ -134,7 +134,7 @@ bool CWinShader::UnlockVertexBuffer()
   return true;
 }
 
-bool CWinShader::LoadEffect(CStdString filename, DefinesMap* defines)
+bool CWinShader::LoadEffect(const std::string& filename, DefinesMap* defines)
 {
   CLog::Log(LOGDEBUG, __FUNCTION__" - loading shader %s", filename.c_str());
 
@@ -145,7 +145,7 @@ bool CWinShader::LoadEffect(CStdString filename, DefinesMap* defines)
     return false;
   }
 
-  CStdString pStrEffect;
+  std::string pStrEffect;
   getline(file, pStrEffect, '\0');
 
   if (!m_effect.Create(pStrEffect, defines))
@@ -163,7 +163,7 @@ bool CWinShader::Execute(std::vector<LPDIRECT3DSURFACE9> *vecRT, unsigned int ve
 
   LPDIRECT3DSURFACE9 oldRT = 0;
   // The render target will be overriden: save the caller's original RT
-  if (vecRT != NULL && vecRT->size() > 0)
+  if (vecRT != NULL && !vecRT->empty())
     pD3DDevice->GetRenderTarget(0, &oldRT);
 
   pD3DDevice->SetFVF(m_FVF);
@@ -203,6 +203,10 @@ bool CWinShader::Execute(std::vector<LPDIRECT3DSURFACE9> *vecRT, unsigned int ve
     oldRT->Release();
   }
 
+  // MSDN says: Setting a new render target will cause the viewport 
+  // to be set to the full size of the new render target.
+  // So we need restore our viewport
+  g_Windowing.RestoreViewPort();
   return true;
 }
 
@@ -299,7 +303,7 @@ bool CYUV2RGBShader::Create(unsigned int sourceWidth, unsigned int sourceHeight,
   m_texSteps[0] = 1.0f/(float)texWidth;
   m_texSteps[1] = 1.0f/(float)sourceHeight;
 
-  CStdString effectString = "special://xbmc/system/shaders/yuv2rgb_d3d.fx";
+  std::string effectString = "special://xbmc/system/shaders/yuv2rgb_d3d.fx";
 
   if(!LoadEffect(effectString, &defines))
   {
@@ -404,7 +408,7 @@ void CYUV2RGBShader::SetShaderParameters(YUVBuffer* YUVbuf)
     m_effect.SetTexture("g_UTexture", m_YUVPlanes[1]);
   if (YUVbuf->GetActivePlanes() > 2)
     m_effect.SetTexture("g_VTexture", m_YUVPlanes[2]);
-  m_effect.SetFloatArray("g_StepXY", m_texSteps, sizeof(m_texSteps)/sizeof(m_texSteps[0]));
+  m_effect.SetFloatArray("g_StepXY", m_texSteps, ARRAY_SIZE(m_texSteps));
 }
 
 bool CYUV2RGBShader::UploadToGPU(YUVBuffer* YUVbuf)
@@ -511,7 +515,7 @@ bool CConvolutionShader::CreateHQKernel(ESCALINGMETHOD method)
 //==================================================================================
 bool CConvolutionShader1Pass::Create(ESCALINGMETHOD method)
 {
-  CStdString effectString;
+  std::string effectString;
   switch(method)
   {
     case VS_SCALINGMETHOD_CUBIC:
@@ -563,7 +567,7 @@ void CConvolutionShader1Pass::Render(CD3DTexture &sourceTexture,
 {
   PrepareParameters(sourceWidth, sourceHeight, sourceRect, destRect);
   float texSteps[] = { 1.0f/(float)sourceWidth, 1.0f/(float)sourceHeight};
-  SetShaderParameters(sourceTexture, &texSteps[0], sizeof(texSteps)/sizeof(texSteps[0]));
+  SetShaderParameters(sourceTexture, &texSteps[0], ARRAY_SIZE(texSteps));
   Execute(NULL,4);
 }
 
@@ -636,7 +640,7 @@ CConvolutionShaderSeparable::CConvolutionShaderSeparable()
 
 bool CConvolutionShaderSeparable::Create(ESCALINGMETHOD method)
 {
-  CStdString effectString;
+  std::string effectString;
   switch(method)
   {
     case VS_SCALINGMETHOD_CUBIC:
@@ -700,7 +704,7 @@ void CConvolutionShaderSeparable::Render(CD3DTexture &sourceTexture,
   PrepareParameters(sourceWidth, sourceHeight, destWidth, destHeight, sourceRect, destRect);
   float texSteps1[] = { 1.0f/(float)sourceWidth, 1.0f/(float)sourceHeight};
   float texSteps2[] = { 1.0f/(float)destWidth, 1.0f/(float)(sourceHeight)};
-  SetShaderParameters(sourceTexture, &texSteps1[0], sizeof(texSteps1)/sizeof(texSteps1[0]), &texSteps2[0], sizeof(texSteps2)/sizeof(texSteps2[0]));
+  SetShaderParameters(sourceTexture, &texSteps1[0], ARRAY_SIZE(texSteps1), &texSteps2[0], ARRAY_SIZE(texSteps2));
 
   // This part should be cleaned up, but how?
   std::vector<LPDIRECT3DSURFACE9> rts;
@@ -769,6 +773,10 @@ bool CConvolutionShaderSeparable::ClearIntermediateRenderTarget()
   currentRT->Release();
   intermediateRT->Release();
 
+  // MSDN says: Setting a new render target will cause the viewport 
+  // to be set to the full size of the new render target.
+  // So we need restore our viewport
+  g_Windowing.RestoreViewPort();
   return true;
 }
 
@@ -881,7 +889,7 @@ void CConvolutionShaderSeparable::SetShaderParameters(CD3DTexture &sourceTexture
 
 bool CTestShader::Create()
 {
-  CStdString effectString = "special://xbmc/system/shaders/testshader.fx";
+  std::string effectString = "special://xbmc/system/shaders/testshader.fx";
 
   if(!LoadEffect(effectString, NULL))
   {

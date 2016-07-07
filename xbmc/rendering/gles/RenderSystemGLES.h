@@ -65,16 +65,19 @@ public:
   virtual void SetViewPort(CRect& viewPort);
   virtual void GetViewPort(CRect& viewPort);
 
+  virtual bool ScissorsCanEffectClipping();
+  virtual CRect ClipRectToScissorRect(const CRect &rect);
   virtual void SetScissors(const CRect& rect);
   virtual void ResetScissors();
 
   virtual void CaptureStateBlock();
   virtual void ApplyStateBlock();
 
-  virtual void SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight);
+  virtual void SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor = 0.0f);
 
   virtual void ApplyHardwareTransform(const TransformMatrix &matrix);
   virtual void RestoreHardwareTransform();
+  virtual bool SupportsStereo(RENDER_STEREO_MODE mode) const;
 
   virtual bool TestRender();
 
@@ -110,7 +113,7 @@ protected:
   int        m_width;
   int        m_height;
 
-  CStdString m_RenderExtensions;
+  std::string m_RenderExtensions;
 
   CGUIShader  **m_pGUIshader;  // One GUI shader for each method
   ESHADERMETHOD m_method;      // Current GUI Shader method

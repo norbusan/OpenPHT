@@ -55,7 +55,7 @@ void CGUIDialogVideoOSD::FrameMove()
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_PVR_OSD_DIRECTOR)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_PVR_OSD_CUTTER)
                            || g_windowManager.IsWindowActive(WINDOW_DIALOG_OSD_TELETEXT)
-                           || g_application.IsPaused())
+                           || g_application.m_pPlayer->IsPausedPlayback())
       // extend show time by original value
       ResetAutoClose();
   }
@@ -64,18 +64,12 @@ void CGUIDialogVideoOSD::FrameMove()
 
 bool CGUIDialogVideoOSD::OnAction(const CAction &action)
 {
-  if (action.GetID() == ACTION_NEXT_ITEM || action.GetID() == ACTION_PREV_ITEM || action.GetID() == ACTION_CHANNEL_UP || action.GetID() == ACTION_CHANNEL_DOWN)
-  {
-    // these could indicate next chapter if video supports it
-    if (g_application.m_pPlayer != NULL && g_application.m_pPlayer->OnAction(action))
-      return true;
-  }
-
   if (action.GetID() == ACTION_SHOW_OSD)
   {
     Close();
     return true;
   }
+
   return CGUIDialog::OnAction(action);
 }
 

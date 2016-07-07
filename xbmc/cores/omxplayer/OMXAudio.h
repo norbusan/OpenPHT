@@ -27,19 +27,20 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
-#include "cores/AudioEngine/AEAudioFormat.h"
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
-#include "cores/AudioEngine/Utils/AERemap.h"
-#include "cores/IAudioCallback.h"
 #include "linux/PlatformDefs.h"
 #include "DVDStreamInfo.h"
 
 #include "OMXClock.h"
 #include "OMXCore.h"
-#include "DllAvCodec.h"
-#include "DllAvUtil.h"
 
 #include "threads/CriticalSection.h"
+
+extern "C" {
+#include "libavcodec/avcodec.h"
+#include "libavutil/avutil.h"
+}
 
 #define AUDIO_BUFFER_SECONDS 3
 #define VIS_PACKET_SIZE 512
@@ -54,8 +55,6 @@
 class COMXAudio
 {
 public:
-  void UnRegisterAudioCallback();
-  void RegisterAudioCallback(IAudioCallback* pCallback);
   unsigned int GetChunkLen();
   float GetDelay();
   float GetCacheTime();
@@ -96,7 +95,6 @@ public:
   float GetMaxLevel(double &pts);
 
 private:
-  IAudioCallback* m_pCallback;
   bool          m_Initialized;
   float         m_CurrentVolume;
   bool          m_Mute;
@@ -155,7 +153,6 @@ protected:
   COMXCoreTunel     m_omx_tunnel_decoder;
   COMXCoreTunel     m_omx_tunnel_splitter_analog;
   COMXCoreTunel     m_omx_tunnel_splitter_hdmi;
-  DllAvUtil         m_dllAvUtil;
 
   CCriticalSection m_critSection;
 };

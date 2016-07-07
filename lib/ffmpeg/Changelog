@@ -1,302 +1,859 @@
 Entries are sorted chronologically from oldest to youngest within each release,
 releases are sorted from youngest to oldest.
 
-version next:
+version 2.8.7
+- avcodec/motion_est: Attempt to fix "short data segment overflowed" on IA64
+- avformat/ffmdec: Check pix_fmt
+- avcodec/ttaenc: Reallocate packet if its too small
+- pgssubdec: fix subpicture output colorspace and range
+- avcodec/ac3dec: Reset SPX when switching from EAC3 to AC3
+- avfilter/vf_drawtext: Check return code of load_glyph()
+- avcodec/takdec: add code that got somehow lost in process of REing
+- avcodec/apedec: fix decoding of stereo files with one channel full of silence
+- avcodec/avpacket: Fix off by 5 error
+- avcodec/h264: Fix for H.264 configuration parsing
+- avcodec/bmp_parser: Ensure remaining_size is not too small in startcode packet crossing corner case
+- avfilter/src_movie: fix how we check for overflows with seek_point
+- avcodec/j2kenc: Add attribution to OpenJPEG project:
+- avcodec/h264_slice: Check PPS more extensively when its not copied
+- avcodec/libutvideodec: copy frame so it has reference counters when refcounted_frames is set
+- avformat/rtpdec_jpeg: fix low contrast image on low quality setting
+- avcodec/mjpegenc_common: Store approximate aspect if exact cannot be stored
+- lavc/hevc: Allow arbitrary garbage in bytestream as long as at least one NAL unit is found.
+- avcodec/resample: Remove disabled and faulty code
+- indeo2: Fix banding artefacts
+- indeo2data: K&R formatting cosmetics
+- avcodec/imgconvert: Support non-planar colorspaces while padding
+- avutil/random_seed: Add the runtime in cycles of the main loop to the entropy pool
+- avutil/channel_layout: AV_CH_LAYOUT_6POINT1_BACK not reachable in parsing
+- avformat/concatdec: set safe mode to enabled instead of auto
+- avformat/utils: fix dts from pts code in compute_pkt_fields() during ascending delay
+- avformat/rtpenc: Fix integer overflow in NTP_TO_RTP_FORMAT
+- avformat/cache: Fix memleak of tree entries
+- lavf/mov: downgrade sidx errors to non-fatal warnings; fixes trac #5216 (cherry picked from commit 22dbc1caaf13e4bb17c9e0164a5b1ccaf490e428)
+- lavf/mov: fix sidx with edit lists (cherry picked from commit 3617e69d50dd9dd07b5011dfb9477a9d1a630354)
+- avcodec/mjpegdec: Fix decoding slightly odd progressive jpeg
+- libwebpenc_animencoder: print library messages in verbose log levels
+- libwebpenc_animencoder: zero initialize the WebPAnimEncoderOptions struct
+- doc/utils: fix typo for min() description
+- avcodec/avpacket: clear priv in av_init_packet()
+- swscale/utils: Fix chrSrcHSubSample for GBRAP16
+- swscale/input: Fix GBRAP16 input
+- postproc: fix unaligned access
+- avutil/pixdesc: Make get_color_type() aware of CIE XYZ formats
+- avcodec/h264: Execute error concealment before marking the frame as done.
+- swscale/x86/output: Fix yuv2planeX_16* with unaligned destination
+- swscale/x86/output: Move code into yuv2planeX_mainloop
+- avutil/frame: Free destination qp_table_buf in frame_copy_props()
 
 
-version 0.10.11
-
-- pthread: Avoid spurious wakeups
-- pthread: Fix deadlock during thread initialization
-- mpegvideo: Initialize chroma_*_shift and codec_tag even if the size is 0
-- vc1dec: Don't decode slices when the latest slice header failed to decode
-- vc1dec: Make sure last_picture is initialized in vc1_decode_skip_blocks
-- r3d: Add more input value validation
-- fraps: Make the input buffer size checks more strict
-- svq3: Avoid a division by zero
-- rmdec: Validate the fps value
-- twinvqdec: Check the ibps parameter separately
-- asfdec: Check the return value of asf_read_stream_properties
-- mxfdec: set audio timebase to 1/samplerate
-- pcx: Check the packet size before assuming it fits a palette
-- rpza: Fix a buffer size check
-- xxan: Disallow odd width
-- xan: Only read within the data that actually was initialized
-- xan: Use bytestream2 to limit reading to within the buffer
-- pcx: Consume the whole packet if giving up due to missing palette
-- pngdec: Stop trying to decode once inflate returns Z_STREAM_END
-- mov: Make sure the read sample count is nonnegative
-- bfi: Add some very basic sanity checks for input packet sizes
-- bfi: Avoid divisions by zero
-- electronicarts: Add more sanity checking for the number of channels
-- riffdec: Add sanity checks for the sample rate
-- mvi: Add sanity checking for the audio frame size
-- xwma: Avoid division by zero
-- avidec: Make sure a packet is large enough before reading its data
-- vqf: Make sure the bitrate is in the valid range
-- vqf: Make sure sample_rate is set to a valid value
-- vc1dec: Undo mpegvideo initialization if unable to allocate tables
-- vc1dec: Fix leaks in ff_vc1_decode_init_alloc_tables on errors
-- wnv1: Make sure the input packet is large enough
-- dca: Validate the lfe parameter
-- rl2: Avoid a division by zero
-- wtv: Add more sanity checks for a length read from the file
-- segafilm: Validate the number of audio channels
-- qpeg: Add checks for running out of rows in qpeg_decode_inter
-- mpegaudiodec: Validate that the number of channels fits at the given offset
-- asv1: Verify the amount of extradata
-- idroqdec: Make sure a video stream has been allocated before returning packets
-- rv10: Validate the dimensions set from the container
-- xmv: Add more sanity checks for parameters read from the bitstream
-- ffv1: Make sure at least one slice context is initialized
-- truemotion2: Use av_freep properly in an error path
-- eacmv: Make sure a reference frame exists before referencing it
-- mpeg4videodec: Check the width/height in mpeg4_decode_sprite_trajectory
-- ivi_common: Make sure color planes have been initialized
-- oggparseogm: Convert to use bytestream2
-- rv34: Check the return value from ff_rv34_decode_init
-- matroskadec: Verify realaudio codec parameters
-- mace: Make sure that the channel count is set to a valid value
-- svq3: Check for any negative return value from ff_h264_check_intra_pred_mode
-- vp3: Check the framerate for validity
-- cavsdec: Make sure a sequence header has been decoded before decoding pictures
-- sierravmd: Do sanity checking of frame sizes
-- omadec: Properly check lengths before incrementing the position
-- mpc8: Make sure the first stream exists before parsing the seek table
-- mpc8: Check the seek table size parsed from the bitstream
-- zmbvdec: Check the buffer size for uncompressed data
-- ape: Don't allow the seektable to be omitted
-- shorten: Break out of loop looking for fmt chunk if none is found
-- shorten: Use a checked bytestream reader for the wave header
-- smacker: Make sure we don't fill in huffman codes out of range
-- smacker: Avoid integer overflow when allocating packets
-- smacker: Don't return packets in unallocated streams
-- dsicin: Add some basic sanity checks for fields read from the file
-- roqvideodec: check dimensions validity
-- qdm2: check array index before use, fix out of array accesses
-- alsdec: check block length
+version 2.8.6
+- avcodec/jpeg2000dec: More completely check cdef
+- avutil/opt: check for and handle errors in av_opt_set_dict2()
+- avcodec/flacenc: fix calculation of bits required in case of custom sample rate
+- avformat: Document urls a bit
+- avformat/libquvi: Set default demuxer and protocol limitations
+- avformat/concat: Check protocol prefix
+- doc/demuxers: Document enable_drefs and use_absolute_path
+- avcodec/mjpegdec: Check for end for both bytes in unescaping
+- avcodec/mpegvideo_enc: Check for integer overflow in ff_mpv_reallocate_putbitbuffer()
+- avformat/avformat: Replace some references to filenames by urls
+- avcodec/wmaenc: Check ff_wma_init() for failure
+- avcodec/mpeg12enc: Move high resolution thread check to before initializing threads
+- avformat/img2dec: Use AVOpenCallback
+- avformat/avio: Limit url option parsing to the documented cases
+- avformat/img2dec: do not interpret the filename by default if a IO context has been opened
+- avcodec/ass_split: Fix null pointer dereference in ff_ass_style_get()
+- mov: Add an option to toggle dref opening
+- avcodec/gif: Fix lzw buffer size
+- avcodec/put_bits: Assert buf_ptr in flush_put_bits()
+- avcodec/tiff: Check subsample & rps values more completely
+- swscale/swscale: Add some sanity checks for srcSlice* parameters
+- swscale/x86/rgb2rgb_template: Fix planar2x() for short width
+- swscale/swscale_unscaled: Fix odd height inputs for bayer_to_yv12_wrapper()
+- swscale/swscale_unscaled: Fix odd height inputs for bayer_to_rgb24_wrapper()
+- avcodec/aacenc: Check both channels for finiteness
+- asfdec_o: check for too small size in asf_read_unknown
+- asfdec_o: break if EOF is reached after asf_read_packet_header
+- asfdec_o: make sure packet_size is non-zero before seeking
+- asfdec_o: prevent overflow causing seekback
+- asfdec_o: check avio_skip in asf_read_simple_index
+- asfdec_o: reject size > INT64_MAX in asf_read_unknown
+- asfdec_o: only set asf_pkt->data_size after sanity checks
+- Merge commit '8375dc1dd101d51baa430f34c0bcadfa37873896'
+- dca: fix misaligned access in avpriv_dca_convert_bitstream
+- brstm: fix missing closing brace
+- brstm: also allocate b->table in read_packet
+- brstm: make sure an ADPC chunk was read for adpcm_thp
+- vorbisdec: reject rangebits 0 with non-0 partitions
+- vorbisdec: reject channel mapping with less than two channels
+- ffmdec: reset packet_end in case of failure
+- avformat/ipmovie: put video decoding_map_size into packet and use it in decoder
+- avformat/brstm: fix overflow
 
 
-version 0.10.10
-
-- x86: fft: Remove 3DNow! optimizations, they break FATE
-- x86: ac3dsp: Drop mmx variant of ac3_max_msb_abs_int16
-- aac: Check init_get_bits return value
-- aac: return meaningful errors
-- dsicinav: K&R formatting cosmetics
-- mov: Seek back if overreading an individual atom
-- vcr1: add sanity checks
-- pictordec: pass correct context to avpriv_request_sample
-- dsicinav: Clip the source size to the expected maximum
-- alsdec: Clean up error paths
-- ogg: Fix potential infinite discard loop
-- nuv: check rtjpeg_decode_frame_yuv420 return value
-- nuv: Reset the frame on resize
-- nuv: Use av_fast_realloc
-- nuv: return meaningful error codes.
-- nuv: Pad the lzo outbuf
-- nuv: Do not ignore lzo decompression failures
-- oma: correctly mark and decrypt partial packets
-- oma: check geob tag boundary
-- oma: refactor seek function
-- 8bps: Bound-check the input buffer
-- rtmp: Do not misuse memcmp
-- rtmp: rename data_size to size
-- lavc: set the default rc_initial_buffer_occupancy
-- 4xm: Reject not a multiple of 16 dimension
-- 4xm: do not overread the prestream buffer
-- 4xm: validate the buffer size before parsing it
-- indeo: Do not reference mismatched tiles
-- indeo: Sanitize ff_ivi_init_planes fail paths
-- indeo: Bound-check before applying motion compensation
-- indeo: Bound-check before applying transform
-- indeo: reject negative array indexes
-- indeo: Cosmetic formatting
-- indeo: Refactor ff_ivi_init_tiles and ivi_decode_blocks
-- indeo: Refactor ff_ivi_dec_huff_desc
-- lavf: fix the comparison in an overflow check
-- dv: Add a guard to not overread the ppcm array
-- mpegvideo: Avoid 32-bit wrapping of linesize multiplications
-- mjpegb: Detect changing number of planes in interlaced video
-- matroskadec: Check that .lang was allocated and set before reading it
-- ape demuxer: check for EOF in potentially long loops
-- lavf: avoid integer overflow when estimating bitrate
-- pictordec: break out of both decoding loops when y drops below 0
-- ac3: Return proper error codes
-- ac3: Clean up the error paths
-- ac3: Do not clash with normal AVERROR
-- dxa: Make sure the reference frame exists
-- h261: check the mtype index
-- segafilm: Error out on impossible packet size
-- ogg: Always alloc the private context in vorbis_header
-- vc1: check mb_height validity.
-- vc1: check the source buffer in vc1_mc functions
-- bink: Bound check the quantization matrix.
-- xl: Make sure the width is valid
-- alsdec: Fix the clipping range
-- dsicinav: Bound-check the source buffer when needed
-- mov: Do not allow updating the time scale after it has been set
-- ac3dec: Don't consume more data than the actual input packet size
-- indeo: Reject impossible FRAMETYPE_NULL
-- indeo5: return proper error codes
-- indeo4: Validate scantable dimension
-- indeo4: Check the quantization matrix index
-- indeo4: Do not access missing reference MV
-- adpcm: Unbreak ima-dk4
-- ac3dec: validate channel output mode against channel count
-- dca: Respect the current limits in the downmixing capabilities
-- dca: Error out on missing DSYNC
-- pcm: always use codec->id instead of codec_id
-- mlpdec: Do not set invalid context in read_restart_header
-- pcx: Do not overread source buffer in pcx_rle_decode
-- wmavoice: conceal clearly corrupted blocks
-- iff: Do not read over the source buffer
-- qdm2: Conceal broken samples
-- qdm2: refactor joined stereo support
-- adpcm: Write the correct number of samples for ima-dk4
-- imc: Catch a division by zero
-- atrac3: Error on impossible encoding/channel combinations
-- atrac3: set the getbits context the right buffer_end
-- atrac3: fix error handling
-- qdm2: check and reset dithering index per channel
-- westwood_vqa: do not free extradata on error in read_header
-- vqavideo: check the version
-- rmdec: Use the AVIOContext given as parameter in rm_read_metadata()
-- avio: Handle AVERROR_EOF in the same way as the return value 0
-- wtv: Mark attachment with a negative stream id
-- avidec: Let the inner dv demuxer take care of discarding
-- swfdec: do better validation of tag length
+version 2.8.5
+- avformat/hls: Even stricter URL checks
+- avformat/hls: More strict url checks
+- avcodec/pngenc: Fix mixed up linesizes
+- avcodec/pngenc: Replace memcpy by av_image_copy()
+- swscale/vscale: Check that 2 tap filters are bilinear before using bilinear code
+- swscale: Move VScalerContext into vscale.c
+- swscale/utils: Detect and skip unneeded sws_setColorspaceDetails() calls
+- swscale/yuv2rgb: Increase YUV2RGB table headroom
+- swscale/yuv2rgb: Factor YUVRGB_TABLE_LUMA_HEADROOM out
+- avformat/hls: forbid all protocols except http(s) & file
+- avformat/aviobuf: Fix end check in put_str16()
+- avformat/asfenc: Check pts
+- avcodec/mpeg4video: Check time_incr
+- avcodec/wavpackenc: Check the number of channels
+- avcodec/wavpackenc: Headers are per channel
+- avcodec/aacdec_template: Check id_map
+- avcodec/dvdec: Fix "left shift of negative value -254"
+- avcodec/g2meet: Check for ff_els_decode_bit() failure in epic_decode_run_length()
+- avcodec/mjpegdec: Fix negative shift
+- avcodec/mss2: Check for repeat overflow
+- avformat: Add integer fps from 31 to 60 to get_std_framerate()
+- avformat/ivfenc: fix division by zero
+- avcodec/mpegvideo_enc: Clip bits_per_raw_sample within valid range
+- avfilter/vf_scale: set proper out frame color range
+- avcodec/motion_est: Fix mv_penalty table size
+- avcodec/h264_slice: Fix integer overflow in implicit weight computation
+- swscale/utils: Use normal bilinear scaler if fast cannot be used due to tiny dimensions
+- avcodec/put_bits: Always check buffer end before writing
+- mjpegdec: extend check for incompatible values of s->rgb and s->ls
+- swscale/utils: Fix intermediate format for cascaded alpha downscaling
+- avformat/mov: Update handbrake_version threshold for full mp3 parsing
+- x86/float_dsp: zero extend offset from ff_scalarproduct_float_sse
+- avfilter/vf_zoompan: do not free frame we pushed to lavfi
+- nuv: sanitize negative fps rate
+- nutdec: reject negative value_len in read_sm_data
+- xwddec: prevent overflow of lsize * avctx->height
+- nutdec: only copy the header if it exists
+- exr: fix out of bounds read in get_code
+- on2avc: limit number of bits to 30 in get_egolomb
 
 
-version 0.10.8
-- kmvc: Clip pixel position to valid range
-- kmvc: use fixed sized arrays in the context
-- indeo: use a typedef for the mc function pointer
-- lavc: check for overflow in init_get_bits
-- mjpegdec: properly report unsupported disabled features
-- jpegls: return meaningful errors
-- jpegls: factorize return paths
-- jpegls: check the scan offset
-- wavpack: validate samples size parsed in wavpack_decode_block
-- ljpeg: use the correct number of components in yuv
-- mjpeg: Validate sampling factors
-- mjpegdec: validate parameters in mjpeg_decode_scan_progressive_ac
-- wavpack: check packet size early
-- wavpack: return meaningful errors
-- apetag: use int64_t for filesize
-- tiff: do not overread the source buffer
-- Prepare for 0.8.8 Release
-- smacker: fix an off by one in huff.length computation
-- smacker: check the return value of smacker_decode_tree
-- smacker: pad the extradata allocation
-- smacker: check frame size validity
-- vmdav: convert to bytestream2
-- 4xm: don't rely on get_buffer() initializing the frame.
-- 4xm: check the return value of read_huffman_tables().
-- 4xm: use the correct logging context
-- 4xm: reject frames not compatible with the declared version
-- 4xm: check bitstream_size boundary before using it
-- 4xm: do not overread the source buffer in decode_p_block
-- avfiltergraph: check for sws opts being non-NULL before using them
-- bmv: check for len being valid in bmv_decode_frame()
-- dfa: check for invalid access in decode_wdlt()
-- indeo3: check motion vectors
-- indeo3: fix data size check
-- indeo3: switch parsing the header to bytestream2
-- lavf: make sure stream probe data gets freed.
-- oggdec: fix faulty cleanup prototype
-- oma: Validate sample rates
-- qdm2: check that the FFT size is a power of 2
-- rv10: check that extradata is large enough
-- xmv: check audio track parameters validity
-- xmv: do not leak memory in the error paths in xmv_read_header()
-- aac: check the maximum number of channels
-- indeo3: fix off by one in MV validity check, Bug #503
-- id3v2: check for end of file while unescaping tags
-- wav: Always seek to an even offset, Bug #500, LP: #1174737
-- proresdec: support mixed interlaced/non-interlaced content
+version 2.8.4
+- rawdec: only exempt BIT0 with need_copy from buffer sanity check
+- mlvdec: check that index_entries exist
+- avcodec/mpeg4videodec: also for empty partitioned slices
+- avcodec/h264_refs: Fix long_idx check
+- avcodec/h264_mc_template: prefetch list1 only if it is used in the MB
+- avcodec/h264_slice: Simplify ref2frm indexing
+- avfilter/vf_mpdecimate: Add missing emms_c()
+- sonic: make sure num_taps * channels is not larger than frame_size
+- opus_silk: fix typo causing overflow in silk_stabilize_lsf
+- ffm: reject invalid codec_id and codec_type
+- golomb: always check for invalid UE golomb codes in get_ue_golomb
+- sbr_qmf_analysis: sanitize input for 32-bit imdct
+- sbrdsp_fixed: assert that input values are in the valid range
+- aacsbr: ensure strictly monotone time borders
+- aacenc: update max_sfb when num_swb changes
+- aaccoder: prevent crash of anmr coder
+- ffmdec: reject zero-sized chunks
+- swscale/x86/rgb2rgb_template: Fallback to mmx in interleaveBytes() if the alignment is insufficient for SSE*
+- swscale/x86/rgb2rgb_template: Do not crash on misaligend stride
+- avformat/mxfenc: Do not crash if there is no packet in the first stream
+- lavf/tee: fix side data double free.
+- avformat/hlsenc: Check the return code of avformat_write_header()
+- avformat/mov: Enable parser for mp3s by old HandBrake
+- avformat/mxfenc: Fix integer overflow in length computation
+- avformat/utils: estimate_timings_from_pts - increase retry counter, fixes invalid duration for ts files with hevc codec
+- avformat/matroskaenc: Check codecdelay before use
+- avutil/mathematics: Fix division by 0
+- mjpegdec: consider chroma subsampling in size check
+- libvpxenc: remove some unused ctrl id mappings
+- avcodec/vp3: ensure header is parsed successfully before tables
+- avcodec/jpeg2000dec: Check bpno in decode_cblk()
+- avcodec/pgssubdec: Fix left shift of 255 by 24 places cannot be represented in type int
+- swscale/utils: Fix for runtime error: left shift of negative value -1
+- avcodec/hevc: Fix integer overflow of entry_point_offset
+- avcodec/dirac_parser: Check that there is a previous PU before accessing it
+- avcodec/dirac_parser: Add basic validity checks for next_pu_offset and prev_pu_offset
+- avcodec/dirac_parser: Fix potential overflows in pointer checks
+- avcodec/wmaprodec: Check bits per sample to be within the range not causing integer overflows
+- avcodec/wmaprodec: Fix overflow of cutoff
+- avformat/smacker: fix integer overflow with pts_inc
+- avcodec/vp3: Fix "runtime error: left shift of negative value"
+- avformat/riffdec: Initialize bitrate
+- mpegencts: Fix overflow in cbr mode period calculations
+- avutil/timecode: Fix fps check
+- avutil/mathematics: return INT64_MIN (=AV_NOPTS_VALUE) from av_rescale_rnd() for overflows
+- avcodec/apedec: Check length in long_filter_high_3800()
+- avcodec/vp3: always set pix_fmt in theora_decode_header()
+- avcodec/mpeg4videodec: Check available data before reading custom matrix
+- avutil/mathematics: Do not treat INT64_MIN as positive in av_rescale_rnd
+- avutil/integer: Fix av_mod_i() with negative dividend
+- avformat/dump: Fix integer overflow in av_dump_format()
+- avcodec/h264_refs: Check that long references match before use
+- avcodec/utils: Clear dimensions in ff_get_buffer() on failure
+- avcodec/utils: Use 64bit for aspect ratio calculation in avcodec_string()
+- avcodec/hevc: Check max ctb addresses for WPP
+- avcodec/vp3: Clear context on reinitialization failure
+- avcodec/hevc: allocate entries unconditionally
+- avcodec/hevc_cabac: Fix multiple integer overflows
+- avcodec/jpeg2000dwt: Check ndeclevels before calling dwt_encode*()
+- avcodec/jpeg2000dwt: Check ndeclevels before calling dwt_decode*()
+- avcodec/hevc: Check entry_point_offsets
+- lavf/rtpenc_jpeg: Less strict check for standard Huffman tables.
+- avcodec/ffv1dec: Clear quant_table_count if its invalid
+- avcodec/ffv1dec: Print an error if the quant table count is invalid
+- doc/filters/drawtext: fix centering example
 
 
-version 0.10.6:
+version 2.8.3
+- avcodec/cabac: Check initial cabac decoder state
+- avcodec/cabac_functions: Fix "left shift of negative value -31767"
+- avcodec/h264_slice: Limit max_contexts when slice_context_count is initialized
+- rtmpcrypt: Do the xtea decryption in little endian mode
+- avformat/matroskadec: Check subtitle stream before dereferencing
+- avcodec/pngdec: Replace assert by request for sample for unsupported TRNS cases
+- avformat/utils: Do not init parser if probing is unfinished
+- avcodec/jpeg2000dec: Fix potential integer overflow with tile dimensions
+- avcodec/jpeg2000: Use av_image_check_size() in ff_jpeg2000_init_component()
+- avcodec/wmaprodec: Check for overread in decode_packet()
+- avcodec/smacker: Check that the data size is a multiple of a sample vector
+- avcodec/takdec: Skip last p2 sample (which is unused)
+- avcodec/dxtory: Fix input size check in dxtory_decode_v1_410()
+- avcodec/dxtory: Fix input size check in dxtory_decode_v1_420()
+- avcodec/error_resilience: avoid accessing previous or next frames tables beyond height
+- avcodec/dpx: Move need_align to act per line
+- avcodec/flashsv: Check size before updating it
+- avcodec/ivi: Check image dimensions
+- avcodec/utils: Better check for channels in av_get_audio_frame_duration()
+- avcodec/jpeg2000dec: Check for duplicate SIZ marker
+- aacsbr: don't call sbr_dequant twice without intermediate read_sbr_data
+- hqx: correct type and size check of info_offset
+- mxfdec: check edit_rate also for physical_track
+- avcodec/jpeg2000: Change coord to 32bit to support larger than 32k width or height
+- avcodec/jpeg2000dec: Check SIZ dimensions to be within the supported range
+- avcodec/jpeg2000: Check comp coords to be within the supported size
+- mpegvideo: clear overread in clear_context
+- avcodec/avrndec: Use the AVFrame format instead of the context
+- dds: disable palette flag for compressed images
+- dds: validate compressed source buffer size
+- dds: validate source buffer size before copying
+- dvdsubdec: validate offset2 similar to offset1
+- brstm: reject negative sample rate
+- aacps: avoid division by zero in stereo_processing
+- softfloat: assert when the argument of av_sqrt_sf is negative
 
-- many bug fixes that where found with Coverity
+version 2.8.2
+- various fixes in the aac_fixed decoder
+- various fixes in softfloat
+- swresample/resample: increase precision for compensation
+- lavf/mov: add support for sidx fragment indexes
+- avformat/mxfenc: Only store user comment related tags when needed
+- tests/fate/avformat: Fix fate-lavf
+- doc/ffmpeg: Clarify that the sdp_file option requires an rtp output.
+- ffmpeg: Don't try and write sdp info if none of the outputs had an rtp format.
+- apng: use correct size for output buffer
+- jvdec: avoid unsigned overflow in comparison
+- avcodec/jpeg2000dec: Clip all tile coordinates
+- avcodec/microdvddec: Check for string end in 'P' case
+- avcodec/dirac_parser: Fix undefined memcpy() use
+- avformat/xmv: Discard remainder of packet on error
+- avformat/xmv: factor return check out of if/else
+- avcodec/mpeg12dec: Do not call show_bits() with invalid bits
+- avcodec/faxcompr: Add missing runs check in decode_uncompressed()
+- libavutil/channel_layout: Check strtol*() for failure
+- avformat/mpegts: Only start probing data streams within probe_packets
+- avcodec/hevc_ps: Check chroma_format_idc
+- avcodec/ffv1dec: Check for 0 quant tables
+- avcodec/mjpegdec: Reinitialize IDCT on BPP changes
+- avcodec/mjpegdec: Check index in ljpeg_decode_yuv_scan() before using it
+- avutil/file_open: avoid file handle inheritance on Windows
+- avcodec/h264_slice: Disable slice threads if there are multiple access units in a packet
+- avformat/hls: update cookies on setcookie response
+- opusdec: Don't run vector_fmul_scalar on zero length arrays
+- avcodec/opusdec: Fix extra samples read index
+- avcodec/ffv1: Initialize vlc_state on allocation
+- avcodec/ffv1dec: update progress in case of broken pointer chains
+- avcodec/ffv1dec: Clear slice coordinates if they are invalid or slice header decoding fails for other reasons
+- rtsp: Allow $ as interleaved packet indicator before a complete response header
+- videodsp: don't overread edges in vfix3 emu_edge.
+- avformat/mp3dec: improve junk skipping heuristic
+- concatdec: fix file_start_time calculation regression
+- avcodec: loongson optimize h264dsp idct and loop filter with mmi
+- avcodec/jpeg2000dec: Clear properties in jpeg2000_dec_cleanup() too
+- avformat/hls: add support for EXT-X-MAP
+- avformat/hls: fix segment selection regression on track changes of live streams
+- configure: Require libkvazaar < 0.7.
+- avcodec/vp8: Do not use num_coeff_partitions in thread/buffer setup
 
-- The following CVE fixes where backported:
-  CVE-2012-2796, CVE-2012-2775, CVE-2012-2772, CVE-2012-2776,
-  CVE-2012-2779, CVE-2012-2787, CVE-2012-2794, CVE-2012-2800,
-  CVE-2012-2802, CVE-2012-2801, CVE-2012-2786, CVE-2012-2798,
-  CVE-2012-2793, CVE-2012-2789, CVE-2012-2788, CVE-2012-2790,
-  CVE-2012-2777, CVE-2012-2784
 
-- hundreads of other bug fixes, some possibly security relevant,
-  see the git log for details.
+version 2.8.1:
+- swscale: fix ticket #4881
+- doc: fix spelling errors
+- hls: only seek if there is an offset
+- asfdec: add more checks for size left in asf packet buffer
+- asfdec: alloc enough space for storing name in asf_read_metadata_obj
+- avcodec/pngdec: Check blend_op.
+- h264_mp4toannexb: fix pps offfset fault when there are more than one sps in avcc
+- avcodec/h264_mp4toannexb_bsf: Use av_freep() to free spspps_buf
+- avformat/avidec: Workaround broken initial frame
+- avformat/hls: fix some cases of HLS streams which require cookies
+- avcodec/pngdec: reset has_trns after every decode_frame_png()
+- lavf/img2dec: Fix memory leak
+- avcodec/mp3: fix skipping zeros
+- avformat/srtdec: make sure we probe a number
+- configure: check for ID3D11VideoContext
+- avformat/vobsub: compare correct packet stream IDs
+- avformat/srtdec: more lenient first line probing
+- avformat/srtdec: fix number check for the first character
+- avcodec/mips: build fix for MSA 64bit
+- avcodec/mips: build fix for MSA
+- avformat/httpauth: Add space after commas in HTTP/RTSP auth header
+- libavformat/hlsenc: Use of uninitialized memory unlinking old files
+- avcodec/x86/sbrdsp: Fix using uninitialized upper 32bit of noise
+- avcodec/ffv1dec: Fix off by 1 error in quant_table_count check
+- avcodec/ffv1dec: Explicitly check read_quant_table() return value
+- dnxhddata: correct weight tables
+- dnxhddec: decode and use interlace mb flag
+- swscale: fix ticket #4877
+- avcodec/rangecoder: Check e
+- avcodec/ffv1: separate slice_count from max_slice_count
+- swscale: fix ticket 4850
+- cmdutils: Filter dst/srcw/h
+- avutil/log: fix zero length gnu_printf format string warning
+- lavf/webvttenc: Require webvtt file to contain exactly one WebVTT stream.
+- swscale/swscale: Fix "unused variable" warning
+- avcodec/mjpegdec: Fix decoding RGBA RCT LJPEG
+- MAINTAINERS: add 2.8, drop 2.2
+- doc: mention libavcodec can decode Opus natively
+- hevc: properly handle no_rasl_output_flag when removing pictures from the DPB
+- avfilter/af_ladspa: process all channels for nb_handles > 1
+- configure: add libsoxr to swresample's pkgconfig
+- lavc: Fix compilation with --disable-everything --enable-parser=mpeg4video.
+
+version 2.8:
+- colorkey video filter
+- BFSTM/BCSTM demuxer
+- little-endian ADPCM_THP decoder
+- Hap decoder and encoder
+- DirectDraw Surface image/texture decoder
+- ssim filter
+- optional new ASF demuxer
+- showvolume filter
+- Many improvements to the JPEG 2000 decoder
+- Go2Meeting decoding support
+- adrawgraph audio and drawgraph video filter
+- removegrain video filter
+- Intel QSV-accelerated MPEG-2 video and HEVC encoding
+- Intel QSV-accelerated MPEG-2 video and HEVC decoding
+- Intel QSV-accelerated VC-1 video decoding
+- libkvazaar HEVC encoder
+- erosion, dilation, deflate and inflate video filters
+- Dynamic Audio Normalizer as dynaudnorm filter
+- Reverse video and areverse audio filter
+- Random filter
+- deband filter
+- AAC fixed-point decoding
+- sidechaincompress audio filter
+- bitstream filter for converting HEVC from MP4 to Annex B
+- acrossfade audio filter
+- allyuv and allrgb video sources
+- atadenoise video filter
+- OS X VideoToolbox support
+- aphasemeter filter
+- showfreqs filter
+- vectorscope filter
+- waveform filter
+- hstack and vstack filter
+- Support DNx100 (1440x1080@8)
+- VAAPI hevc hwaccel
+- VDPAU hevc hwaccel
+- framerate filter
+- Switched default encoders for webm to VP9 and Opus
+- Removed experimental flag from the JPEG 2000 encoder
 
 
-version 0.10.5:
-
-- Several bugs and crashes have been fixed as well as build problems
-  with recent mingw64
-
-
-version 0.10.4:
-
-- Several bugs and crashes have been fixed
-  Note, CVE-2012-0851 and CVE-2011-3937 have been fixed in previous releases
-
-version 0.10.3:
-
-- Security fixes in the 4xm demuxer, avi demuxer, cook decoder,
-  mm demuxer, mpegvideo decoder, vqavideo decoder (CVE-2012-0947) and
-  xmv demuxer.
-
-- Several bugs and crashes have been fixed in the following codecs: AAC,
-  APE, H.263, H.264, Indeo 4, Mimic, MJPEG, Motion Pixels Video, RAW,
-  TTA, VC1, VQA, WMA Voice, vqavideo.
-
-- Several bugs and crashes have been fixed in the following formats:
-  ASF, ID3v2, MOV, xWMA
-
-- This release additionally updates the following codecs to the
-  bytestream2 API, and therefore benefit from additional overflow
-  checks: truemotion2, utvideo, vqavideo
+version 2.7:
+- FFT video filter
+- TDSC decoder
+- DTS lossless extension (XLL) decoding (not lossless, disabled by default)
+- showwavespic filter
+- DTS decoding through libdcadec
+- Drop support for nvenc API before 5.0
+- nvenc HEVC encoder
+- Detelecine filter
+- Intel QSV-accelerated H.264 encoding
+- MMAL-accelerated H.264 decoding
+- basic APNG encoder and muxer with default extension "apng"
+- unpack DivX-style packed B-frames in MPEG-4 bitstream filter
+- WebM Live Chunk Muxer
+- nvenc level and tier options
+- chorus filter
+- Canopus HQ/HQA decoder
+- Automatically rotate videos based on metadata in ffmpeg
+- improved Quickdraw compatibility
+- VP9 high bit-depth and extended colorspaces decoding support
+- WebPAnimEncoder API when available for encoding and muxing WebP
+- Direct3D11-accelerated decoding
+- Support Secure Transport
+- Multipart JPEG demuxer
 
 
-version 0.10.1
-- Several security fixes, many bugfixes affecting many formats and
-  codecs, the list below is not complete.
+version 2.6:
+- nvenc encoder
+- 10bit spp filter
+- colorlevels filter
+- RIFX format for *.wav files
+- RTP/mpegts muxer
+- non continuous cache protocol support
+- tblend filter
+- cropdetect support for non 8bpp, absolute (if limit >= 1) and relative (if limit < 1.0) threshold
+- Camellia symmetric block cipher
+- OpenH264 encoder wrapper
+- VOC seeking support
+- Closed caption Decoder
+- fspp, uspp, pp7 MPlayer postprocessing filters ported to native filters
+- showpalette filter
+- Twofish symmetric block cipher
+- Support DNx100 (960x720@8)
+- eq2 filter ported from libmpcodecs as eq filter
+- removed libmpcodecs
+- Changed default DNxHD colour range in QuickTime .mov derivatives to mpeg range
+- ported softpulldown filter from libmpcodecs as repeatfields filter
+- dcshift filter
+- RTP depacketizer for loss tolerant payload format for MP3 audio (RFC 5219)
+- RTP depacketizer for AC3 payload format (RFC 4184)
+- palettegen and paletteuse filters
+- VP9 RTP payload format (draft 0) experimental depacketizer
+- RTP depacketizer for DV (RFC 6469)
+- DXVA2-accelerated HEVC decoding
+- AAC ELD 480 decoding
+- Intel QSV-accelerated H.264 decoding
+- DSS SP decoder and DSS demuxer
+- Fix stsd atom corruption in DNxHD QuickTimes
+- Canopus HQX decoder
+- RTP depacketization of T.140 text (RFC 4103)
+- Port MIPS optimizations to 64-bit
 
+
+version 2.5:
+- HEVC/H.265 RTP payload format (draft v6) packetizer
+- SUP/PGS subtitle demuxer
+- ffprobe -show_pixel_formats option
+- CAST128 symmetric block cipher, ECB mode
+- STL subtitle demuxer and decoder
+- libutvideo YUV 4:2:2 10bit support
+- XCB-based screen-grabber
+- UDP-Lite support (RFC 3828)
+- xBR scaling filter
+- AVFoundation screen capturing support
+- ffserver supports codec private options
+- creating DASH compatible fragmented MP4, MPEG-DASH segmenting muxer
+- WebP muxer with animated WebP support
+- zygoaudio decoding support
+- APNG demuxer
+- postproc visualization support
+
+
+version 2.4:
+- Icecast protocol
+- ported lenscorrection filter from frei0r filter
+- large optimizations in dctdnoiz to make it usable
+- ICY metadata are now requested by default with the HTTP protocol
+- support for using metadata in stream specifiers in fftools
+- LZMA compression support in TIFF decoder
+- H.261 RTP payload format (RFC 4587) depacketizer and experimental packetizer
+- HEVC/H.265 RTP payload format (draft v6) depacketizer
+- added codecview filter to visualize information exported by some codecs
+- Matroska 3D support thorugh side data
+- HTML generation using texi2html is deprecated in favor of makeinfo/texi2any
+- silenceremove filter
+
+
+version 2.3:
+- AC3 fixed-point decoding
+- shuffleplanes filter
+- subfile protocol
+- Phantom Cine demuxer
+- replaygain data export
+- VP7 video decoder
+- Alias PIX image encoder and decoder
+- Improvements to the BRender PIX image decoder
+- Improvements to the XBM decoder
+- QTKit input device
+- improvements to OpenEXR image decoder
+- support decoding 16-bit RLE SGI images
+- GDI screen grabbing for Windows
+- alternative rendition support for HTTP Live Streaming
+- AVFoundation input device
+- Direct Stream Digital (DSD) decoder
+- Magic Lantern Video (MLV) demuxer
+- On2 AVC (Audio for Video) decoder
+- support for decoding through DXVA2 in ffmpeg
+- libbs2b-based stereo-to-binaural audio filter
+- libx264 reference frames count limiting depending on level
+- native Opus decoder
+- display matrix export and rotation API
+- WebVTT encoder
+- showcqt multimedia filter
+- zoompan filter
+- signalstats filter
+- hqx filter (hq2x, hq3x, hq4x)
+- flanger filter
+- Image format auto-detection
+- LRC demuxer and muxer
+- Samba protocol (via libsmbclient)
+- WebM DASH Manifest muxer
+- libfribidi support in drawtext
+
+
+version 2.2:
+
+- HNM version 4 demuxer and video decoder
+- Live HDS muxer
+- setsar/setdar filters now support variables in ratio expressions
+- elbg filter
+- string validation in ffprobe
+- support for decoding through VDPAU in ffmpeg (the -hwaccel option)
+- complete Voxware MetaSound decoder
+- remove mp3_header_compress bitstream filter
+- Windows resource files for shared libraries
+- aeval filter
+- stereoscopic 3d metadata handling
+- WebP encoding via libwebp
+- ATRAC3+ decoder
+- VP8 in Ogg demuxing
+- side & metadata support in NUT
+- framepack filter
+- XYZ12 rawvideo support in NUT
+- Exif metadata support in WebP decoder
+- OpenGL device
+- Use metadata_header_padding to control padding in ID3 tags (currently used in
+  MP3, AIFF, and OMA files), FLAC header, and the AVI "junk" block.
+- Mirillis FIC video decoder
+- Support DNx444
+- libx265 encoder
+- dejudder filter
+- Autodetect VDA like all other hardware accelerations
+- aliases and defaults for Ogg subtypes (opus, spx)
+
+
+version 2.1:
+
+- aecho filter
+- perspective filter ported from libmpcodecs
+- ffprobe -show_programs option
+- compand filter
+- RTMP seek support
+- when transcoding with ffmpeg (i.e. not streamcopying), -ss is now accurate
+  even when used as an input option. Previous behavior can be restored with
+  the -noaccurate_seek option.
+- ffmpeg -t option can now be used for inputs, to limit the duration of
+  data read from an input file
+- incomplete Voxware MetaSound decoder
+- read EXIF metadata from JPEG
+- DVB teletext decoder
+- phase filter ported from libmpcodecs
+- w3fdif filter
+- Opus support in Matroska
+- FFV1 version 1.3 is stable and no longer experimental
+- FFV1: YUVA(444,422,420) 9, 10 and 16 bit support
+- changed DTS stream id in lavf mpeg ps muxer from 0x8a to 0x88, to be
+  more consistent with other muxers.
+- adelay filter
+- pullup filter ported from libmpcodecs
+- ffprobe -read_intervals option
+- Lossless and alpha support for WebP decoder
+- Error Resilient AAC syntax (ER AAC LC) decoding
+- Low Delay AAC (ER AAC LD) decoding
+- mux chapters in ASF files
+- SFTP protocol (via libssh)
+- libx264: add ability to encode in YUVJ422P and YUVJ444P
+- Fraps: use BT.709 colorspace by default for yuv, as reference fraps decoder does
+- make decoding alpha optional for prores, ffv1 and vp6 by setting
+  the skip_alpha flag.
+- ladspa wrapper filter
+- native VP9 decoder
+- dpx parser
+- max_error_rate parameter in ffmpeg
+- PulseAudio output device
+- ReplayGain scanner
+- Enhanced Low Delay AAC (ER AAC ELD) decoding (no LD SBR support)
+- Linux framebuffer output device
+- HEVC decoder
+- raw HEVC, HEVC in MOV/MP4, HEVC in Matroska, HEVC in MPEG-TS demuxing
+- mergeplanes filter
+
+
+version 2.0:
+
+- curves filter
+- reference-counting for AVFrame and AVPacket data
+- ffmpeg now fails when input options are used for output file
+  or vice versa
+- support for Monkey's Audio versions from 3.93
+- perms and aperms filters
+- audio filtering support in ffplay
+- 10% faster aac encoding on x86 and MIPS
+- sine audio filter source
+- WebP demuxing and decoding support
+- ffmpeg options -filter_script and -filter_complex_script, which allow a
+  filtergraph description to be read from a file
+- OpenCL support
+- audio phaser filter
+- separatefields filter
+- libquvi demuxer
+- uniform options syntax across all filters
+- telecine filter
+- interlace filter
+- smptehdbars source
+- inverse telecine filters (fieldmatch and decimate)
+- colorbalance filter
+- colorchannelmixer filter
+- The matroska demuxer can now output proper verbatim ASS packets. It will
+  become the default at the next libavformat major bump.
+- decent native animated GIF encoding
+- asetrate filter
+- interleave filter
+- timeline editing with filters
+- vidstabdetect and vidstabtransform filters for video stabilization using
+  the vid.stab library
+- astats filter
+- trim and atrim filters
+- ffmpeg -t and -ss (output-only) options are now sample-accurate when
+  transcoding audio
+- Matroska muxer can now put the index at the beginning of the file.
+- extractplanes filter
+- avectorscope filter
+- ADPCM DTK decoder
+- ADP demuxer
+- RSD demuxer
+- RedSpark demuxer
+- ADPCM IMA Radical decoder
+- zmq filters
+- DCT denoiser filter (dctdnoiz)
+- Wavelet denoiser filter ported from libmpcodecs as owdenoise (formerly "ow")
+- Apple Intermediate Codec decoder
+- Escape 130 video decoder
+- FTP protocol support
+- V4L2 output device
+- 3D LUT filter (lut3d)
+- SMPTE 302M audio encoder
+- support for slice multithreading in libavfilter
+- Hald CLUT support (generation and filtering)
+- VC-1 interlaced B-frame support
+- support for WavPack muxing (raw and in Matroska)
+- XVideo output device
+- vignette filter
+- True Audio (TTA) encoder
+- Go2Webinar decoder
+- mcdeint filter ported from libmpcodecs
+- sab filter ported from libmpcodecs
+- ffprobe -show_chapters option
+- WavPack encoding through libwavpack
+- rotate filter
+- spp filter ported from libmpcodecs
+- libgme support
+- psnr filter
+
+
+version 1.2:
+
+- VDPAU hardware acceleration through normal hwaccel
+- SRTP support
+- Error diffusion dither in Swscale
+- Chained Ogg support
+- Theora Midstream reconfiguration support
+- EVRC decoder
+- audio fade filter
+- filtering audio with unknown channel layout
+- allpass, bass, bandpass, bandreject, biquad, equalizer, highpass, lowpass
+  and treble audio filter
+- improved showspectrum filter, with multichannel support and sox-like colors
+- histogram filter
+- tee muxer
+- il filter ported from libmpcodecs
+- support ID3v2 tags in ASF files
+- encrypted TTA stream decoding support
+- RF64 support in WAV muxer
+- noise filter ported from libmpcodecs
+- Subtitles character encoding conversion
+- blend filter
+- stereo3d filter ported from libmpcodecs
+
+
+version 1.1:
+
+- stream disposition information printing in ffprobe
+- filter for loudness analysis following EBU R128
+- Opus encoder using libopus
+- ffprobe -select_streams option
+- Pinnacle TARGA CineWave YUV16 decoder
+- TAK demuxer, decoder and parser
+- DTS-HD demuxer
+- remove -same_quant, it hasn't worked for years
+- FFM2 support
+- X-Face image encoder and decoder
+- 24-bit FLAC encoding
+- multi-channel ALAC encoding up to 7.1
+- metadata (INFO tag) support in WAV muxer
+- subtitles raw text decoder
+- support for building DLLs using MSVC
+- LVF demuxer
+- ffescape tool
+- metadata (info chunk) support in CAF muxer
+- field filter ported from libmpcodecs
+- AVR demuxer
+- geq filter ported from libmpcodecs
+- remove ffserver daemon mode
+- AST muxer/demuxer
+- new expansion syntax for drawtext
+- BRender PIX image decoder
+- ffprobe -show_entries option
+- ffprobe -sections option
+- ADPCM IMA Dialogic decoder
+- BRSTM demuxer
+- animated GIF decoder and demuxer
+- PVF demuxer
+- subtitles filter
+- IRCAM muxer/demuxer
+- Paris Audio File demuxer
+- Virtual concatenation demuxer
+- VobSub demuxer
+- JSON captions for TED talks decoding support
+- SOX Resampler support in libswresample
+- aselect filter
+- SGI RLE 8-bit / Silicon Graphics RLE 8-bit video decoder
+- Silicon Graphics Motion Video Compressor 1 & 2 decoder
+- Silicon Graphics Movie demuxer
+- apad filter
+- Resolution & pixel format change support with multithreading for H.264
+- documentation split into per-component manuals
+- pp (postproc) filter ported from MPlayer
+- NIST Sphere demuxer
+- MPL2, VPlayer, MPlayer, AQTitle, PJS and SubViewer v1 subtitles demuxers and decoders
+- Sony Wave64 muxer
+- adobe and limelight publisher authentication in RTMP
+- data: URI scheme
+- support building on the Plan 9 operating system
+- kerndeint filter ported from MPlayer
+- histeq filter ported from VirtualDub
+- Megalux Frame demuxer
+- 012v decoder
+- Improved AVC Intra decoding support
+
+
+version 1.0:
+
+- INI and flat output in ffprobe
+- Scene detection in libavfilter
+- Indeo Audio decoder
+- channelsplit audio filter
+- setnsamples audio filter
+- atempo filter
+- ffprobe -show_data option
+- RTMPT protocol support
+- iLBC encoding/decoding via libilbc
+- Microsoft Screen 1 decoder
+- join audio filter
+- audio channel mapping filter
+- Microsoft ATC Screen decoder
+- RTSP listen mode
+- TechSmith Screen Codec 2 decoder
+- AAC encoding via libfdk-aac
+- Microsoft Expression Encoder Screen decoder
+- RTMPS protocol support
+- RTMPTS protocol support
+- RTMPE protocol support
+- RTMPTE protocol support
+- showwaves and showspectrum filter
+- LucasArts SMUSH SANM playback support
+- LucasArts SMUSH VIMA audio decoder (ADPCM)
+- LucasArts SMUSH demuxer
+- SAMI, RealText and SubViewer demuxers and decoders
+- Heart Of Darkness PAF playback support
+- iec61883 device
+- asettb filter
+- new option: -progress
+- 3GPP Timed Text encoder/decoder
+- GeoTIFF decoder support
+- ffmpeg -(no)stdin option
+- Opus decoder using libopus
+- caca output device using libcaca
+- alphaextract and alphamerge filters
+- concat filter
+- flite filter
+- Canopus Lossless Codec decoder
+- bitmap subtitles in filters (experimental and temporary)
+- MP2 encoding via TwoLAME
+- bmp parser
+- smptebars source
+- asetpts filter
+- hue filter
+- ICO muxer
+- SubRip encoder and decoder without embedded timing
+- edge detection filter
+- framestep filter
+- ffmpeg -shortest option is now per-output file
+  -pass and -passlogfile are now per-output stream
+- volume measurement filter
+- Ut Video encoder
+- Microsoft Screen 2 decoder
+- smartblur filter ported from MPlayer
+- CPiA decoder
+- decimate filter ported from MPlayer
+- RTP depacketization of JPEG
+- Smooth Streaming live segmenter muxer
+- F4V muxer
+- sendcmd and asendcmd filters
+- WebVTT demuxer and decoder (simple tags supported)
+- RTP packetization of JPEG
+- faststart option in the MOV/MP4 muxer
+- support for building with MSVC
+
+
+version 0.11:
+
+- Fixes: CVE-2012-2772, CVE-2012-2774, CVE-2012-2775, CVE-2012-2776, CVE-2012-2777,
+         CVE-2012-2779, CVE-2012-2782, CVE-2012-2783, CVE-2012-2784, CVE-2012-2785,
+         CVE-2012-2786, CVE-2012-2787, CVE-2012-2788, CVE-2012-2789, CVE-2012-2790,
+         CVE-2012-2791, CVE-2012-2792, CVE-2012-2793, CVE-2012-2794, CVE-2012-2795,
+         CVE-2012-2796, CVE-2012-2797, CVE-2012-2798, CVE-2012-2799, CVE-2012-2800,
+         CVE-2012-2801, CVE-2012-2802, CVE-2012-2803, CVE-2012-2804,
+- v408 Quicktime and Microsoft AYUV Uncompressed 4:4:4:4 encoder and decoder
+- setfield filter
+- CDXL demuxer and decoder
+- Apple ProRes encoder
+- ffprobe -count_packets and -count_frames options
+- Sun Rasterfile Encoder
+- ID3v2 attached pictures reading and writing
+- WMA Lossless decoder
+- bluray protocol
+- blackdetect filter
+- libutvideo encoder wrapper (--enable-libutvideo)
 - swapuv filter
-
-- Several bugs and crashes have been fixed in the following codecs: AAC,
-  AC-3, ADPCM, AMR (both NB and WB), ATRAC3, CAVC, Cook, camstudio, DCA,
-  DPCM, DSI CIN, DV, EA TGQ, FLAC, fraps, G.722 (both encoder and
-  decoder), H.264, huvffyuv, BB JV decoder, Indeo 3, KGV1, LCL, the
-  libx264 wrapper, MJPEG, mp3on4, Musepack, MPEG1/2, PNG, QDM2, Qt RLE,
-  ROQ, RV10, RV30/RV34/RV40, shorten, smacker, subrip, SVQ3, TIFF,
-  Truemotion2, TTA, VC1, VMware Screen codec, Vorbis, VP5, VP6, WMA,
-  Westwood SNDx, XXAN.
-
-- This release additionally updates the following codecs to the
-  bytestream2 API, and therefore benefit from additional overflow
-  checks: XXAN, ALG MM, TQG, SMC, Qt SMC, ROQ, PNG
-
-- Several bugs and crashes have been fixed in the following formats:
-  AIFF, ASF, DV, Matroska, NSV, MOV, MPEG-TS, Smacker, Sony OpenMG, RM,
-  SWF.
-
-- Libswscale has an potential overflow for large image size fixed.
-
-- The following APIs have been added:
-
-  avcodec_is_open()
-  avformat_get_riff_video_tags()
-  avformat_get_riff_audio_tags()
-
-  Please see the file doc/APIchanges and the Doxygen documentation for
-  further information.
+- bbox filter
+- XBM encoder and decoder
+- RealAudio Lossless decoder
+- ZeroCodec decoder
+- tile video filter
+- Metal Gear Solid: The Twin Snakes demuxer
+- OpenEXR image decoder
+- removelogo filter
+- drop support for ffmpeg without libavfilter
+- drawtext video filter: fontconfig support
+- ffmpeg -benchmark_all option
+- super2xsai filter ported from libmpcodecs
+- add libavresample audio conversion library for compatibility
+- MicroDVD decoder
+- Avid Meridien (AVUI) encoder and decoder
+- accept + prefix to -pix_fmt option to disable automatic conversions.
+- complete audio filtering in libavfilter and ffmpeg
+- add fps filter
+- vorbis parser
+- png parser
+- audio mix filter
+- ffv1: support (draft) version 1.3
 
 
 version 0.10:
+
 - Fixes: CVE-2011-3929, CVE-2011-3934, CVE-2011-3935, CVE-2011-3936,
          CVE-2011-3937, CVE-2011-3940, CVE-2011-3941, CVE-2011-3944,
          CVE-2011-3945, CVE-2011-3946, CVE-2011-3947, CVE-2011-3949,
@@ -332,6 +889,7 @@ version 0.10:
 - ffwavesynth decoder
 - aviocat tool
 - ffeval tool
+- support encoding and decoding 4-channel SGI images
 
 
 version 0.9:
@@ -380,7 +938,7 @@ easier to use. The changes are:
           all the stream in the first input file, except for the second audio
           stream'.
     * There is a new option -c (or -codec) for choosing the decoder/encoder to
-      use, which allows to precisely specify target stream(s) consistently with
+      use, which makes it possible to precisely specify target stream(s) consistently with
       other options. E.g. -c:v lib264 sets the codec for all video streams, -c:a:0
       libvorbis sets the codec for the first audio stream and -c copy copies all
       the streams without reencoding. Old -vcodec/-acodec/-scodec options are now
@@ -632,7 +1190,7 @@ version 0.6:
 - LPCM support in MPEG-TS (HDMV RID as found on Blu-ray disks)
 - WMA Pro decoder
 - Core Audio Format demuxer
-- Atrac1 decoder
+- ATRAC1 decoder
 - MD STUDIO audio demuxer
 - RF64 support in WAV demuxer
 - MPEG-4 Audio Lossless Coding (ALS) decoder
@@ -732,7 +1290,7 @@ version 0.5:
 - MXF demuxer
 - VC-1/WMV3/WMV9 video decoder
 - MacIntel support
-- AVISynth support
+- AviSynth support
 - VMware video decoder
 - VP5 video decoder
 - VP6 video decoder
@@ -760,7 +1318,7 @@ version 0.5:
 - Interplay C93 demuxer and video decoder
 - Bethsoft VID demuxer and video decoder
 - CRYO APC demuxer
-- Atrac3 decoder
+- ATRAC3 decoder
 - V.Flash PTX decoder
 - RoQ muxer, RoQ audio encoder
 - Renderware TXD demuxer and decoder
@@ -1037,7 +1595,7 @@ version 0.4.5:
 - MPEG-4 vol header fixes (Jonathan Marsden <snmjbm at pacbell.net>)
 - ARM optimizations (Lionel Ulmer <lionel.ulmer at free.fr>).
 - Windows porting of file converter
-- added MJPEG raw format (input/ouput)
+- added MJPEG raw format (input/output)
 - added JPEG image format support (input/output)
 
 

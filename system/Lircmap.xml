@@ -10,6 +10,7 @@
 
 <lircmap>
 	<remote device="mceusb">
+		<altname>mceusb_hauppauge</altname>
 		<play>Play</play>
 		<pause>Pause</pause>
 		<stop>Stop</stop>

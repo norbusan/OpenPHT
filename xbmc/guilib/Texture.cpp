@@ -175,7 +175,7 @@ void CBaseTexture::ClampToEdge()
   }
 }
 
-CBaseTexture *CBaseTexture::LoadFromFile(const CStdString& texturePath, unsigned int idealWidth, unsigned int idealHeight, bool autoRotate)
+CBaseTexture *CBaseTexture::LoadFromFile(const CStdString& texturePath, unsigned int idealWidth, unsigned int idealHeight, bool requirePixels, const std::string& strMimeType)
 {
 #if defined(TARGET_ANDROID)
   CURL url(texturePath);
@@ -203,7 +203,7 @@ CBaseTexture *CBaseTexture::LoadFromFile(const CStdString& texturePath, unsigned
   }
 #endif
   CTexture *texture = new CTexture();
-  if (texture->LoadFromFileInternal(texturePath, idealWidth, idealHeight, autoRotate))
+  if (texture->LoadFromFileInternal(texturePath, idealWidth, idealHeight, requirePixels, strMimeType))
     return texture;
   delete texture;
   return NULL;
@@ -218,7 +218,7 @@ CBaseTexture *CBaseTexture::LoadFromFileInMemory(unsigned char *buffer, size_t b
   return NULL;
 }
 
-bool CBaseTexture::LoadFromFileInternal(const CStdString& texturePath, unsigned int maxWidth, unsigned int maxHeight, bool autoRotate)
+bool CBaseTexture::LoadFromFileInternal(const CStdString& texturePath, unsigned int maxWidth, unsigned int maxHeight, bool requirePixels, const std::string& strMimeType)
 {
   if (URIUtils::GetExtension(texturePath).Equals(".dds"))
   { // special case for DDS images
@@ -244,7 +244,7 @@ bool CBaseTexture::LoadFromFileInternal(const CStdString& texturePath, unsigned 
         Allocate(jpegfile.Width(), jpegfile.Height(), XB_FMT_A8R8G8B8);
         if (jpegfile.Decode(m_pixels, GetPitch(), XB_FMT_A8R8G8B8))
         {
-          if (autoRotate && jpegfile.Orientation())
+          if (jpegfile.Orientation())
             m_orientation = jpegfile.Orientation() - 1;
           m_hasAlpha=false;
           ClampToEdge();
@@ -271,7 +271,7 @@ bool CBaseTexture::LoadFromFileInternal(const CStdString& texturePath, unsigned 
     return false;
   }
 
-  LoadFromImage(image, autoRotate);
+  LoadFromImage(image);
   dll.ReleaseImage(&image);
 
   return true;
@@ -326,12 +326,12 @@ bool CBaseTexture::LoadFromFileInMem(unsigned char* buffer, size_t size, const s
   return true;
 }
 
-void CBaseTexture::LoadFromImage(ImageInfo &image, bool autoRotate)
+void CBaseTexture::LoadFromImage(ImageInfo &image)
 {
   m_hasAlpha = NULL != image.alpha;
 
   Allocate(image.width, image.height, XB_FMT_A8R8G8B8);
-  if (autoRotate && image.exifInfo.Orientation)
+  if (image.exifInfo.Orientation)
     m_orientation = image.exifInfo.Orientation - 1;
   m_originalWidth = image.originalwidth;
   m_originalHeight = image.originalheight;

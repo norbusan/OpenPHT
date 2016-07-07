@@ -20,8 +20,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "libavutil/common.h"
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
+#include "internal.h"
 
 static av_cold int v410_encode_init(AVCodecContext *avctx)
 {
@@ -30,34 +32,28 @@ static av_cold int v410_encode_init(AVCodecContext *avctx)
         return AVERROR_INVALIDDATA;
     }
 
-    avctx->coded_frame = avcodec_alloc_frame();
-
-    if (!avctx->coded_frame) {
-        av_log(avctx, AV_LOG_ERROR, "Could not allocate frame.\n");
-        return AVERROR(ENOMEM);
-    }
-
     return 0;
 }
 
-static int v410_encode_frame(AVCodecContext *avctx, uint8_t *buf,
-                             int buf_size, void *data)
+static int v410_encode_frame(AVCodecContext *avctx, AVPacket *pkt,
+                             const AVFrame *pic, int *got_packet)
 {
-    AVFrame *pic = data;
-    uint8_t *dst = buf;
+    uint8_t *dst;
     uint16_t *y, *u, *v;
     uint32_t val;
-    int i, j;
-    int output_size = 0;
+    int i, j, ret;
 
-    if (buf_size < avctx->width * avctx->height * 4) {
-        av_log(avctx, AV_LOG_ERROR, "Out buffer is too small.\n");
-        return AVERROR(ENOMEM);
-    }
+    if ((ret = ff_alloc_packet2(avctx, pkt, avctx->width * avctx->height * 4,
+                                            avctx->width * avctx->height * 4)) < 0)
+        return ret;
+    dst = pkt->data;
 
-    avctx->coded_frame->reference = 0;
+#if FF_API_CODED_FRAME
+FF_DISABLE_DEPRECATION_WARNINGS
     avctx->coded_frame->key_frame = 1;
     avctx->coded_frame->pict_type = AV_PICTURE_TYPE_I;
+FF_ENABLE_DEPRECATION_WARNINGS
+#endif
 
     y = (uint16_t *)pic->data[0];
     u = (uint16_t *)pic->data[1];
@@ -70,30 +66,23 @@ static int v410_encode_frame(AVCodecContext *avctx, uint8_t *buf,
             val |= (uint32_t) v[j] << 22;
             AV_WL32(dst, val);
             dst += 4;
-            output_size += 4;
         }
         y += pic->linesize[0] >> 1;
         u += pic->linesize[1] >> 1;
         v += pic->linesize[2] >> 1;
     }
 
-    return output_size;
-}
-
-static av_cold int v410_encode_close(AVCodecContext *avctx)
-{
-    av_freep(&avctx->coded_frame);
-
+    pkt->flags |= AV_PKT_FLAG_KEY;
+    *got_packet = 1;
     return 0;
 }
 
 AVCodec ff_v410_encoder = {
     .name         = "v410",
-    .type         = AVMEDIA_TYPE_VIDEO,
-    .id           = CODEC_ID_V410,
-    .init         = v410_encode_init,
-    .encode       = v410_encode_frame,
-    .close        = v410_encode_close,
-    .pix_fmts     = (const enum PixelFormat[]){ PIX_FMT_YUV444P10, PIX_FMT_NONE },
     .long_name    = NULL_IF_CONFIG_SMALL("Uncompressed 4:4:4 10-bit"),
+    .type         = AVMEDIA_TYPE_VIDEO,
+    .id           = AV_CODEC_ID_V410,
+    .init         = v410_encode_init,
+    .encode2      = v410_encode_frame,
+    .pix_fmts     = (const enum AVPixelFormat[]){ AV_PIX_FMT_YUV444P10, AV_PIX_FMT_NONE },
 };

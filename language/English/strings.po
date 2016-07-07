@@ -617,7 +617,7 @@ msgid "Resolution"
 msgstr ""
 
 msgctxt "#170"
-msgid "Adjust display refresh rate to match video"
+msgid "Adjust display refresh rate"
 msgstr ""
 
 #empty string with id 171
@@ -871,11 +871,11 @@ msgid "Clear playlist on finish"
 msgstr ""
 
 msgctxt "#240"
-msgid "Display Mode"
+msgid "Display mode"
 msgstr ""
 
 msgctxt "#241"
-msgid "Full Screen #%d"
+msgid "Full screen #%d"
 msgstr ""
 
 msgctxt "#242"
@@ -883,7 +883,7 @@ msgid "Windowed"
 msgstr ""
 
 msgctxt "#243"
-msgid "Refresh Rate"
+msgid "Refresh rate"
 msgstr ""
 
 msgctxt "#244"
@@ -894,7 +894,9 @@ msgctxt "#245"
 msgid "Sizing: (%i,%i)->(%i,%i) (Zoom x%2.2f) AR:%2.2f:1 (Pixels: %2.2f:1) (VShift: %2.2f)"
 msgstr ""
 
-#empty string with id 246
+msgctxt "#246"
+msgid "Monitor"
+msgstr ""
 
 msgctxt "#247"
 msgid "Scripts"
@@ -917,7 +919,7 @@ msgid "Select destination directory"
 msgstr ""
 
 msgctxt "#252"
-msgid "Output stereo to all speakers"
+msgid "Stereo upmix"
 msgstr ""
 
 msgctxt "#253"
@@ -961,7 +963,7 @@ msgid "Scripts output"
 msgstr ""
 
 msgctxt "#263"
-msgid "Allow control of XBMC via HTTP"
+msgid "Allow remote control via HTTP"
 msgstr ""
 
 msgctxt "#264"
@@ -1247,15 +1249,15 @@ msgid "Framerate conversion"
 msgstr ""
 
 msgctxt "#337"
-msgid "Audio output"
+msgid "Output configuration"
 msgstr ""
 
 msgctxt "#338"
-msgid "Analog"
+msgid "Fixed"
 msgstr ""
 
 msgctxt "#339"
-msgid "Optical/Coax"
+msgid "Optimized"
 msgstr ""
 
 msgctxt "#340"
@@ -1283,7 +1285,7 @@ msgid "Year"
 msgstr ""
 
 msgctxt "#346"
-msgid "Boost volume level on downmix"
+msgid "Maintain original volume on downmix"
 msgstr ""
 
 #: xbmc/settings/GUISettings.cpp
@@ -1293,7 +1295,7 @@ msgstr ""
 
 #: xbmc/settings/GUISettings.cpp
 msgctxt "#348"
-msgid "- Multichannel LPCM capable receiver"
+msgid "Enable passthrough"
 msgstr ""
 
 #: xbmc/settings/GUISettings.cpp
@@ -1604,10 +1606,12 @@ msgid "High"
 msgstr ""
 
 msgctxt "#420"
-msgid "HDMI"
+msgid "Best match"
 msgstr ""
 
-#empty string with id 421
+msgctxt "#421"
+msgid "Keep audio device alive"
+msgstr ""
 
 msgctxt "#422"
 msgid "Delete album info"
@@ -1715,7 +1719,7 @@ msgid "Autorun media"
 msgstr ""
 
 msgctxt "#448"
-msgid "LCD"
+msgid "- Dolby Digital Plus (E-AC3) capable receiver"
 msgstr ""
 
 msgctxt "#449"
@@ -1754,7 +1758,9 @@ msgctxt "#457"
 msgid "Switch view"
 msgstr ""
 
-#empty string with id 458
+msgctxt "#458"
+msgid "- Limit sampling rate (kHz)"
+msgstr ""
 
 msgctxt "#459"
 msgid "Subs"
@@ -1808,11 +1814,7 @@ msgctxt "#471"
 msgid "Modchip"
 msgstr ""
 
-msgctxt "#472"
-msgid "- Dolby Digital Plus (E-AC3) capable receiver"
-msgstr ""
-
-#empty string with id 473
+#empty strings from id 472 to 473
 
 msgctxt "#474"
 msgid "Off"
@@ -1891,7 +1893,7 @@ msgid "Overall audio headroom"
 msgstr ""
 
 msgctxt "#495"
-msgid "Upsample videos to GUI resolution"
+msgid "Upscale videos to GUI resolution"
 msgstr ""
 
 msgctxt "#496"
@@ -2514,6 +2516,10 @@ msgctxt "#665"
 msgid "Compression level"
 msgstr ""
 
+msgctxt "#667"
+msgid "  - Enable Dolby Digital (AC3) transcoding"
+msgstr ""
+
 #empty strings from id 666 to 699
 
 msgctxt "#700"
@@ -2844,7 +2850,7 @@ msgid "Remote control"
 msgstr ""
 
 msgctxt "#791"
-msgid "Allow programs on this system to control XBMC"
+msgid "Allow remote control by programs on this system"
 msgstr ""
 
 msgctxt "#792"
@@ -2856,7 +2862,7 @@ msgid "Port range"
 msgstr ""
 
 msgctxt "#794"
-msgid "Allow programs on other systems to control XBMC"
+msgid "Allow remote control by programs on other systems"
 msgstr ""
 
 msgctxt "#795"
@@ -3256,13 +3262,13 @@ msgid "Zeroconf"
 msgstr ""
 
 msgctxt "#1260"
-msgid "Announce these services to other systems via Zeroconf"
+msgid "Announce services to other systems"
 msgstr ""
 
 #empty strings from id 1261 to 1269
 
 msgctxt "#1270"
-msgid "Allow XBMC to receive AirPlay content"
+msgid "Enable AirPlay support"
 msgstr ""
 
 msgctxt "#1271"
@@ -4321,15 +4327,15 @@ msgid "Always enabled"
 msgstr ""
 
 msgctxt "#13109"
-msgid "Test & apply resolution"
+msgid "Test & apply the resolution"
 msgstr ""
 
 msgctxt "#13110"
-msgid "Save resolution?"
+msgid "Save this resolution?"
 msgstr ""
 
 msgctxt "#13111"
-msgid "Would you like to keep this resolution?"
+msgid "Would you like to keep this change?"
 msgstr ""
 
 msgctxt "#13112"
@@ -5075,40 +5081,40 @@ msgid "Use pixel buffer objects"
 msgstr ""
 
 msgctxt "#13425"
-msgid "Allow hardware acceleration (VDPAU)"
+msgid "Allow hardware acceleration - VDPAU"
 msgstr ""
 
 msgctxt "#13426"
-msgid "Allow hardware acceleration (VAAPI)"
+msgid "Allow hardware acceleration - VAAPI"
 msgstr ""
 
 msgctxt "#13427"
-msgid "Allow hardware acceleration (DXVA2)"
+msgid "Allow hardware acceleration - DXVA2"
 msgstr ""
 
 msgctxt "#13428"
-msgid "Allow hardware acceleration (CrystalHD)"
+msgid "Allow hardware acceleration - CrystalHD"
 msgstr ""
 
 msgctxt "#13429"
-msgid "Allow hardware acceleration (VDADecoder)"
+msgid "Allow hardware acceleration - VDADecoder"
 msgstr ""
 
 msgctxt "#13430"
-msgid "Allow hardware acceleration (OpenMax)"
+msgid "Allow hardware acceleration - OpenMax"
 msgstr ""
 
 msgctxt "#13431"
-msgid "Pixel Shaders"
+msgid "Pixel shaders"
 msgstr ""
 
 msgctxt "#13432"
-msgid "Allow hardware acceleration (VideoToolbox)"
+msgid "Allow hardware acceleration - VideoToolbox"
 msgstr ""
 
 #: xbmc/settings/GUISettings.cpp
 msgctxt "#13433"
-msgid "Play the next video automatically"
+msgid "Play next video automatically"
 msgstr ""
 
 #. If autoplay next video is set true
@@ -5119,10 +5125,54 @@ msgstr ""
 
 #: system/settings/settings.xml
 msgctxt "#13435"
-msgid "Enable HQ Scalers for scalings above"
+msgid "Enable HQ scalers for scaling above"
 msgstr ""
 
-#empty strings from id 13436 to 13499
+msgctxt "#13437"
+msgid "Prefer VDPAU video mixer"
+msgstr ""
+
+msgctxt "#13438"
+msgid "Allow hardware acceleration - amcodec"
+msgstr ""
+
+msgctxt "#13441"
+msgid "Use MPEG-2 VDPAU"
+msgstr ""
+
+msgctxt "#13443"
+msgid "Use MPEG-4 VDPAU"
+msgstr ""
+
+msgctxt "#13445"
+msgid "Use VC-1 VDPAU"
+msgstr ""
+
+msgctxt "#13447"
+msgid "Use MPEG-2 VAAPI"
+msgstr ""
+
+msgctxt "#13449"
+msgid "Use MPEG-4 VAAPI"
+msgstr ""
+
+msgctxt "#13451"
+msgid "Use VC-1 VAAPI"
+msgstr ""
+
+msgctxt "#13457"
+msgid "Prefer VAAPI render method"
+msgstr ""
+
+msgctxt "#13458"
+msgid "Allow hardware acceleration - OMXPlayer"
+msgstr ""
+
+msgctxt "#13459"
+msgid "Use OMXPlayer for decoding of video files."
+msgstr ""
+
+#empty strings from id 13460 to 13499
 
 msgctxt "#13500"
 msgid "A/V sync method"
@@ -5137,11 +5187,11 @@ msgid "Video clock (Drop/Dupe audio)"
 msgstr ""
 
 msgctxt "#13503"
-msgid "Video clock (Resample audio)"
+msgid "Resample audio"
 msgstr ""
 
 msgctxt "#13504"
-msgid "Maximum resample amount (%)"
+msgid "Adjust PLL"
 msgstr ""
 
 msgctxt "#13505"
@@ -5149,7 +5199,7 @@ msgid "Resample quality"
 msgstr ""
 
 msgctxt "#13506"
-msgid "Low(fast)"
+msgid "Low (fast)"
 msgstr ""
 
 msgctxt "#13507"
@@ -5161,7 +5211,7 @@ msgid "High"
 msgstr ""
 
 msgctxt "#13509"
-msgid "Really high(slow!)"
+msgid "Really high (slow)"
 msgstr ""
 
 msgctxt "#13510"
@@ -5211,16 +5261,20 @@ msgctxt "#13553"
 msgid "%.1f Seconds"
 msgstr ""
 
+msgctxt "#13557"
+msgid "Skip delay"
+msgstr ""
+
 #empty strings from id 13554 to 13599
 
 msgctxt "#13600"
-msgid "Apple remote"
+msgid "Apple Remote"
 msgstr ""
 
 #empty string with id 13601
 
 msgctxt "#13602"
-msgid "Allow start of XBMC using the remote"
+msgid "Allow start of OpenPHT using the remote"
 msgstr ""
 
 msgctxt "#13603"
@@ -5238,11 +5292,11 @@ msgid "Standard"
 msgstr ""
 
 msgctxt "#13612"
-msgid "Universal Remote"
+msgid "Universal remote"
 msgstr ""
 
 msgctxt "#13613"
-msgid "Multi Remote (Harmony)"
+msgid "Harmony remote"
 msgstr ""
 
 #empty strings from id 13614 to 13619
@@ -5252,7 +5306,7 @@ msgid "Apple Remote Error"
 msgstr ""
 
 msgctxt "#13621"
-msgid "Apple Remote support could be enabled."
+msgid "Apple Remote support couldn't be enabled."
 msgstr ""
 
 #empty strings from id 13622 to 13999
@@ -5570,7 +5624,7 @@ msgid "Show EXIF picture information"
 msgstr ""
 
 msgctxt "#14083"
-msgid "Use a fullscreen window rather than true fullscreen"
+msgid "Use fullscreen window"
 msgstr ""
 
 msgctxt "#14084"
@@ -5695,7 +5749,7 @@ msgid "Buffering..."
 msgstr ""
 
 msgctxt "#15108"
-msgid "Navigation sounds"
+msgid "GUI sounds"
 msgstr ""
 
 msgctxt "#15109"
@@ -6097,7 +6151,7 @@ msgid "Auto select"
 msgstr ""
 
 msgctxt "#16020"
-msgid "De-interlace"
+msgid "Deinterlace"
 msgstr ""
 
 msgctxt "#16021"
@@ -6105,7 +6159,7 @@ msgid "Bob"
 msgstr ""
 
 msgctxt "#16022"
-msgid "Bob (inverted)"
+msgid "Bob - Inverted"
 msgstr ""
 
 #empty string with id 16023
@@ -6159,7 +6213,7 @@ msgid "Party mode playlist"
 msgstr ""
 
 msgctxt "#16036"
-msgid "De-interlace (Half)"
+msgid "Deinterlace (half)"
 msgstr ""
 
 msgctxt "#16037"
@@ -6285,23 +6339,23 @@ msgid "Temporal"
 msgstr ""
 
 msgctxt "#16311"
-msgid "Temporal/Spatial"
+msgid "Temporal / Spatial"
 msgstr ""
 
 msgctxt "#16312"
-msgid "(VDPAU)Noise Reduction"
+msgid "VDPAU - Noise reduction"
 msgstr ""
 
 msgctxt "#16313"
-msgid "(VDPAU)Sharpness"
+msgid "VDPAU - Sharpness"
 msgstr ""
 
 msgctxt "#16314"
-msgid "Inverse Telecine"
+msgid "Inverse telecine"
 msgstr ""
 
 msgctxt "#16315"
-msgid "Lanczos3 optimized"
+msgid "Lanczos3 - Optimised"
 msgstr ""
 
 msgctxt "#16316"
@@ -6309,11 +6363,11 @@ msgid "Auto"
 msgstr ""
 
 msgctxt "#16317"
-msgid "Temporal (Half)"
+msgid "Temporal (half)"
 msgstr ""
 
 msgctxt "#16318"
-msgid "Temporal/Spatial (Half)"
+msgid "Temporal / Spatial (half)"
 msgstr ""
 
 msgctxt "#16319"
@@ -6321,11 +6375,11 @@ msgid "DXVA"
 msgstr ""
 
 msgctxt "#16320"
-msgid "DXVA Bob"
+msgid "DXVA - Bob"
 msgstr ""
 
 msgctxt "#16321"
-msgid "DXVA Best"
+msgid "DXVA - Best"
 msgstr ""
 
 msgctxt "#16322"
@@ -6333,18 +6387,58 @@ msgid "Spline36"
 msgstr ""
 
 msgctxt "#16323"
-msgid "Spline36 optimized"
+msgid "Spline36 - Optimised"
 msgstr ""
 
 msgctxt "#16324"
-msgid "Software Blend"
+msgid "Software - Blend"
 msgstr ""
 
 msgctxt "#16325"
-msgid "Auto - ION Optimized"
+msgid "VDPAU - Bob"
 msgstr ""
 
-#empty strings from id 16326 to 16399
+msgctxt "#16326"
+msgid "DXVA-HD"
+msgstr ""
+
+msgctxt "#16327"
+msgid "VAAPI - Bob"
+msgstr ""
+
+msgctxt "#16328"
+msgid "VAAPI - Motion adaptive"
+msgstr ""
+
+msgctxt "#16329"
+msgid "VAAPI - Motion compensated"
+msgstr ""
+
+msgctxt "#16330"
+msgid "MMAL - Advanced"
+msgstr ""
+
+msgctxt "#16331"
+msgid "MMAL - Advanced (half)"
+msgstr ""
+
+msgctxt "#16332"
+msgid "MMAL - Bob"
+msgstr ""
+
+msgctxt "#16333"
+msgid "MMAL - Bob (half)"
+msgstr ""
+
+msgctxt "#16334"
+msgid "IMX - Fast motion"
+msgstr ""
+
+msgctxt "#16335"
+msgid "IMX - Fast motion (double)"
+msgstr ""
+
+#empty strings from id 16336 to 16399
 
 msgctxt "#16400"
 msgid "Post-processing"
@@ -10643,7 +10737,7 @@ msgid "To use this feature you must download an Add-on:"
 msgstr ""
 
 msgctxt "#24101"
-msgid "Would you like to download this Add-on?"
+msgid "Would you like to download this add-on?"
 msgstr ""
 
 #: xbmc/Application.cpp
@@ -11053,7 +11147,7 @@ msgstr ""
 #empty strings from id 34006 to 34099
 
 msgctxt "#34100"
-msgid "Speaker Configuration"
+msgid "Number of channels"
 msgstr ""
 
 msgctxt "#34101"
@@ -11122,8 +11216,28 @@ msgctxt "#34123"
 msgid "Never"
 msgstr ""
 
-#empty strings from id 34124 to 34200
-#34124-34200 reserved for future use
+msgctxt "#34124"
+msgid "44.1"
+msgstr ""
+
+msgctxt "#34125"
+msgid "48.0"
+msgstr ""
+
+msgctxt "#34126"
+msgid "88.2"
+msgstr ""
+
+msgctxt "#34127"
+msgid "96.0"
+msgstr ""
+
+msgctxt "#34128"
+msgid "192.0"
+msgstr ""
+
+#empty strings from id 34129 to 34200
+#34129-34200 reserved for future use
 
 msgctxt "#34201"
 msgid "Can't find a next item to play"
@@ -11146,15 +11260,15 @@ msgstr ""
 #empty strings from id 34302 to 34399
 
 msgctxt "#34400"
-msgid "Video Rendering"
+msgid "Video rendering"
 msgstr ""
 
 msgctxt "#34401"
-msgid "Failed to init video filters/scalers, falling back to bilinear scaling"
+msgid "Failed to initialize video filters / scalers, falling back to bilinear scaling"
 msgstr ""
 
 msgctxt "#34402"
-msgid "Failed to initialize audio device"
+msgid "Failed to initialise audio device"
 msgstr ""
 
 msgctxt "#34403"
@@ -11222,7 +11336,7 @@ msgid "Keymap enabled"
 msgstr ""
 
 msgctxt "#35009"
-msgid "Do not use the custom keymap for this device"
+msgid "Don't use the custom keymap for this device"
 msgstr ""
 
 #empty strings from id 35010 to 35099
@@ -11236,7 +11350,7 @@ msgstr ""
 
 #: system/peripherals.xml
 msgctxt "#35102"
-msgid "Disable joystick when device is present"
+msgid "Disable joystick when this device is present"
 msgstr ""
 
 #empty strings from id 35103 to 35499
@@ -11289,31 +11403,31 @@ msgid "Enable switch side commands"
 msgstr ""
 
 msgctxt "#36006"
-msgid "Could not open the adapter"
+msgid "Couldn't open the adapter"
 msgstr ""
 
 msgctxt "#36007"
-msgid "Devices to power on when starting XBMC"
+msgid "Devices to power on during startup"
 msgstr ""
 
 msgctxt "#36008"
-msgid "Devices to power off when stopping XBMC"
+msgid "Devices to power off during shutdown"
 msgstr ""
 
 msgctxt "#36009"
-msgid "Put devices in standby mode when activating screensaver"
+msgid "Put devices in standby mode when activating the screensaver"
 msgstr ""
 
 msgctxt "#36010"
-msgid "Wake devices when deactivating screensaver"
+msgid "Wake devices when deactivating the screensaver"
 msgstr ""
 
 msgctxt "#36011"
-msgid "Could not detect the CEC com port. Set it up manually."
+msgid "Couldn't detect the CEC com port. Please configure it manually."
 msgstr ""
 
 msgctxt "#36012"
-msgid "Could not initialise the CEC adapter. Please check your settings."
+msgid "Couldn't initialise the CEC adapter. Please check your settings."
 msgstr ""
 
 #empty strings from id 36013 to 36014
@@ -11328,7 +11442,7 @@ msgid "Connected"
 msgstr ""
 
 msgctxt "#36017"
-msgid "Could not initialise the CEC adapter: libCEC was not found on your system."
+msgid "Couldn't initialise the CEC adapter: libCEC was not found on your system."
 msgstr ""
 
 msgctxt "#36018"
@@ -11340,7 +11454,7 @@ msgid "Connected to HDMI device"
 msgstr ""
 
 msgctxt "#36020"
-msgid "Make XBMC the active source when starting"
+msgid "Switch source to this device on startup"
 msgstr ""
 
 msgctxt "#36021"
@@ -11360,11 +11474,11 @@ msgid "Failed to set the new configuration. Please check your settings."
 msgstr ""
 
 msgctxt "#36025"
-msgid "Send 'inactive source' command when stopping XBMC"
+msgid "Send \"Inactive source\" command on shutdown"
 msgstr ""
 
 msgctxt "#36026"
-msgid "Put devices in standby mode when putting the PC in standby"
+msgid "Devices to also put in standby mode"
 msgstr ""
 
 msgctxt "#36027"
@@ -11392,7 +11506,7 @@ msgid "The port is busy. Only one program can access the CEC adapter"
 msgstr ""
 
 msgctxt "#36033"
-msgid "Pause playback when switching to another source"
+msgid "Action when switching to another source"
 msgstr ""
 
 #empty string with id 36034
@@ -11406,7 +11520,7 @@ msgstr ""
 #. adjust refreshrate
 #: xbmc/settings/GUISettings.cpp
 msgctxt "#36036"
-msgid "On start/stop"
+msgid "On start / stop"
 msgstr ""
 
 #: xbmc/peripherals/devices/PeripheralCecAdapter.cpp
@@ -11425,7 +11539,7 @@ msgid "TV and AVR device (explicit)"
 msgstr ""
 
 msgctxt "#36040"
-msgid "Unsupported libCEC interface version. %x is lower than the version XBMC supports (%x)"
+msgid "Detected version of libCEC interface (%x) is lower than the supported version %x."
 msgstr ""
 
 msgctxt "#36041"
@@ -11440,6 +11554,106 @@ msgstr ""
 #: system/settings/rbp.xml
 msgctxt "#36043"
 msgid "Boost center channel when downmixing"
+msgstr ""
+
+msgctxt "#36434"
+msgid "Allow hardware acceleration - MMAL"
+msgstr ""
+
+msgctxt "#36500"
+msgid "Stereoscopic 3D mode / Current"
+msgstr ""
+
+msgctxt "#36501"
+msgid "Stereoscopic 3D mode"
+msgstr ""
+
+msgctxt "#36502"
+msgid "Disabled"
+msgstr ""
+
+msgctxt "#36503"
+msgid "Over / Under"
+msgstr ""
+
+msgctxt "#36504"
+msgid "Side by side"
+msgstr ""
+
+msgctxt "#36505"
+msgid "Anaglyph red / cyan"
+msgstr ""
+
+msgctxt "#36506"
+msgid "Anaglyph green / magenta"
+msgstr ""
+
+msgctxt "#36507"
+msgid "Interlaced"
+msgstr ""
+
+msgctxt "#36508"
+msgid "Hardware based"
+msgstr ""
+
+msgctxt "#36509"
+msgid "Monoscopic / 2D"
+msgstr ""
+
+msgctxt "#36510"
+msgid "Anaglyph yellow / blue"
+msgstr ""
+
+msgctxt "#36520"
+msgid "Playback mode of stereoscopic 3D videos"
+msgstr ""
+
+msgctxt "#36521"
+msgid "Ask me"
+msgstr ""
+
+msgctxt "#36524"
+msgid "Preferred mode"
+msgstr ""
+
+msgctxt "#36525"
+msgid "Same as movie (autodetect)"
+msgstr ""
+
+msgctxt "#36526"
+msgid "Disable stereoscopic 3D mode when playback ended"
+msgstr ""
+
+msgctxt "#36527"
+msgid "Select playback mode"
+msgstr ""
+
+msgctxt "#36528"
+msgid "Select stereoscopic 3D mode"
+msgstr ""
+
+msgctxt "#36531"
+msgid "Select alternate mode..."
+msgstr ""
+
+msgctxt "#36532"
+msgid "Same as movie"
+msgstr ""
+
+msgctxt "#36535"
+msgid "Stereoscopic 3D mode of video"
+msgstr ""
+
+msgctxt "#36536"
+msgid "Invert stereoscopic 3D mode (flip eyes)"
+msgstr ""
+
+msgctxt "#36545"
+msgid "Stereoscopic 3D depth of subtitles"
+msgstr ""
+
+msgctxt "#36550"
+msgid "Stereoscopic 3D effect strength"
 msgstr ""
 
 #: system/settings/rbp.xml
@@ -11477,6 +11691,42 @@ msgctxt "#37030"
 msgid "Unlimited"
 msgstr ""
 
+msgctxt "#38010"
+msgid "GPU accelerated"
+msgstr ""
+
+msgctxt "#38013"
+msgid "Limit GUI updates during playback"
+msgstr ""
+
+msgctxt "#38015"
+msgid "Unlimited"
+msgstr ""
+
+msgctxt "#38016"
+msgid "%d fps"
+msgstr ""
+
+msgctxt "#38019"
+msgid "Support 8 channel DTS-HD audio decoding"
+msgstr ""
+
+msgctxt "#38027"
+msgid "Decode the stereo stream from 3D files"
+msgstr ""
+
+msgctxt "#38029"
+msgid "Enable Full HD HDMI modes for stereoscopic 3D"
+msgstr ""
+
+msgctxt "#38007"
+msgid "Boost centre channel when downmixing"
+msgstr ""
+
+msgctxt "#38009"
+msgid "%i dB"
+msgstr ""
+
 #: system/peripherals.xml
 msgctxt "#38050"
 msgid "Remote button press delay before repeating (ms)"
@@ -11492,7 +11742,42 @@ msgctxt "#38052"
 msgid "Remote button press release time (ms)"
 msgstr ""
 
-#: system/settings/settings.xml
-msgctxt "#38118"
-msgid "Support 8 channel DTS-HD audio decoding"
+msgctxt "#38501"
+msgid "1 second"
+msgstr ""
+
+msgctxt "#38502"
+msgid "2 seconds"
+msgstr ""
+
+msgctxt "#38503"
+msgid "3 seconds"
+msgstr ""
+
+msgctxt "#38504"
+msgid "4 seconds"
+msgstr ""
+
+msgctxt "#38505"
+msgid "5 seconds"
+msgstr ""
+
+msgctxt "#38506"
+msgid "6 seconds"
+msgstr ""
+
+msgctxt "#38507"
+msgid "7 seconds"
+msgstr ""
+
+msgctxt "#38508"
+msgid "8 seconds"
+msgstr ""
+
+msgctxt "#38509"
+msgid "9 seconds"
+msgstr ""
+
+msgctxt "#38510"
+msgid "10 seconds"
 msgstr ""

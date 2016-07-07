@@ -19,17 +19,20 @@
  *
  */
 
-#include "XBTFWriter.h"
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include "guilib/XBTF.h"
-#include "utils/EndianSwap.h"
-#if defined(__FreeBSD__)
+#if defined(TARGET_FREEBSD) || defined(TARGET_DARWIN)
 #include <stdlib.h>
-#elif !defined(__APPLE__)
+#elif !defined(TARGET_DARWIN)
 #include <malloc.h>
 #endif
 #include <memory.h>
+#include <string.h>
+
+#include "XBTFWriter.h"
+#include "guilib/XBTF.h"
+#include "utils/EndianSwap.h"
+
 
 #define WRITE_STR(str, size, file) fwrite(str, size, 1, file)
 #define WRITE_U32(i, file) { uint32_t _n = Endian_SwapLE32(i); fwrite(&_n, 4, 1, file); }

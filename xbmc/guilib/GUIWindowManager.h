@@ -96,6 +96,8 @@ public:
    */
   bool Render();
 
+  void RenderEx() const;
+
   /*! \brief Do any post render activities.
    */
   void AfterRender();
@@ -112,6 +114,16 @@ public:
    \return true if the window manager is initialized, false otherwise.
    */
   bool Initialized() const { return m_initialized; };
+
+  /*! \brief Create and initialize all windows and dialogs
+   */
+  void CreateWindows();
+
+  /*! \brief Destroy and remove all windows and dialogs
+  *
+  * \return true on success, false if destruction fails for any window
+  */
+  bool DestroyWindows();
 
   CGUIWindow* GetWindow(int id) const;
   void ProcessRenderLoop(bool renderOnly = false);

@@ -26,8 +26,10 @@
  */
 
 #include <string.h>
+#include "libavutil/avassert.h"
 #include "libavutil/intreadwrite.h"
 #include "libavcodec/avcodec.h"
+#include "internal.h"
 #include "rtp.h"
 #include "rtpdec.h"
 #include "rtpdec_formats.h"
@@ -103,9 +105,7 @@ static int qdm2_parse_config(PayloadContext *qdm, AVStream *st,
                 if (item_len < 30)
                     return AVERROR_INVALIDDATA;
                 av_freep(&st->codec->extradata);
-                st->codec->extradata_size = 26 + item_len;
-                if (!(st->codec->extradata = av_mallocz(st->codec->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE))) {
-                    st->codec->extradata_size = 0;
+                if (ff_alloc_extradata(st->codec, 26 + item_len)) {
                     return AVERROR(ENOMEM);
                 }
                 AV_WB32(st->codec->extradata, 12);
@@ -189,11 +189,11 @@ static int qdm2_restore_block(PayloadContext *qdm, AVStream *st, AVPacket *pkt)
     uint8_t *p, *csum_pos = NULL;
 
     /* create packet to hold subpkts into a superblock */
-    assert(qdm->cache > 0);
+    av_assert0(qdm->cache > 0);
     for (n = 0; n < 0x80; n++)
         if (qdm->len[n] > 0)
             break;
-    assert(n < 0x80);
+    av_assert0(n < 0x80);
 
     if ((res = av_new_packet(pkt, qdm->block_size)) < 0)
         return res;
@@ -237,7 +237,8 @@ static int qdm2_restore_block(PayloadContext *qdm, AVStream *st, AVPacket *pkt)
 static int qdm2_parse_packet(AVFormatContext *s, PayloadContext *qdm,
                              AVStream *st, AVPacket *pkt,
                              uint32_t *timestamp,
-                             const uint8_t *buf, int len, int flags)
+                             const uint8_t *buf, int len, uint16_t seq,
+                             int flags)
 {
     int res = AVERROR_INVALIDDATA, n;
     const uint8_t *end = buf + len, *p = buf;
@@ -259,14 +260,14 @@ static int qdm2_parse_packet(AVFormatContext *s, PayloadContext *qdm,
                 return res;
             p += res;
 
-            /* We set codec_id to CODEC_ID_NONE initially to
+            /* We set codec_id to AV_CODEC_ID_NONE initially to
              * delay decoder initialization since extradata is
              * carried within the RTP stream, not SDP. Here,
-             * by setting codec_id to CODEC_ID_QDM2, we are signalling
+             * by setting codec_id to AV_CODEC_ID_QDM2, we are signalling
              * to the decoder that it is OK to initialize. */
-            st->codec->codec_id = CODEC_ID_QDM2;
+            st->codec->codec_id = AV_CODEC_ID_QDM2;
         }
-        if (st->codec->codec_id == CODEC_ID_NONE)
+        if (st->codec->codec_id == AV_CODEC_ID_NONE)
             return AVERROR(EAGAIN);
 
         /* subpackets */
@@ -297,21 +298,10 @@ static int qdm2_parse_packet(AVFormatContext *s, PayloadContext *qdm,
     return (qdm->cache > 0) ? 1 : 0;
 }
 
-static PayloadContext *qdm2_extradata_new(void)
-{
-    return av_mallocz(sizeof(PayloadContext));
-}
-
-static void qdm2_extradata_free(PayloadContext *qdm)
-{
-    av_free(qdm);
-}
-
 RTPDynamicProtocolHandler ff_qdm2_dynamic_handler = {
     .enc_name         = "X-QDM",
     .codec_type       = AVMEDIA_TYPE_AUDIO,
-    .codec_id         = CODEC_ID_NONE,
-    .alloc            = qdm2_extradata_new,
-    .free             = qdm2_extradata_free,
+    .codec_id         = AV_CODEC_ID_NONE,
+    .priv_data_size   = sizeof(PayloadContext),
     .parse_packet     = qdm2_parse_packet,
 };

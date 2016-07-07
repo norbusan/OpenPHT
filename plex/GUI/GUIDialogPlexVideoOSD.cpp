@@ -19,7 +19,7 @@ bool CGUIDialogPlexVideoOSD::OnAction(const CAction &action)
       return false;
 
     case ACTION_NAV_BACK:
-      if (m_openedFromPause || g_application.IsPaused())
+      if (m_openedFromPause || g_application.m_pPlayer->IsPausedPlayback())
       {
         g_application.StopPlaying();
         return true;

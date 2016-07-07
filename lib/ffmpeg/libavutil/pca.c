@@ -32,6 +32,7 @@ typedef struct PCA{
     int n;
     double *covariance;
     double *mean;
+    double *z;
 }PCA;
 
 PCA *ff_pca_init(int n){
@@ -39,11 +40,20 @@ PCA *ff_pca_init(int n){
     if(n<=0)
         return NULL;
 
-    pca= av_mallocz(sizeof(PCA));
+    pca= av_mallocz(sizeof(*pca));
+    if (!pca)
+        return NULL;
+
     pca->n= n;
+    pca->z = av_malloc_array(n, sizeof(*pca->z));
     pca->count=0;
-    pca->covariance= av_mallocz(sizeof(double)*n*n);
-    pca->mean= av_mallocz(sizeof(double)*n);
+    pca->covariance= av_calloc(n*n, sizeof(double));
+    pca->mean= av_calloc(n, sizeof(double));
+
+    if (!pca->z || !pca->covariance || !pca->mean) {
+        ff_pca_free(pca);
+        return NULL;
+    }
 
     return pca;
 }
@@ -51,10 +61,11 @@ PCA *ff_pca_init(int n){
 void ff_pca_free(PCA *pca){
     av_freep(&pca->covariance);
     av_freep(&pca->mean);
+    av_freep(&pca->z);
     av_free(pca);
 }
 
-void ff_pca_add(PCA *pca, double *v){
+void ff_pca_add(PCA *pca, const double *v){
     int i, j;
     const int n= pca->n;
 
@@ -70,7 +81,7 @@ int ff_pca(PCA *pca, double *eigenvector, double *eigenvalue){
     int i, j, pass;
     int k=0;
     const int n= pca->n;
-    double z[n];
+    double *z = pca->z;
 
     memset(eigenvector, 0, sizeof(double)*n*n);
 

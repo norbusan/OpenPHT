@@ -38,11 +38,11 @@ CTextureInfo::CTextureInfo()
   useLarge = false;
 }
 
-CTextureInfo::CTextureInfo(const CStdString &file)
+CTextureInfo::CTextureInfo(const CStdString &file):
+  filename(file)
 {
   orientation = 0;
   useLarge = false;
-  filename = file;
 }
 
 CTextureInfo& CTextureInfo::operator=(const CTextureInfo &right)
@@ -52,6 +52,7 @@ CTextureInfo& CTextureInfo::operator=(const CTextureInfo &right)
   diffuse = right.diffuse;
   filename = right.filename;
   useLarge = right.useLarge;
+  diffuseColor = right.diffuseColor;
   /* PLEX */
   blur = right.blur;
   saturation = right.saturation;
@@ -60,16 +61,15 @@ CTextureInfo& CTextureInfo::operator=(const CTextureInfo &right)
 }
 
 #ifndef __PLEX__
-CGUITextureBase::CGUITextureBase(float posX, float posY, float width, float height, const CTextureInfo& texture)
+CGUITextureBase::CGUITextureBase(float posX, float posY, float width, float height, const CTextureInfo& texture) :
 #else
-CGUITextureBase::CGUITextureBase(float posX, float posY, float width, float height, const CTextureInfo& texture, float minWidth)
+CGUITextureBase::CGUITextureBase(float posX, float posY, float width, float height, const CTextureInfo& texture, float minWidth) :
 #endif
+  m_height(height), m_info(texture)
 {
   m_posX = posX;
   m_posY = posY;
   m_width = width;
-  m_height = height;
-  m_info = texture;
 
   // defaults
   m_visible = true;
@@ -89,32 +89,32 @@ CGUITextureBase::CGUITextureBase(float posX, float posY, float width, float heig
   m_diffuseScaleV = 1.0f;
 
   // anim gifs
-  m_currentFrame = 0;
-  m_frameCounter = (unsigned int) -1;
-  m_currentLoop = 0;
+  ResetAnimState();
 
   m_allocateDynamically = false;
   m_isAllocated = NO;
   m_invalid = true;
+  m_use_cache = true;
 
   /* PLEX */
   m_minWidth = minWidth;
 }
 
-CGUITextureBase::CGUITextureBase(const CGUITextureBase &right)
+CGUITextureBase::CGUITextureBase(const CGUITextureBase &right) :
+  m_height(right.m_height),
+  m_alpha(right.m_alpha),
+  m_info(right.m_info),
+  m_aspect(right.m_aspect)
 {
   m_posX = right.m_posX;
   m_posY = right.m_posY;
   m_width = right.m_width;
-  m_height = right.m_height;
-  m_info = right.m_info;
 
   m_visible = right.m_visible;
   m_diffuseColor = right.m_diffuseColor;
-  m_alpha = right.m_alpha;
-  m_aspect = right.m_aspect;
 
   m_allocateDynamically = right.m_allocateDynamically;
+  m_use_cache = right.m_use_cache;
 
   // defaults
   m_vertex.SetRect(m_posX, m_posY, m_posX + m_width, m_posY + m_height);
@@ -129,9 +129,7 @@ CGUITextureBase::CGUITextureBase(const CGUITextureBase &right)
   m_diffuseScaleU = 1.0f;
   m_diffuseScaleV = 1.0f;
 
-  m_currentFrame = 0;
-  m_frameCounter = (unsigned int) -1;
-  m_currentLoop = 0;
+  ResetAnimState();
 
   m_isAllocated = NO;
   m_invalid = true;
@@ -155,9 +153,7 @@ bool CGUITextureBase::AllocateOnDemand()
     if (m_allocateDynamically && IsAllocated())
       FreeResources();
     // reset animated textures (animgifs)
-    m_currentLoop = 0;
-    m_currentFrame = 0;
-    m_frameCounter = 0;
+    ResetAnimState();
   }
 
   return false;
@@ -170,7 +166,7 @@ bool CGUITextureBase::Process(unsigned int currentTime)
   changed |= AllocateOnDemand();
 
   if (m_texture.size() > 1)
-    changed |= UpdateAnimFrame();
+    changed |= UpdateAnimFrame(currentTime);
 
   if (m_invalid)
     changed |= CalculateSize();
@@ -192,8 +188,12 @@ void CGUITextureBase::Render()
 
   // set our draw color
   #define MIX_ALPHA(a,c) (((a * (c >> 24)) / 255) << 24) | (c & 0x00ffffff)
-  color_t color = m_diffuseColor;
-  if (m_alpha != 0xFF) color = MIX_ALPHA(m_alpha, m_diffuseColor);
+
+  // diffuse color
+  color_t color = (m_info.diffuseColor) ? (color_t)m_info.diffuseColor : m_diffuseColor;
+  if (m_alpha != 0xFF)
+	  color = MIX_ALPHA(m_alpha, color);
+
   color = g_graphicsContext.MergeAlpha(color);
 
   // setup our renderer
@@ -313,9 +313,7 @@ bool CGUITextureBase::AllocResources()
 #endif
 
   // reset our animstate
-  m_frameCounter = 0;
-  m_currentFrame = 0;
-  m_currentLoop = 0;
+  ResetAnimState();
 
   bool changed = false;
   bool useLarge = m_info.useLarge || !g_TextureManager.CanLoad(m_info.filename);
@@ -323,18 +321,19 @@ bool CGUITextureBase::AllocResources()
   { // we want to use the large image loader, but we first check for bundled textures
     if (!IsAllocated())
     {
-      int images = g_TextureManager.Load(m_info.filename, true);
-      if (images)
+      CTextureArray texture;
+      texture = g_TextureManager.Load(m_info.filename, true);
+      if (texture.size())
       {
         m_isAllocated = NORMAL;
-        m_texture = g_TextureManager.GetTexture(m_info.filename);
+        m_texture = texture;
         changed = true;
       }
     }
     if (m_isAllocated != NORMAL)
     { // use our large image background loader
       CTextureArray texture;
-      if (g_largeTextureManager.GetImage(m_info.filename, texture, !IsAllocated()))
+      if (g_largeTextureManager.GetImage(m_info.filename, texture, !IsAllocated(), m_use_cache))
       {
         m_isAllocated = LARGE;
 
@@ -351,15 +350,14 @@ bool CGUITextureBase::AllocResources()
   }
   else if (!IsAllocated())
   {
-    int images = g_TextureManager.Load(m_info.filename);
+    CTextureArray texture = g_TextureManager.Load(m_info.filename);
 
     // set allocated to true even if we couldn't load the image to save
     // us hitting the disk every frame
-    m_isAllocated = images ? NORMAL : NORMAL_FAILED;
-    if (!images)
+    m_isAllocated = texture.size() ? NORMAL : NORMAL_FAILED;
+    if (!texture.size())
       return false;
-
-    m_texture = g_TextureManager.GetTexture(m_info.filename);
+    m_texture = texture;
     changed = true;
   }
   m_frameWidth = (float)m_texture.m_width;
@@ -368,8 +366,7 @@ bool CGUITextureBase::AllocResources()
   // load the diffuse texture (if necessary)
   if (!m_info.diffuse.IsEmpty())
   {
-    g_TextureManager.Load(m_info.diffuse);
-    m_diffuse = g_TextureManager.GetTexture(m_info.diffuse);
+    m_diffuse = g_TextureManager.Load(m_info.diffuse);
   }
 
   CalculateSize();
@@ -480,16 +477,16 @@ void CGUITextureBase::FreeResources(bool immediately /* = false */)
   if (m_isAllocated == LARGE || m_isAllocated == LARGE_FAILED)
     g_largeTextureManager.ReleaseImage(m_info.filename, immediately || (m_isAllocated == LARGE_FAILED));
   else if (m_isAllocated == NORMAL && m_texture.size())
-    g_TextureManager.ReleaseTexture(m_info.filename);
+    g_TextureManager.ReleaseTexture(m_info.filename, immediately);
 
   if (m_diffuse.size())
-    g_TextureManager.ReleaseTexture(m_info.diffuse);
+    g_TextureManager.ReleaseTexture(m_info.diffuse, immediately);
   m_diffuse.Reset();
 
   m_texture.Reset();
 
-  m_currentFrame = 0;
-  m_currentLoop = 0;
+  ResetAnimState();
+
   m_texCoordsScaleU = 1.0f;
   m_texCoordsScaleV = 1.0f;
 
@@ -509,38 +506,45 @@ void CGUITextureBase::SetInvalid()
   m_invalid = true;
 }
 
-bool CGUITextureBase::UpdateAnimFrame()
+bool CGUITextureBase::UpdateAnimFrame(unsigned int currentTime)
 {
   bool changed = false;
-
-  m_frameCounter++;
   unsigned int delay = m_texture.m_delays[m_currentFrame];
-  if (!delay) delay = 100;
-  if (m_frameCounter * 40 >= delay)
+
+  if (m_lasttime == 0)
   {
-    m_frameCounter = 0;
-    if (m_currentFrame + 1 >= m_texture.size())
+    m_lasttime = currentTime;
+  }
+  else
+  {
+    if ((currentTime - m_lasttime) >= delay)
     {
-      if (m_texture.m_loops > 0)
+      if (m_currentFrame + 1 >= m_texture.size())
       {
-        if (m_currentLoop + 1 < m_texture.m_loops)
+        if (m_texture.m_loops > 0)
         {
-          m_currentLoop++;
+          if (m_currentLoop + 1 < m_texture.m_loops)
+          {
+            m_currentLoop++;
+            m_currentFrame = 0;
+            m_lasttime = currentTime;
+            changed = true;
+          }
+        }
+        else
+        {
+          // 0 == loop forever
           m_currentFrame = 0;
+          m_lasttime = currentTime;
           changed = true;
         }
       }
       else
       {
-        // 0 == loop forever
-        m_currentFrame = 0;
+        m_currentFrame++;
+        m_lasttime = currentTime;
         changed = true;
       }
-    }
-    else
-    {
-      m_currentFrame++;
-      changed = true;
     }
   }
 
@@ -565,6 +569,7 @@ bool CGUITextureBase::SetDiffuseColor(color_t color)
 {
   bool changed = m_diffuseColor != color;
   m_diffuseColor = color;
+  changed |= m_info.diffuseColor.Update();
   return changed;
 }
 
@@ -608,6 +613,13 @@ void CGUITextureBase::OrientateTexture(CRect &rect, float width, float height, i
     rect.x2 = rect.y2 * width/height;
     rect.y2 = temp * height/width;
   }
+}
+
+void CGUITextureBase::ResetAnimState()
+{
+  m_lasttime = 0;
+  m_currentFrame = 0;
+  m_currentLoop = 0;
 }
 
 bool CGUITextureBase::SetWidth(float width)
@@ -666,23 +678,17 @@ bool CGUITextureBase::SetAspectRatio(const CAspectRatio &aspect)
 bool CGUITextureBase::SetFileName(const CStdString& filename)
 {
   if (m_info.filename.Equals(filename)) return false;
-
-  /* PLEX */
-  // If the new name is the cached version of the old name, don't do anything.
-  // This can occur if the texture cache loads something for us, and then a bit
-  // later the texture is requested with the cached name and we don't want it
-  // flickering.
-  //
-  //if (CFileItem::GetCachedPlexMediaServerThumb(m_info.filename) == filename)
-    //return false;
-  /* END PLEX */
-
   // Don't completely free resources here - we may be just changing
   // filenames mid-animation
   FreeResources();
   m_info.filename = filename;
   // Don't allocate resources here as this is done at render time
   return true;
+}
+
+void CGUITextureBase::SetUseCache(const bool useCache)
+{
+  m_use_cache = useCache;
 }
 
 int CGUITextureBase::GetOrientation() const

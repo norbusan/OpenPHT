@@ -488,6 +488,10 @@ void XBPython::Initialize()
          was used to compile the various Python object files (i.e. .pyo,
          .pyc, etc.). */
         // check if we are running as real xbmc.app or just binary
+#ifdef TARGET_OPENELEC
+      // Required for python to find optimized code (pyo) files
+      setenv("PYTHONOPTIMIZE", "1", 1);
+#endif
       if (!CUtil::GetFrameworksPath(true).IsEmpty())
       {
         // using external python, it's build looking for xxx/lib/python2.6

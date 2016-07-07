@@ -1,5 +1,5 @@
 ;******************************************************************************
-;* MMX optimized deinterlacing functions
+;* SIMD-optimized deinterlacing functions
 ;* Copyright (c) 2010 Vitor Sessak
 ;* Copyright (c) 2002 Michael Niedermayer
 ;*
@@ -20,7 +20,6 @@
 ;* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ;******************************************************************************
 
-%include "libavutil/x86/x86inc.asm"
 %include "libavutil/x86/x86util.asm"
 
 SECTION_RODATA
@@ -32,14 +31,14 @@ SECTION .text
 %macro DEINTERLACE 1
 %ifidn %1, inplace
 ;void ff_deinterlace_line_inplace_mmx(const uint8_t *lum_m4, const uint8_t *lum_m3, const uint8_t *lum_m2, const uint8_t *lum_m1, const uint8_t *lum,  int size)
-cglobal deinterlace_line_inplace_mmx, 6,6,7,      lum_m4, lum_m3, lum_m2, lum_m1, lum, size
+cglobal deinterlace_line_inplace, 6,6,7,      lum_m4, lum_m3, lum_m2, lum_m1, lum, size
 %else
 ;void ff_deinterlace_line_mmx(uint8_t *dst, const uint8_t *lum_m4, const uint8_t *lum_m3, const uint8_t *lum_m2, const uint8_t *lum_m1, const uint8_t *lum,  int size)
-cglobal deinterlace_line_mmx,         7,7,7, dst, lum_m4, lum_m3, lum_m2, lum_m1, lum, size
+cglobal deinterlace_line,         7,7,7, dst, lum_m4, lum_m3, lum_m2, lum_m1, lum, size
 %endif
     pxor  mm7, mm7
     movq  mm6, [pw_4]
-.nextrow
+.nextrow:
     movd  mm0, [lum_m4q]
     movd  mm1, [lum_m3q]
     movd  mm2, [lum_m2q]
@@ -77,6 +76,8 @@ cglobal deinterlace_line_mmx,         7,7,7, dst, lum_m4, lum_m3, lum_m2, lum_m1
     jg .nextrow
     REP_RET
 %endmacro
+
+INIT_MMX mmx
 
 DEINTERLACE ""
 

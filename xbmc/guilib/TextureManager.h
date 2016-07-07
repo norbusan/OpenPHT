@@ -22,15 +22,14 @@
 \file TextureManager.h
 \brief
 */
+#pragma once
 
-#ifndef GUILIB_TEXTUREMANAGER_H
-#define GUILIB_TEXTUREMANAGER_H
-
+#include <list>
 #include <vector>
+#include <utility>
+
 #include "TextureBundle.h"
 #include "threads/CriticalSection.h"
-
-#pragma once
 
 /************************************************************************/
 /*                                                                      */
@@ -84,11 +83,13 @@ public:
   uint32_t GetMemoryUsage() const;
   void Flush();
   bool IsEmpty() const;
+  void SetHeight(int height);
+  void SetWidth(int height);
 protected:
   void FreeTexture();
 
-  CStdString m_textureName;
   CTextureArray m_texture;
+  CStdString m_textureName;
   unsigned int m_referenceCount;
   uint32_t m_memUsage;
 };
@@ -107,10 +108,9 @@ public:
   virtual ~CGUITextureManager(void);
 
   bool HasTexture(const CStdString &textureName, CStdString *path = NULL, int *bundle = NULL, int *size = NULL);
-  bool CanLoad(const CStdString &texturePath) const; ///< Returns true if the texture manager can load this texture
-  int Load(const CStdString& strTextureName, bool checkBundleOnly = false);
-  const CTextureArray& GetTexture(const CStdString& strTextureName);
-  void ReleaseTexture(const CStdString& strTextureName);
+  static bool CanLoad(const CStdString &texturePath); ///< Returns true if the texture manager can load this texture
+  const CTextureArray& Load(const CStdString& strTextureName, bool checkBundleOnly = false);
+  void ReleaseTexture(const CStdString& strTextureName, bool immediately = false);
   void Cleanup();
   void Dump() const;
   uint32_t GetMemoryUsage() const;
@@ -122,13 +122,14 @@ public:
   void SetTexturePath(const CStdString &texturePath);    ///< Set a single path as the path to check when loading media (clear then add)
   void RemoveTexturePath(const CStdString &texturePath); ///< Remove a path from the paths to check when loading media
 
-  void FreeUnusedTextures(); ///< Free textures (called from app thread only)
+  void FreeUnusedTextures(unsigned int timeDelay = 0); ///< Free textures (called from app thread only)
   void ReleaseHwTexture(unsigned int texture);
 protected:
   std::vector<CTextureMap*> m_vecTextures;
-  std::vector<CTextureMap*> m_unusedTextures;
+  std::list<std::pair<CTextureMap*, unsigned int> > m_unusedTextures;
   std::vector<unsigned int> m_unusedHwTextures;
   typedef std::vector<CTextureMap*>::iterator ivecTextures;
+  typedef std::list<std::pair<CTextureMap*, unsigned int> >::iterator ilistUnused;
   // we have 2 texture bundles (one for the base textures, one for the theme)
   CTextureBundle m_TexBundle[2];
 
@@ -141,4 +142,3 @@ protected:
  \brief
  */
 extern CGUITextureManager g_TextureManager;
-#endif

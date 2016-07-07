@@ -36,15 +36,6 @@ enum EPLAYERCORES
   EPC_DVDPLAYER,
   EPC_MPLAYER,
   EPC_PAPLAYER,
-  /* PLEX */
-  EPC_PMSPLAYER,
-  /* END PLEX */
-#if defined(HAS_AMLPLAYER)
-  EPC_AMLPLAYER,
-#endif
-#if defined(HAS_OMXPLAYER)
-  EPC_OMXPLAYER,
-#endif
   EPC_EXTPLAYER
 };
 
@@ -54,12 +45,6 @@ const PLAYERCOREID PCID_NONE = EPC_NONE;
 const PLAYERCOREID PCID_DVDPLAYER = EPC_DVDPLAYER;
 const PLAYERCOREID PCID_MPLAYER = EPC_MPLAYER;
 const PLAYERCOREID PCID_PAPLAYER = EPC_PAPLAYER;
-#if defined(HAS_AMLPLAYER)
-const PLAYERCOREID PCID_AMLPLAYER = EPC_AMLPLAYER;
-#endif
-#if defined(HAS_OMXPLAYER)
-const PLAYERCOREID PCID_OMXPLAYER = EPC_OMXPLAYER;
-#endif
 
 class CPlayerCoreFactory
 {
@@ -80,7 +65,7 @@ public:
 
   static PLAYERCOREID GetDefaultPlayer( const CFileItem& item );
 
-  static PLAYERCOREID SelectPlayerDialog(VECPLAYERCORES &vecCores, float posX = 0, float posY = 0);
+  static PLAYERCOREID SelectPlayerDialog(const VECPLAYERCORES &vecCores, float posX = 0, float posY = 0);
   static PLAYERCOREID SelectPlayerDialog(float posX, float posY);
 
   static bool LoadConfiguration(TiXmlElement* pConfig, bool clear);

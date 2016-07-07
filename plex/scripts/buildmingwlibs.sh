@@ -1,18 +1,33 @@
 
-ERRORFILE=/xbmc/project/Win32BuildSetup/errormingw
-NOPFILE=/xbmc/project/Win32BuildSetup/noprompt
-MAKECLEANFILE=/xbmc/project/Win32BuildSetup/makeclean
+Win32BuildSetup=/xbmc/project/Win32BuildSetup
+ERRORFILE=$Win32BuildSetup/errormingw
+NOPFILE=$Win32BuildSetup/noprompt
+MAKECLEANFILE=$Win32BuildSetup/makeclean
+BGPROCESSFILE=$Win32BuildSetup/bgprocess
 TOUCH=/bin/touch
 RM=/bin/rm
 NOPROMPT=0
 MAKECLEAN=""
 MAKEFLAGS=""
+TOOLS="mingw"
 
 export _WIN32_WINNT=0x0600
 export NTDDI_VERSION=0x06000000
 
-function throwerror ()
-{
+while true; do
+  case $1 in
+    --tools=* ) TOOLS="${1#*=}"; shift ;;
+    --build32=* ) build32="${1#*=}"; shift ;;
+    --build64=* ) build64="${1#*=}"; shift ;;
+    --prompt=* ) PROMPTLEVEL="${1#*=}"; shift ;;
+    --mode=* ) BUILDMODE="${1#*=}"; shift ;;
+    -- ) shift; break ;;
+    -* ) shift ;;
+    * ) break ;;
+  esac
+done
+
+throwerror() {
   $TOUCH $ERRORFILE
   echo failed to compile $1
   if [ $NOPROMPT == 0 ]; then
@@ -20,20 +35,84 @@ function throwerror ()
   fi
 }
 
-function setfilepath ()
-{
+setfilepath() {
   FILEPATH=$1
 }
 
-function checkfiles ()
-{
+checkfiles() {
   for i in $@; do
-  FILE=$FILEPATH/$i
-  if [ ! -f $FILE ]; then
-    throwerror "$FILE"
-    exit 1
-  fi
+    if [ ! -f "$FILEPATH/$i" ]; then
+      throwerror "$FILEPATH/$i"
+      exit 1
+    fi
   done
+}
+
+#start the process backgrounded
+runBackgroundProcess() {
+  $TOUCH $BGPROCESSFILE
+  echo "backgrounding: sh $1 $BGPROCESSFILE $TOOLS & (workdir: $(PWD))"
+  sh $1 $BGPROCESSFILE $targetBuild $TOOLS &
+  echo "waiting on bgprocess..."
+  while [ -f $BGPROCESSFILE ]; do
+    echo -n "."
+    sleep 5
+  done
+}
+
+
+buildProcess() {
+cd /xbmc/tools/buildsteps/win32
+
+# compile our mingw dlls
+echo "-------------------------------------------------------------------------------"
+echo "compiling mingw libs $BITS"
+echo
+echo " NOPROMPT  = $NOPROMPT"
+echo " MAKECLEAN = $MAKECLEAN"
+echo " WORKSPACE = $WORKSPACE"
+echo " TOOLCHAIN = $TOOLS"
+echo
+echo "-------------------------------------------------------------------------------"
+
+echo -ne "\033]0;building FFmpeg $BITS\007"
+echo "-------------------------------------------------"
+echo " building FFmpeg $BITS"
+echo "-------------------------------------------------"
+cd /xbmc/lib/ffmpeg
+runBackgroundProcess "./build_xbmc_win32.sh $MAKECLEAN"
+setfilepath /xbmc/system/players/dvdplayer
+checkfiles avcodec-56.dll avformat-56.dll avutil-54.dll postproc-53.dll swscale-3.dll avfilter-5.dll swresample-1.dll
+echo "-------------------------------------------------"
+echo " building of FFmpeg $BITS done..."
+echo "-------------------------------------------------"
+
+echo "-------------------------------------------------------------------------------"
+echo
+echo "compile mingw libs $BITS done..."
+echo
+echo "-------------------------------------------------------------------------------"
+
+}
+
+run_builds() {
+    new_updates="no"
+    new_updates_packages=""
+    if [[ $build32 = "yes" ]]; then
+        source /local32/etc/profile.local
+        buildProcess
+        echo "-------------------------------------------------------------------------------"
+        echo "compile all libs 32bit done..."
+        echo "-------------------------------------------------------------------------------"
+    fi
+
+    if [[ $build64 = "yes" ]]; then
+        source /local64/etc/profile.local
+        buildProcess
+        echo "-------------------------------------------------------------------------------"
+        echo "compile all libs 64bit done..."
+        echo "-------------------------------------------------------------------------------"
+    fi
 }
 
 # cleanup
@@ -42,13 +121,11 @@ if [ -f $ERRORFILE ]; then
 fi
 
 # check for noprompt
-if [ -f $NOPFILE ]; then
-  $RM $NOPFILE
+if [ "$PROMPTLEVEL" == "noprompt" ]; then
   NOPROMPT=1
 fi
 
-if [ -f $MAKECLEANFILE ]; then
-  $RM $MAKECLEANFILE
+if [ "$BUILDMODE" == "clean" ]; then
   MAKECLEAN="clean"
 else
   MAKECLEAN="noclean"
@@ -58,19 +135,10 @@ if [ $NUMBER_OF_PROCESSORS > 1 ]; then
   MAKEFLAGS=-j`expr $NUMBER_OF_PROCESSORS + $NUMBER_OF_PROCESSORS / 2`
 fi
 
-# compile our mingw dlls
-echo "################################"
-echo "## compiling mingw libs"
-echo "## NOPROMPT  = $NOPROMPT"
-echo "## MAKECLEAN = $MAKECLEAN"
-echo "################################"
+run_builds
 
-echo "##### building ffmpeg dlls #####"
-cd /xbmc/lib/ffmpeg/
-sh ./build_xbmc_win32.sh $MAKECLEAN
-setfilepath /xbmc/system/players/dvdplayer
-checkfiles avcodec-53.dll avformat-53.dll avutil-51.dll postproc-52.dll swscale-2.dll avfilter-2.dll swresample-0.dll
-echo "##### building of ffmpeg dlls done #####"
+echo -e "\033]0;compiling done...\007"
+echo
 
 # wait for key press
 if [ $NOPROMPT == 0 ]; then

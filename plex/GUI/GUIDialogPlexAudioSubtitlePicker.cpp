@@ -29,7 +29,7 @@ CGUIDialogPlexPicker::OnMessage(CGUIMessage &msg)
   if (msg.GetMessage() == GUI_MSG_WINDOW_INIT)
   {
     SetHeading(g_localizeStrings.Get(m_audio ? 52100 : 52101));
-    if (g_application.IsPlaying() && g_application.CurrentFileItemPtr())
+    if (g_application.m_pPlayer->IsPlaying() && g_application.CurrentFileItemPtr())
       SetFileItem(g_application.CurrentFileItemPtr());
     else if (g_plexApplication.m_preplayItem)
       SetFileItem(g_plexApplication.m_preplayItem);
@@ -114,30 +114,29 @@ void CGUIDialogPlexPicker::UpdateStreamSelection()
   PlexUtils::SetSelectedStream(m_fileItem, selectedStream);
 
   if (g_application.CurrentFileItemPtr()->GetPath() == m_fileItem->GetPath() &&
-      g_application.IsPlayingVideo() && g_application.m_pPlayer)
+      g_application.m_pPlayer->IsPlayingVideo())
   {
-    IPlayer *player = g_application.m_pPlayer;
     int64_t streamId = selectedStream->GetProperty("id").asInteger();
     bool audioStreamChanged = false;
 
     if (m_audio)
     {
-      if (player->GetAudioStreamPlexID() != streamId)
+      if (g_application.m_pPlayer->GetAudioStreamPlexID() != streamId)
       {
-        player->SetAudioStreamPlexID(streamId);
-        g_settings.m_currentVideoSettings.m_AudioStream = player->GetAudioStream();
+        g_application.m_pPlayer->SetAudioStreamPlexID(streamId);
+        g_settings.m_currentVideoSettings.m_AudioStream = g_application.m_pPlayer->GetAudioStream();
         audioStreamChanged = true;
       }
     }
     else
     {
       bool visible = streamId != 0;
-      player->SetSubtitleVisible(visible);
+      g_application.m_pPlayer->SetSubtitleVisible(visible);
 
       if (visible)
       {
-        player->SetSubtitleStreamPlexID(streamId);
-        g_settings.m_currentVideoSettings.m_SubtitleStream = player->GetSubtitle();
+        g_application.m_pPlayer->SetSubtitleStreamPlexID(streamId);
+        g_settings.m_currentVideoSettings.m_SubtitleStream = g_application.m_pPlayer->GetSubtitle();
       }
     }
 

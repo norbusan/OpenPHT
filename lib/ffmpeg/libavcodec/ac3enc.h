@@ -3,20 +3,20 @@
  * Copyright (c) 2000 Fabrice Bellard
  * Copyright (c) 2006-2010 Justin Ruggles <justin.ruggles@gmail.com>
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -29,12 +29,17 @@
 #define AVCODEC_AC3ENC_H
 
 #include <stdint.h>
+
+#include "libavutil/float_dsp.h"
+
 #include "ac3.h"
 #include "ac3dsp.h"
 #include "avcodec.h"
-#include "dsputil.h"
-#include "put_bits.h"
 #include "fft.h"
+#include "mathops.h"
+#include "me_cmp.h"
+#include "put_bits.h"
+#include "audiodsp.h"
 
 #ifndef CONFIG_AC3ENC_FLOAT
 #define CONFIG_AC3ENC_FLOAT 0
@@ -75,12 +80,14 @@ typedef int64_t CoefSumType;
 #define AC3ENC_OPT_NOT_INDICATED    0
 #define AC3ENC_OPT_MODE_ON          2
 #define AC3ENC_OPT_MODE_OFF         1
+#define AC3ENC_OPT_DSUREX_DPLIIZ    3
 
 /* specific option values */
 #define AC3ENC_OPT_LARGE_ROOM       1
 #define AC3ENC_OPT_SMALL_ROOM       2
 #define AC3ENC_OPT_DOWNMIX_LTRT     1
 #define AC3ENC_OPT_DOWNMIX_LORO     2
+#define AC3ENC_OPT_DOWNMIX_DPLII    3 // reserved value in A/52, but used by encoders to indicate DPL2
 #define AC3ENC_OPT_ADCONV_STANDARD  0
 #define AC3ENC_OPT_ADCONV_HDCD      1
 
@@ -157,7 +164,9 @@ typedef struct AC3EncodeContext {
     AC3EncOptions options;                  ///< encoding options
     AVCodecContext *avctx;                  ///< parent AVCodecContext
     PutBitContext pb;                       ///< bitstream writer context
-    DSPContext dsp;
+    AudioDSPContext adsp;
+    AVFloatDSPContext *fdsp;
+    MECmpContext mecc;
     AC3DSPContext ac3dsp;                   ///< AC-3 optimized functions
     FFTContext mdct;                        ///< FFT context for MDCT calculation
     const SampleType *mdct_window;          ///< MDCT window function array
@@ -261,6 +270,7 @@ typedef struct AC3EncodeContext {
 extern const uint64_t ff_ac3_channel_layouts[19];
 
 int ff_ac3_encode_init(AVCodecContext *avctx);
+int ff_ac3_float_encode_init(AVCodecContext *avctx);
 
 int ff_ac3_encode_close(AVCodecContext *avctx);
 
@@ -297,9 +307,9 @@ int ff_ac3_float_mdct_init(AC3EncodeContext *s);
 int ff_ac3_fixed_allocate_sample_buffers(AC3EncodeContext *s);
 int ff_ac3_float_allocate_sample_buffers(AC3EncodeContext *s);
 
-int ff_ac3_fixed_encode_frame(AVCodecContext *avctx, unsigned char *frame,
-                              int buf_size, void *data);
-int ff_ac3_float_encode_frame(AVCodecContext *avctx, unsigned char *frame,
-                              int buf_size, void *data);
+int ff_ac3_fixed_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
+                              const AVFrame *frame, int *got_packet_ptr);
+int ff_ac3_float_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
+                              const AVFrame *frame, int *got_packet_ptr);
 
 #endif /* AVCODEC_AC3ENC_H */

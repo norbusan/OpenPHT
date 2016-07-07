@@ -27,16 +27,19 @@
 class CDVDInputStreamRTMP 
   : public CDVDInputStream
   , public CDVDInputStream::ISeekTime
+  , public CDVDInputStream::ISeekable
 {
 public:
   CDVDInputStreamRTMP();
   virtual ~CDVDInputStreamRTMP();
   virtual bool    Open(const char* strFile, const std::string &content);
   virtual void    Close();
-  virtual int     Read(BYTE* buf, int buf_size);
+  virtual int     Read(uint8_t* buf, int buf_size);
   virtual int64_t Seek(int64_t offset, int whence);
   bool            SeekTime(int iTimeInMsec);
-  virtual bool Pause(double dTime);
+  bool            CanSeek()  { return m_canSeek; }
+  bool            CanPause() { return m_canPause; }
+  virtual bool    Pause(double dTime);
   virtual bool    IsEOF();
   virtual int64_t GetLength();
 
@@ -45,8 +48,10 @@ public:
 protected:
   bool       m_eof;
   bool       m_bPaused;
+  bool       m_canSeek;
+  bool       m_canPause;
   char*      m_sStreamPlaying;
-  std::vector<CStdString> m_optionvalues;
+  std::vector<std::string> m_optionvalues;
 
   RTMP       *m_rtmp;
   DllLibRTMP m_libRTMP;

@@ -44,7 +44,7 @@ bool CPlexServerVersion::parse(const std::string& versionString)
 
   std::vector<std::string> dotsplit = StringUtils::Split(versionStr, ".");
 
-  if (dotsplit.size() != 5)
+  if (dotsplit.size() > 5 || dotsplit.size() < 4)
   {
     CLog::Log(LOGWARNING, "CPlexServerVersion::parse could not split apart: %s",
               firstSplit.at(0).c_str());
@@ -56,15 +56,31 @@ bool CPlexServerVersion::parse(const std::string& versionString)
     major = boost::lexical_cast<int>(dotsplit.at(0));
     minor = boost::lexical_cast<int>(dotsplit.at(1));
     micro = boost::lexical_cast<int>(dotsplit.at(2));
-    patch = boost::lexical_cast<int>(dotsplit.at(3));
-    if (dotsplit.at(4) != "dev")
+    if (dotsplit.size() == 5)
     {
-      build = boost::lexical_cast<int>(dotsplit.at(4));
+      patch = boost::lexical_cast<int>(dotsplit.at(3));
+      if (dotsplit.at(4) != "dev")
+      {
+        build = boost::lexical_cast<int>(dotsplit.at(4));
+      }
+      else
+      {
+        isDev = true;
+        build = 0;
+      }
     }
-    else
+    else if (dotsplit.size() == 4)
     {
-      isDev = true;
-      build = 0;
+      patch = 0;
+      if (dotsplit.at(3) != "dev")
+      {
+        build = boost::lexical_cast<int>(dotsplit.at(3));
+      }
+      else
+      {
+        isDev = true;
+        build = 0;
+      }
     }
   }
   catch (...)

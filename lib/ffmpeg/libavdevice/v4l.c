@@ -25,6 +25,7 @@
 #include "config.h"
 #include "libavutil/rational.h"
 #include "libavutil/imgutils.h"
+#include "libavutil/internal.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
 #include "libavformat/internal.h"
@@ -37,7 +38,6 @@
 #define _LINUX_TIME_H 1
 #include <linux/videodev.h>
 #include <time.h>
-#include "avdevice.h"
 
 typedef struct {
     AVClass *class;
@@ -60,16 +60,16 @@ typedef struct {
 static const struct {
     int palette;
     int depth;
-    enum PixelFormat pix_fmt;
+    enum AVPixelFormat pix_fmt;
 } video_formats [] = {
-    {.palette = VIDEO_PALETTE_YUV420P, .depth = 12, .pix_fmt = PIX_FMT_YUV420P },
-    {.palette = VIDEO_PALETTE_YUV422,  .depth = 16, .pix_fmt = PIX_FMT_YUYV422 },
-    {.palette = VIDEO_PALETTE_UYVY,    .depth = 16, .pix_fmt = PIX_FMT_UYVY422 },
-    {.palette = VIDEO_PALETTE_YUYV,    .depth = 16, .pix_fmt = PIX_FMT_YUYV422 },
+    {.palette = VIDEO_PALETTE_YUV420P, .depth = 12, .pix_fmt = AV_PIX_FMT_YUV420P },
+    {.palette = VIDEO_PALETTE_YUV422,  .depth = 16, .pix_fmt = AV_PIX_FMT_YUYV422 },
+    {.palette = VIDEO_PALETTE_UYVY,    .depth = 16, .pix_fmt = AV_PIX_FMT_UYVY422 },
+    {.palette = VIDEO_PALETTE_YUYV,    .depth = 16, .pix_fmt = AV_PIX_FMT_YUYV422 },
     /* NOTE: v4l uses BGR24, not RGB24 */
-    {.palette = VIDEO_PALETTE_RGB24,   .depth = 24, .pix_fmt = PIX_FMT_BGR24   },
-    {.palette = VIDEO_PALETTE_RGB565,  .depth = 16, .pix_fmt = PIX_FMT_BGR565  },
-    {.palette = VIDEO_PALETTE_GREY,    .depth = 8,  .pix_fmt = PIX_FMT_GRAY8   },
+    {.palette = VIDEO_PALETTE_RGB24,   .depth = 24, .pix_fmt = AV_PIX_FMT_BGR24   },
+    {.palette = VIDEO_PALETTE_RGB565,  .depth = 16, .pix_fmt = AV_PIX_FMT_BGR565  },
+    {.palette = VIDEO_PALETTE_GREY,    .depth = 8,  .pix_fmt = AV_PIX_FMT_GRAY8   },
 };
 
 
@@ -152,7 +152,7 @@ static int grab_read_header(AVFormatContext *s1, AVFormatParameters *ap)
     ioctl(video_fd, VIDIOCSAUDIO, &audio);
 
     ioctl(video_fd, VIDIOCGPICT, &pict);
-    av_dlog(s1, "v4l: colour=%d hue=%d brightness=%d constrast=%d whiteness=%d\n",
+    ff_dlog(s1, "v4l: colour=%d hue=%d brightness=%d constrast=%d whiteness=%d\n",
             pict.colour, pict.hue, pict.brightness, pict.contrast, pict.whiteness);
     /* try to choose a suitable video format */
     pict.palette = desired_palette;
@@ -241,7 +241,7 @@ static int grab_read_header(AVFormatContext *s1, AVFormatParameters *ap)
     s->fd = video_fd;
 
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id = CODEC_ID_RAWVIDEO;
+    st->codec->codec_id = AV_CODEC_ID_RAWVIDEO;
     st->codec->width = s->video_win.width;
     st->codec->height = s->video_win.height;
     st->codec->time_base = s->time_base;
@@ -337,10 +337,10 @@ static int grab_read_close(AVFormatContext *s1)
 }
 
 static const AVOption options[] = {
-    { "standard", "", offsetof(VideoData, standard), AV_OPT_TYPE_INT, {.dbl = VIDEO_MODE_NTSC}, VIDEO_MODE_PAL, VIDEO_MODE_NTSC, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "PAL",   "", 0, AV_OPT_TYPE_CONST, {.dbl = VIDEO_MODE_PAL},   0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "SECAM", "", 0, AV_OPT_TYPE_CONST, {.dbl = VIDEO_MODE_SECAM}, 0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "NTSC",  "", 0, AV_OPT_TYPE_CONST, {.dbl = VIDEO_MODE_NTSC},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "standard", "", offsetof(VideoData, standard), AV_OPT_TYPE_INT, {.i64 = VIDEO_MODE_NTSC}, VIDEO_MODE_PAL, VIDEO_MODE_NTSC, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "PAL",   "", 0, AV_OPT_TYPE_CONST, {.i64 = VIDEO_MODE_PAL},   0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "SECAM", "", 0, AV_OPT_TYPE_CONST, {.i64 = VIDEO_MODE_SECAM}, 0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "NTSC",  "", 0, AV_OPT_TYPE_CONST, {.i64 = VIDEO_MODE_NTSC},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
     { NULL },
 };
 
@@ -349,6 +349,7 @@ static const AVClass v4l_class = {
     .item_name  = av_default_item_name,
     .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,
+    .category   = AV_CLASS_CATEGORY_DEVICE_VIDEO_INPUT,
 };
 
 AVInputFormat ff_v4l_demuxer = {

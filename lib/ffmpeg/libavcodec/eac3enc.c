@@ -2,20 +2,20 @@
  * E-AC-3 encoder
  * Copyright (c) 2011 Justin Ruggles <justin.ruggles@gmail.com>
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -25,6 +25,8 @@
  */
 
 #define CONFIG_AC3ENC_FLOAT 1
+
+#include "libavutil/attributes.h"
 #include "ac3enc.h"
 #include "eac3enc.h"
 #include "eac3_data.h"
@@ -32,9 +34,13 @@
 
 #define AC3ENC_TYPE AC3ENC_TYPE_EAC3
 #include "ac3enc_opts_template.c"
-static const AVClass eac3enc_class = { "E-AC-3 Encoder", av_default_item_name,
-                                       eac3_options, LIBAVUTIL_VERSION_INT };
 
+static const AVClass eac3enc_class = {
+    .class_name = "E-AC-3 Encoder",
+    .item_name  = av_default_item_name,
+    .option     = ac3_options,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
 
 /**
  * LUT for finding a matching frame exponent strategy index from a set of
@@ -43,7 +49,7 @@ static const AVClass eac3enc_class = { "E-AC-3 Encoder", av_default_item_name,
 static int8_t eac3_frame_expstr_index_tab[3][4][4][4][4][4];
 
 
-void ff_eac3_exponent_init(void)
+av_cold void ff_eac3_exponent_init(void)
 {
     int i;
 
@@ -245,18 +251,18 @@ void ff_eac3_output_frame_header(AC3EncodeContext *s)
 }
 
 
-#if CONFIG_EAC3_ENCODER
 AVCodec ff_eac3_encoder = {
     .name            = "eac3",
-    .type            = AVMEDIA_TYPE_AUDIO,
-    .id              = CODEC_ID_EAC3,
-    .priv_data_size  = sizeof(AC3EncodeContext),
-    .init            = ff_ac3_encode_init,
-    .encode          = ff_ac3_float_encode_frame,
-    .close           = ff_ac3_encode_close,
-    .sample_fmts     = (const enum AVSampleFormat[]){AV_SAMPLE_FMT_FLT,AV_SAMPLE_FMT_NONE},
     .long_name       = NULL_IF_CONFIG_SMALL("ATSC A/52 E-AC-3"),
+    .type            = AVMEDIA_TYPE_AUDIO,
+    .id              = AV_CODEC_ID_EAC3,
+    .priv_data_size  = sizeof(AC3EncodeContext),
+    .init            = ff_ac3_float_encode_init,
+    .encode2         = ff_ac3_float_encode_frame,
+    .close           = ff_ac3_encode_close,
+    .sample_fmts     = (const enum AVSampleFormat[]){ AV_SAMPLE_FMT_FLTP,
+                                                      AV_SAMPLE_FMT_NONE },
     .priv_class      = &eac3enc_class,
     .channel_layouts = ff_ac3_channel_layouts,
+    .defaults        = ac3_defaults,
 };
-#endif

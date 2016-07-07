@@ -22,6 +22,7 @@
 #include "WinSystemWin32DX.h"
 #include "settings/GUISettings.h"
 #include "guilib/gui3d.h"
+#include "utils/CharsetConverter.h"
 
 #ifdef HAS_DX
 
@@ -51,14 +52,20 @@ bool CWinSystemWin32DX::CreateNewWindow(CStdString name, bool fullScreen, RESOLU
   CRenderSystemDX::m_interlaced = ((res.dwFlags & D3DPRESENTFLAG_INTERLACED) != 0);
   CRenderSystemDX::m_useWindowedDX = UseWindowedDX(fullScreen);
   SetRenderParams(m_nWidth, m_nHeight, fullScreen, res.fRefreshRate);
-  SetMonitor(GetMonitor(res.iScreen).hMonitor);
+  const MONITOR_DETAILS* monitor = GetMonitor(res.iScreen);
+  if (!monitor)
+    return false;
+
+  SetMonitor(monitor->hMonitor);
 
   return true;
 }
 
 void CWinSystemWin32DX::UpdateMonitor()
 {
-  SetMonitor(GetMonitor(m_nScreen).hMonitor);
+  const MONITOR_DETAILS* monitor = GetMonitor(m_nScreen);
+  if (monitor)
+    SetMonitor(monitor->hMonitor);
 }
 
 bool CWinSystemWin32DX::ResizeWindow(int newWidth, int newHeight, int newLeft, int newTop)
@@ -83,7 +90,11 @@ bool CWinSystemWin32DX::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, boo
 
   bool FS2Windowed = !m_useWindowedDX && UseWindowedDX(fullScreen);
 
-  SetMonitor(GetMonitor(res.iScreen).hMonitor);
+  const MONITOR_DETAILS* monitor = GetMonitor(res.iScreen);
+  if (!monitor)
+    return false;
+
+  SetMonitor(monitor->hMonitor);
   CRenderSystemDX::m_interlaced = ((res.dwFlags & D3DPRESENTFLAG_INTERLACED) != 0);
   CRenderSystemDX::m_useWindowedDX = UseWindowedDX(fullScreen);
 
@@ -94,6 +105,31 @@ bool CWinSystemWin32DX::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, boo
   CRenderSystemDX::ResetRenderSystem(res.iWidth, res.iHeight, fullScreen, res.fRefreshRate);
 
   return true;
+}
+
+std::string CWinSystemWin32DX::GetClipboardText(void)
+{
+  CStdStringW unicode_text;
+  CStdStringA utf8_text;
+
+  if (OpenClipboard(NULL))
+  {
+    HGLOBAL hglb = GetClipboardData(CF_UNICODETEXT);
+    if (hglb != NULL)
+    {
+      LPWSTR lpwstr = (LPWSTR) GlobalLock(hglb);
+      if (lpwstr != NULL)
+      {
+        unicode_text = lpwstr;
+        GlobalUnlock(hglb);
+      }
+    }
+    CloseClipboard();
+  }
+
+  g_charsetConverter.wToUTF8(unicode_text, utf8_text);
+
+  return utf8_text;
 }
 
 #endif

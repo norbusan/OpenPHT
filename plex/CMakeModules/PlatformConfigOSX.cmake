@@ -11,7 +11,7 @@ endif()
 find_package(OSXSDK)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -arch ${OSX_ARCH}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch ${OSX_ARCH}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch ${OSX_ARCH} -stdlib=libc++")
 
 # we will test that our compiler handles the arch
 if(NOT CMAKE_C_FLAGS STREQUAL BASIC_COMPILE_TEST_FLAGS)
@@ -48,7 +48,7 @@ if(DEFINED XCODE_VERSION)
 endif()
 
 ######################### Compiler CFLAGS
-set(EXTRA_CFLAGS "-Qunused-arguments -mmacosx-version-min=10.6 -isysroot ${OSX_SDK_PATH}")
+set(EXTRA_CFLAGS "-Qunused-arguments -mmacosx-version-min=10.7 -isysroot ${OSX_SDK_PATH}")
 
 ######################### CHECK LIBRARIES / FRAMEWORKS
 #### Frameworks for MacOSX
@@ -84,7 +84,6 @@ set(external_libs
   freetype
   fontconfig
   sqlite3
-  samplerate
   microhttpd
   yajl
   jpeg
@@ -99,6 +98,7 @@ set(external_libs
   nettle
   hogweed
   gnutls
+  dcadec
 )
 
 set(ffmpeg_libs
@@ -120,7 +120,7 @@ endif()
 set(non_link_libs
   rtmp
   plist
-  shairport
+  shairplay
   curl
   FLAC
   modplug
@@ -128,7 +128,6 @@ set(non_link_libs
   vorbisfile
   ogg
   ass
-  mad
   mpeg2
   png
   tiff
@@ -161,6 +160,8 @@ foreach(lib ${osx_frameworks})
   plex_find_library(${lib} 1 0 ${dependdir}/Frameworks 1)
 endforeach()
 
+set(HAVE_YAJL_YAJL_VERSION_H 1)
+
 #### Deal with some generated files
 set(EXECUTABLE_NAME "OpenPHT")
 
@@ -180,4 +181,4 @@ set(HAVE_LIBVDADECODER 1)
 set(AC_APPLE_UNIVERSAL_BUILD 0)
 
 ################## Definitions
-add_definitions(-DTARGET_DARWIN -DTARGET_DARWIN_OSX -DUSE_EXTERNAL_FFMPEG)
+add_definitions(-DTARGET_DARWIN -DTARGET_DARWIN_OSX -DUSE_EXTERNAL_FFMPEG -DBOOST_NO_CXX11_VARIADIC_TEMPLATES)

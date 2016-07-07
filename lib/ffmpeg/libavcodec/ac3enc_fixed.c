@@ -26,15 +26,22 @@
  * fixed-point AC-3 encoder.
  */
 
-#define CONFIG_FFT_FLOAT 0
+#define FFT_FLOAT 0
 #undef CONFIG_AC3ENC_FLOAT
+#include "internal.h"
+#include "audiodsp.h"
 #include "ac3enc.h"
 #include "eac3enc.h"
 
 #define AC3ENC_TYPE AC3ENC_TYPE_AC3_FIXED
 #include "ac3enc_opts_template.c"
-static const AVClass ac3enc_class = { "Fixed-Point AC-3 Encoder", av_default_item_name,
-                                      ac3fixed_options, LIBAVUTIL_VERSION_INT };
+
+static const AVClass ac3enc_class = {
+    .class_name = "Fixed-Point AC-3 Encoder",
+    .item_name  = av_default_item_name,
+    .option     = ac3_options,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
 
 #include "ac3enc_template.c"
 
@@ -61,16 +68,6 @@ av_cold int AC3_NAME(mdct_init)(AC3EncodeContext *s)
     int ret = ff_mdct_init(&s->mdct, 9, 0, -1.0);
     s->mdct_window = ff_ac3_window;
     return ret;
-}
-
-
-/*
- * Apply KBD window to input samples prior to MDCT.
- */
-static void apply_window(DSPContext *dsp, int16_t *output, const int16_t *input,
-                         const int16_t *window, unsigned int len)
-{
-    dsp->apply_window_int16(output, input, window, len);
 }
 
 
@@ -115,9 +112,10 @@ static void sum_square_butterfly(AC3EncodeContext *s, int64_t sum[4],
 /*
  * Clip MDCT coefficients to allowable range.
  */
-static void clip_coefficients(DSPContext *dsp, int32_t *coef, unsigned int len)
+static void clip_coefficients(AudioDSPContext *adsp, int32_t *coef,
+                              unsigned int len)
 {
-    dsp->vector_clip_int32(coef, coef, COEF_MIN, COEF_MAX, len);
+    adsp->vector_clip_int32(coef, coef, COEF_MIN, COEF_MAX, len);
 }
 
 
@@ -146,15 +144,17 @@ static av_cold int ac3_fixed_encode_init(AVCodecContext *avctx)
 
 
 AVCodec ff_ac3_fixed_encoder = {
-    .name           = "ac3_fixed",
-    .type           = AVMEDIA_TYPE_AUDIO,
-    .id             = CODEC_ID_AC3,
-    .priv_data_size = sizeof(AC3EncodeContext),
-    .init           = ac3_fixed_encode_init,
-    .encode         = ff_ac3_fixed_encode_frame,
-    .close          = ff_ac3_encode_close,
-    .sample_fmts = (const enum AVSampleFormat[]){AV_SAMPLE_FMT_S16,AV_SAMPLE_FMT_NONE},
-    .long_name = NULL_IF_CONFIG_SMALL("ATSC A/52A (AC-3)"),
-    .priv_class = &ac3enc_class,
+    .name            = "ac3_fixed",
+    .long_name       = NULL_IF_CONFIG_SMALL("ATSC A/52A (AC-3)"),
+    .type            = AVMEDIA_TYPE_AUDIO,
+    .id              = AV_CODEC_ID_AC3,
+    .priv_data_size  = sizeof(AC3EncodeContext),
+    .init            = ac3_fixed_encode_init,
+    .encode2         = ff_ac3_fixed_encode_frame,
+    .close           = ff_ac3_encode_close,
+    .sample_fmts     = (const enum AVSampleFormat[]){ AV_SAMPLE_FMT_S16P,
+                                                      AV_SAMPLE_FMT_NONE },
+    .priv_class      = &ac3enc_class,
     .channel_layouts = ff_ac3_channel_layouts,
+    .defaults        = ac3_defaults,
 };

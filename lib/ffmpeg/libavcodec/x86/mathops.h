@@ -23,7 +23,11 @@
 #define AVCODEC_X86_MATHOPS_H
 
 #include "config.h"
+
 #include "libavutil/common.h"
+#include "libavutil/x86/asm.h"
+
+#if HAVE_INLINE_ASM
 
 #if ARCH_X86_32
 
@@ -66,7 +70,7 @@ static av_always_inline av_const int64_t MUL64(int a, int b)
 
 #endif /* ARCH_X86_32 */
 
-#if HAVE_CMOV
+#if HAVE_I686
 /* median of 3 */
 #define mid_pred mid_pred
 static inline av_const int mid_pred(int a, int b, int c)
@@ -85,9 +89,8 @@ static inline av_const int mid_pred(int a, int b, int c)
     );
     return i;
 }
-#endif
 
-#if HAVE_CMOV
+#if HAVE_6REGS
 #define COPY3_IF_LT(x, y, a, b, c, d)\
 __asm__ volatile(\
     "cmpl  %0, %3       \n\t"\
@@ -97,7 +100,15 @@ __asm__ volatile(\
     : "+&r" (x), "+&r" (a), "+r" (c)\
     : "r" (y), "r" (b), "r" (d)\
 );
-#endif
+#endif /* HAVE_6REGS */
+
+#endif /* HAVE_I686 */
+
+#define MASK_ABS(mask, level)                   \
+    __asm__ ("cdq                    \n\t"      \
+             "xorl %1, %0            \n\t"      \
+             "subl %1, %0            \n\t"      \
+             : "+a"(level), "=&d"(mask))
 
 // avoid +32 for shift optimization (gcc should do that ...)
 #define NEG_SSR32 NEG_SSR32
@@ -118,4 +129,5 @@ static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
     return a;
 }
 
+#endif /* HAVE_INLINE_ASM */
 #endif /* AVCODEC_X86_MATHOPS_H */

@@ -36,6 +36,7 @@
 #endif
 
 
+#include "utils/StdString.h"
 #include <vector>
 #include <stack>
 #include <map>
@@ -43,10 +44,10 @@
 #include "TransformMatrix.h"        // for the members m_guiTransform etc.
 #include "Geometry.h"               // for CRect/CPoint
 #include "gui3d.h"
-#include "utils/StdString.h"
 #include "Resolution.h"
 #include "utils/GlobalsHandling.h"
 #include "DirtyRegion.h"
+#include "rendering/RenderSystem.h"
 
 enum VIEW_TYPE { VIEW_TYPE_NONE = 0,
                  VIEW_TYPE_LIST,
@@ -102,34 +103,48 @@ public:
   void ResetScreenParameters(RESOLUTION res);
   void Lock() { lock(); }
   void Unlock() { unlock(); }
-  float GetPixelRatio(RESOLUTION iRes) const;
   void CaptureStateBlock();
   void ApplyStateBlock();
   void Clear(color_t color = 0);
   void GetAllowedResolutions(std::vector<RESOLUTION> &res);
 
   // output scaling
-  const RESOLUTION_INFO &GetResInfo() const;
+  const RESOLUTION_INFO GetResInfo() const
+  {
+    return GetResInfo(m_Resolution);
+  }
+  const RESOLUTION_INFO GetResInfo(RESOLUTION res) const;
+  void SetResInfo(RESOLUTION res, const RESOLUTION_INFO& info);
   /* PLEX */
   const RESOLUTION_INFO &GetWindowResInfo() { return m_windowResolution; };
   /* END PLEX */
+
+  /* \brief Get UI scaling information from a given resolution to the screen resolution.
+   Takes account of overscan and UI zooming.
+   \param res the resolution to scale from.
+   \param scaleX [out] the scaling amount in the X direction.
+   \param scaleY [out] the scaling amount in the Y direction.
+   \param matrix [out] if non-NULL, a suitable transformation from res to screen resolution is set.
+   */
+  void GetGUIScaling(const RESOLUTION_INFO &res, float &scaleX, float &scaleY, TransformMatrix *matrix = NULL);
 
   void SetRenderingResolution(const RESOLUTION_INFO &res, bool needsScaling);  ///< Sets scaling up for rendering
   void SetScalingResolution(const RESOLUTION_INFO &res, bool needsScaling);    ///< Sets scaling up for skin loading etc.
   float GetScalingPixelRatio() const;
   void Flip(const CDirtyRegionList& dirty);
   void InvertFinalCoords(float &x, float &y) const;
-  inline float ScaleFinalXCoord(float x, float y) const XBMC_FORCE_INLINE { return m_finalTransform.TransformXCoord(x, y, 0); }
-  inline float ScaleFinalYCoord(float x, float y) const XBMC_FORCE_INLINE { return m_finalTransform.TransformYCoord(x, y, 0); }
-  inline float ScaleFinalZCoord(float x, float y) const XBMC_FORCE_INLINE { return m_finalTransform.TransformZCoord(x, y, 0); }
-  inline void ScaleFinalCoords(float &x, float &y, float &z) const XBMC_FORCE_INLINE { m_finalTransform.TransformPosition(x, y, z); }
+  inline float ScaleFinalXCoord(float x, float y) const XBMC_FORCE_INLINE { return m_finalTransform.matrix.TransformXCoord(x, y, 0); }
+  inline float ScaleFinalYCoord(float x, float y) const XBMC_FORCE_INLINE { return m_finalTransform.matrix.TransformYCoord(x, y, 0); }
+  inline float ScaleFinalZCoord(float x, float y) const XBMC_FORCE_INLINE { return m_finalTransform.matrix.TransformZCoord(x, y, 0); }
+  inline void ScaleFinalCoords(float &x, float &y, float &z) const XBMC_FORCE_INLINE { m_finalTransform.matrix.TransformPosition(x, y, z); }
   bool RectIsAngled(float x1, float y1, float x2, float y2) const;
 
-  inline float GetGUIScaleX() const XBMC_FORCE_INLINE { return m_guiScaleX; }
-  inline float GetGUIScaleY() const XBMC_FORCE_INLINE { return m_guiScaleY; }
+  inline const TransformMatrix &GetGUIMatrix() const XBMC_FORCE_INLINE { return m_finalTransform.matrix; }
+  inline float GetGUIScaleX() const XBMC_FORCE_INLINE { return m_finalTransform.scaleX; }
+  inline float GetGUIScaleY() const XBMC_FORCE_INLINE { return m_finalTransform.scaleY; }
   inline color_t MergeAlpha(color_t color) const XBMC_FORCE_INLINE
   {
-    color_t alpha = m_finalTransform.TransformAlpha((color >> 24) & 0xff);
+    color_t alpha = m_finalTransform.matrix.TransformAlpha((color >> 24) & 0xff);
     if (alpha > 255) alpha = 255;
     return ((alpha << 24) & 0xff000000) | (color & 0xffffff);
   }
@@ -137,6 +152,10 @@ public:
   void SetOrigin(float x, float y);
   void RestoreOrigin();
   void SetCameraPosition(const CPoint &camera);
+  void SetStereoView(RENDER_STEREO_VIEW view);
+  RENDER_STEREO_VIEW GetStereoView()  { return m_stereoView; }
+  void SetStereoMode(RENDER_STEREO_MODE mode) { m_nextStereoMode = mode; }
+  RENDER_STEREO_MODE GetStereoMode()  { return m_stereoMode; }
   void RestoreCameraPosition();
   /*! \brief Set a region in which to clip all rendering
    Anything that is rendered after setting a clip region will be clipped so that no part renders
@@ -173,42 +192,49 @@ public:
   void ApplyHardwareTransform();
   void RestoreHardwareTransform();
   void ClipRect(CRect &vertex, CRect &texture, CRect *diffuse = NULL);
-  inline unsigned int AddGUITransform()
+  CRect GetClipRegion();
+  inline void AddGUITransform()
   {
-    unsigned int size = m_groupTransform.size();
-    m_groupTransform.push(m_guiTransform);
-    UpdateFinalTransform(m_groupTransform.top());
-    return size;
+    m_transforms.push(m_finalTransform);
+    m_finalTransform = m_guiTransform;
   }
   inline TransformMatrix AddTransform(const TransformMatrix &matrix)
   {
-    ASSERT(m_groupTransform.size());
-    TransformMatrix absoluteMatrix = m_groupTransform.size() ? m_groupTransform.top() * matrix : matrix;
-    m_groupTransform.push(absoluteMatrix);
-    UpdateFinalTransform(absoluteMatrix);
-    return absoluteMatrix;
+    m_transforms.push(m_finalTransform);
+    m_finalTransform.matrix *= matrix;
+    return m_finalTransform.matrix;
   }
   inline void SetTransform(const TransformMatrix &matrix)
   {
-    // TODO: We only need to add it to the group transform as other transforms may be added on top of this one later on
-    //       Once all transforms are cached then this can be removed and UpdateFinalTransform can be called directly
-    ASSERT(m_groupTransform.size());
-    m_groupTransform.push(matrix);
-    UpdateFinalTransform(m_groupTransform.top());
+   m_transforms.push(m_finalTransform);
+   m_finalTransform.matrix = matrix;
   }
-  inline unsigned int RemoveTransform()
+  inline void SetTransform(const TransformMatrix &matrix, float scaleX, float scaleY)
   {
-    ASSERT(m_groupTransform.size());
-    if (m_groupTransform.size())
-      m_groupTransform.pop();
-    if (m_groupTransform.size())
-      UpdateFinalTransform(m_groupTransform.top());
-    else
-      UpdateFinalTransform(TransformMatrix());
-    return m_groupTransform.size();
+    m_transforms.push(m_finalTransform);
+    m_finalTransform.matrix = matrix;
+    m_finalTransform.scaleX = scaleX;
+    m_finalTransform.scaleY = scaleY;
+  }
+  inline void RemoveTransform()
+  {
+    if (!m_transforms.empty())
+    {
+      m_finalTransform = m_transforms.top();
+      m_transforms.pop();
+    }
   }
 
+  /* modifies final coordinates according to stereo mode if needed */
+  CRect StereoCorrection(const CRect &rect) const;
+  CPoint StereoCorrection(const CPoint &point) const;
+
   CRect generateAABB(const CRect &rect) const;
+
+  /*! \brief sets refresh rate, overrides the one stored with modes
+   *  \param fps refresh rate
+   */
+  void SetFPS(float fps);
 
   /* PLEX */
   void UpdateDisplayBlanking();
@@ -226,20 +252,35 @@ protected:
   bool m_bFullScreenVideo;
   bool m_bCalibrating;
   RESOLUTION m_Resolution;
+  float m_fFPSOverride;
 
 private:
+  class UITransform
+  {
+  public:
+    UITransform() : matrix(), scaleX(1.0f), scaleY(1.0f) {};
+    UITransform(const TransformMatrix &m, const float sX = 1.0f, const float sY = 1.0f) : matrix(m), scaleX(sX), scaleY(sY) { };
+    void Reset() { matrix.Reset(); scaleX = scaleY = 1.0f; };
+
+    TransformMatrix matrix;
+    float scaleX;
+    float scaleY;
+  };
   void UpdateCameraPosition(const CPoint &camera);
-  void UpdateFinalTransform(const TransformMatrix &matrix);
+  // this method is indirectly called by the public SetVideoResolution
+  // it only works when called from mainthread (thats what SetVideoResolution ensures)
+  void SetVideoResolutionInternal(RESOLUTION res, bool forceUpdate);
   RESOLUTION_INFO m_windowResolution;
-  float m_guiScaleX;
-  float m_guiScaleY;
   std::stack<CPoint> m_cameras;
   std::stack<CPoint> m_origins;
   std::stack<CRect>  m_clipRegions;
 
-  TransformMatrix m_guiTransform;
-  TransformMatrix m_finalTransform;
-  std::stack<TransformMatrix> m_groupTransform;
+  UITransform m_guiTransform;
+  UITransform m_finalTransform;
+  std::stack<UITransform> m_transforms;
+  RENDER_STEREO_VIEW m_stereoView;
+  RENDER_STEREO_MODE m_stereoMode;
+  RENDER_STEREO_MODE m_nextStereoMode;
 
   CRect m_scissors;
 };

@@ -30,8 +30,8 @@ else
   platform_gcc_version=4.2
   platform_sdk_version=@use_sdk@
   host_alias=@use_arch@-apple-darwin
-  export MACOSX_DEPLOYMENT_TARGET=10.6
-  platform_min_version=macosx-version-min=10.6
+  export MACOSX_DEPLOYMENT_TARGET=10.7
+  platform_min_version=macosx-version-min=10.7
 fi
 
 platform_path=@use_xcodepath@/Toolchains/XcodeDefault.xctoolchain
@@ -47,7 +47,7 @@ export CC="/usr/local/bin/ccache ${platform_path}/usr/bin/${platform_cc}"
 export CFLAGS="${CFLAGS} -std=${platform_gnu} -no-cpp-precomp -m${platform_min_version} -isysroot ${platform_sdk_path} ${platform_os_cflags}"
 export LD=${platform_path}/usr/bin/ld
 export LDFLAGS="${LDFLAGS} -m${platform_min_version} -isysroot ${platform_sdk_path} ${platform_os_ldflags} -L${prefix}/lib"
-export CXX="/usr/local/bin/ccache ${platform_path}/usr/bin/${platform_cxx}"
+export CXX="/usr/local/bin/ccache ${platform_path}/usr/bin/${platform_cxx} -std=c++11 -stdlib=libc++"
 export CXXFLAGS="${CXXFLAGS} -m${platform_min_version} -isysroot ${platform_sdk_path} ${platform_os_cflags}"
 export AR=${platform_path}/usr/bin/ar
 export AS=${platform_path}/usr/bin/as

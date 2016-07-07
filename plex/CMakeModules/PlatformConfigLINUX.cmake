@@ -22,7 +22,6 @@ set(LINK_PKG
   Lzo2
   FriBiDi
   Fontconfig
-  Samplerate
   YAJL
   microhttpd
   Crypto
@@ -35,6 +34,7 @@ set(LINK_PKG
   LibRt
   FLAC
   DBUS
+  DRM
 )
 
 if(NOT OPENELEC)
@@ -45,6 +45,14 @@ if(NOT USE_INTERNAL_FFMPEG)
   list(APPEND LINK_PKG FFmpeg)
 else()
   set(FFMPEG_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/lib/ffmpeg ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/src/ffmpeg-build)
+  list(APPEND CONFIG_PLEX_LINK_LIBRARIES 
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libavcodec.so
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libavformat.so
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libavutil.so
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libpostproc.so
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libswscale.so
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libavfilter.so
+       ${CMAKE_BINARY_DIR}/lib/ffmpeg/ffmpeg/lib/libswresample.so)
 endif()
 
 if(ENABLE_PYTHON)
@@ -68,7 +76,6 @@ set(INSTALL_LIB
   PNG
   TIFF
   Vorbis
-  LibMad
   Mpeg2
   Ass
   RTMP
@@ -76,32 +83,32 @@ set(INSTALL_LIB
 )
 
 foreach(l ${INSTALL_LIB})
-  plex_find_package(${l} 1 0)
+  plex_find_package(${l} 1 2)
 endforeach()
 
 option(ENABLE_SHAIRPLAY "Enable ShairPlay?" ON)
 if(ENABLE_SHAIRPLAY)
-  plex_find_package(ShairPlay 1 0)
+  plex_find_package(ShairPlay 1 2)
 endif()
 
 option(ENABLE_SHAIRPORT "Enable ShairPort?" OFF)
 if(ENABLE_SHAIRPORT AND NOT ENABLE_SHAIRPLAY)
-  plex_find_package(ShairPort 1 0)
+  plex_find_package(ShairPort 1 2)
 endif()
 
 option(ENABLE_VAAPI "Enable VAAPI?" ON)
 if(ENABLE_VAAPI)
-  plex_find_package(VAAPI 1 0)
+  plex_find_package(VAAPI 1 2)
 endif()
 
 option(ENABLE_VDPAU "Enable VDPAU?" ON)
 if(ENABLE_VDPAU)
-  plex_find_package(VDPAU 1 0)
+  plex_find_package(VDPAU 1 2)
 endif()
 
 option(ENABLE_CEC "Enable CEC?" ON)
 if(ENABLE_CEC)
-  plex_find_package(CEC 1 0)
+  plex_find_package(CEC 1 2)
 endif()
 
 plex_find_package(Threads 1 0)
@@ -136,8 +143,6 @@ endif()
 
 plex_get_soname(CURL_SONAME ${CURL_LIBRARY})
 
-list(APPEND CONFIG_INTERNAL_LIBS lib_dllsymbols)
-
 ####
 if(DEFINED X11_FOUND)
   set(HAVE_X11 1)
@@ -164,6 +169,11 @@ if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
   set(ARCH "x86_64-linux")
 else()
   set(ARCH "i486-linux")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.8)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse")
+    endif()
+  endif()
 endif()
 
 ## remove annying useless warnings
@@ -203,6 +213,15 @@ set(PLEX_LINK_NOWHOLEARCHIVE -Wl,--no-whole-archive)
 option(OPENELEC "Are we building OpenELEC dist?" OFF)
 if(OPENELEC)
   add_definitions(-DTARGET_OPENELEC)
+else()
+  set(LIBPATH lib/openpht)
+  set(BINPATH lib/openpht)
+  set(RESOURCEPATH share/openpht)
+  configure_file("${plexdir}/Resources/openpht.sh.in" "${CMAKE_BINARY_DIR}/openpht.sh" @ONLY)
+  configure_file("${plexdir}/Resources/openpht.desktop.in" "${CMAKE_BINARY_DIR}/openpht.desktop" @ONLY)
+  install(PROGRAMS "${CMAKE_BINARY_DIR}/openpht.sh" DESTINATION bin COMPONENT RUNTIME RENAME openpht)
+  install(FILES "${CMAKE_BINARY_DIR}/openpht.desktop" DESTINATION share/applications COMPONENT RUNTIME)
+  install(FILES "${plexdir}/Resources/plex-icon-256.png" DESTINATION share/pixmaps COMPONENT RUNTIME RENAME openpht.png)
 endif(OPENELEC)
 
 ############ Add our definitions

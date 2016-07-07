@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "libavutil/attributes.h"
 #include "libavutil/mem.h"
 #include "avfft.h"
 #include "fft.h"
@@ -26,7 +27,7 @@
 
 FFTContext *av_fft_init(int nbits, int inverse)
 {
-    FFTContext *s = av_malloc(sizeof(*s));
+    FFTContext *s = av_mallocz(sizeof(*s));
 
     if (s && ff_fft_init(s, nbits, inverse))
         av_freep(&s);
@@ -44,7 +45,7 @@ void av_fft_calc(FFTContext *s, FFTComplex *z)
     s->fft_calc(s, z);
 }
 
-void av_fft_end(FFTContext *s)
+av_cold void av_fft_end(FFTContext *s)
 {
     if (s) {
         ff_fft_end(s);
@@ -79,7 +80,7 @@ void av_mdct_calc(FFTContext *s, FFTSample *output, const FFTSample *input)
     s->mdct_calc(s, output, input);
 }
 
-void av_mdct_end(FFTContext *s)
+av_cold void av_mdct_end(FFTContext *s)
 {
     if (s) {
         ff_mdct_end(s);
@@ -106,7 +107,7 @@ void av_rdft_calc(RDFTContext *s, FFTSample *data)
     s->rdft_calc(s, data);
 }
 
-void av_rdft_end(RDFTContext *s)
+av_cold void av_rdft_end(RDFTContext *s)
 {
     if (s) {
         ff_rdft_end(s);
@@ -133,12 +134,46 @@ void av_dct_calc(DCTContext *s, FFTSample *data)
     s->dct_calc(s, data);
 }
 
-void av_dct_end(DCTContext *s)
+av_cold void av_dct_end(DCTContext *s)
 {
     if (s) {
         ff_dct_end(s);
         av_free(s);
     }
 }
+
+#ifdef TEST
+int main(int argc, char **argv)
+{
+    int i;
+#define LEN 1024
+    FFTSample *ref  = av_malloc_array(LEN, sizeof(*ref));
+    FFTSample *data = av_malloc_array(LEN, sizeof(*data));
+    RDFTContext *rdft_context  = av_rdft_init(10, DFT_R2C);
+    RDFTContext *irdft_context = av_rdft_init(10, IDFT_C2R);
+
+    if (!ref || !data || !rdft_context || !irdft_context)
+        return 2;
+    for (i=0; i<LEN; i++) {
+        ref[i] = data[i] = i*456 + 123 + i*i;
+    }
+    av_rdft_calc(rdft_context, data);
+    av_rdft_calc(irdft_context, data);
+
+    for (i=0; i<LEN; i++) {
+        if (fabs(ref[i] - data[i]/LEN*2) > 1) {
+            fprintf(stderr, "Failed at %d (%f %f)\n", i, ref[i], data[i]/LEN*2);
+            return 1;
+        }
+    }
+
+    av_rdft_end(rdft_context);
+    av_rdft_end(irdft_context);
+    av_free(data);
+    av_free(ref);
+
+    return 0;
+}
+#endif
 
 #endif /* CONFIG_DCT */

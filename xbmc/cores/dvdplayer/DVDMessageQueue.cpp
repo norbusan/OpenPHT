@@ -19,17 +19,13 @@
  */
 
 #include "DVDMessageQueue.h"
-#include "DVDDemuxers/DVDDemuxUtils.h"
 #include "utils/log.h"
 #include "threads/SingleLock.h"
 #include "DVDClock.h"
 #include "utils/MathUtils.h"
 
-using namespace std;
-
-CDVDMessageQueue::CDVDMessageQueue(const string &owner) : m_hEvent(true)
+CDVDMessageQueue::CDVDMessageQueue(const std::string &owner) : m_hEvent(true), m_owner(owner)
 {
-  m_owner = owner;
   m_iDataSize     = 0;
   m_bAbortRequest = false;
   m_bInitialized  = false;
@@ -67,7 +63,7 @@ void CDVDMessageQueue::Flush(CDVDMsg::Message type)
     if (it->message->IsType(type) ||  type == CDVDMsg::NONE)
       it = m_list.erase(it);
     else
-      it++;
+      ++it;
   }
 
   if (type == CDVDMsg::DEMUXER_PACKET ||  type == CDVDMsg::NONE)
@@ -121,7 +117,7 @@ MsgQueueReturnCode CDVDMessageQueue::Put(CDVDMsg* pMsg, int priority)
   {
     if(priority <= it->priority)
       break;
-    it++;
+    ++it;
   }
   m_list.insert(it, DVDMessageListItem(pMsg, priority));
 
@@ -175,11 +171,6 @@ MsgQueueReturnCode CDVDMessageQueue::Get(CDVDMsg** pMsg, unsigned int iTimeoutIn
     {
       DVDMessageListItem& item(m_list.back());
       priority = item.priority;
-
-      /* PLEX */
-      if (item.message == NULL)
-        continue;
-      /* END PLEX */
 
       if (item.message->IsType(CDVDMsg::DEMUXER_PACKET) && item.priority == 0)
       {
@@ -235,7 +226,7 @@ unsigned CDVDMessageQueue::GetPacketCount(CDVDMsg::Message type)
     return 0;
 
   unsigned count = 0;
-  for(SList::iterator it = m_list.begin(); it != m_list.end();it++)
+  for(SList::iterator it = m_list.begin(); it != m_list.end();++it)
   {
     if(it->message->IsType(type))
       count++;
@@ -263,9 +254,9 @@ int CDVDMessageQueue::GetLevel() const
     return 0;
 
   if(IsDataBased())
-    return min(100, 100 * m_iDataSize / m_iMaxDataSize);
+    return std::min(100, 100 * m_iDataSize / m_iMaxDataSize);
 
-  return min(100, MathUtils::round_int(100.0 * m_TimeSize * (m_TimeFront - m_TimeBack) / DVD_TIME_BASE ));
+  return std::min(100, MathUtils::round_int(100.0 * m_TimeSize * (m_TimeFront - m_TimeBack) / DVD_TIME_BASE ));
 }
 
 int CDVDMessageQueue::GetTimeSize() const

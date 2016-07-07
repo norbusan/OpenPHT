@@ -25,6 +25,11 @@
  * G723.1 compatible decoder data tables
  */
 
+#ifndef AVCODEC_G723_1_DATA_H
+#define AVCODEC_G723_1_DATA_H
+
+#include <stdint.h>
+
 #define SUBFRAMES       4
 #define SUBFRAME_LEN    60
 #define FRAME_LEN       (SUBFRAME_LEN << 2)
@@ -44,23 +49,23 @@
 /**
  * G723.1 frame types
  */
-typedef enum {
-    ActiveFrame,        ///< Active speech
-    SIDFrame,           ///< Silence Insertion Descriptor frame
-    UntransmittedFrame
+typedef enum FrameType {
+    ACTIVE_FRAME,        ///< Active speech
+    SID_FRAME,           ///< Silence Insertion Descriptor frame
+    UNTRANSMITTED_FRAME
 } FrameType;
 
-static const uint8_t frame_size[4] = {24, 20, 4, 1};
+static const uint8_t frame_size[4] = { 24, 20, 4, 1 };
 
-typedef enum {
-    Rate6k3,
-    Rate5k3
+typedef enum Rate {
+    RATE_6300,
+    RATE_5300
 } Rate;
 
 /**
  * G723.1 unpacked data subframe
  */
-typedef struct {
+typedef struct G723_1_Subframe {
     int ad_cb_lag;     ///< adaptive codebook lag
     int ad_cb_gain;
     int dirac_train;
@@ -73,7 +78,7 @@ typedef struct {
 /**
  * Pitch postfilter parameters
  */
-typedef struct {
+typedef struct PPFParam {
     int     index;    ///< postfilter backward/forward lag
     int16_t opt_gain; ///< optimal gain
     int16_t sc_gain;  ///< scaling gain
@@ -82,7 +87,7 @@ typedef struct {
 /**
  * Harmonic filter parameters
  */
-typedef struct {
+typedef struct HFParam {
     int index;
     int gain;
 } HFParam;
@@ -90,7 +95,7 @@ typedef struct {
 /**
  * Optimized fixed codebook excitation parameters
  */
-typedef struct {
+typedef struct FCBParam {
     int min_err;
     int amp_index;
     int grid_index;
@@ -123,7 +128,7 @@ static const int16_t dc_lsp[LPC_ORDER] = {
 /**
  * Cosine table scaled by 2^14
  */
-static const int16_t cos_tab[COS_TBL_SIZE] = {
+static const int16_t cos_tab[COS_TBL_SIZE+1] = {
     16384,  16383,  16379,  16373,  16364,  16353,  16340,  16324,
     16305,  16284,  16261,  16235,  16207,  16176,  16143,  16107,
     16069,  16029,  15986,  15941,  15893,  15843,  15791,  15736,
@@ -188,6 +193,7 @@ static const int16_t cos_tab[COS_TBL_SIZE] = {
     15679,  15736,  15791,  15843,  15893,  15941,  15986,  16029,
     16069,  16107,  16143,  16176,  16207,  16235,  16261,  16284,
     16305,  16324,  16340,  16353,  16364,  16373,  16379,  16383,
+    16384
 };
 
 /**
@@ -1313,3 +1319,11 @@ static const int16_t percept_flt_tbl[2][LPC_ORDER] = {
     /* Pole part */
     {16384,  8192,  4096,  2048,  1024,   512,   256,   128,    64,    32}
 };
+
+static const int cng_adaptive_cb_lag[4] = { 1, 0, 1, 3 };
+
+static const int cng_filt[4] = { 273, 998, 499, 333 };
+
+static const int cng_bseg[3] = { 2048, 18432, 231233 };
+
+#endif /* AVCODEC_G723_1_DATA_H */

@@ -1,4 +1,5 @@
 include ../Makefile.include
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=libgpg-error
@@ -8,27 +9,31 @@ ARCHIVE=$(SOURCE).tar.bz2
 
 # configuration settings
 CONFIGURE=./configure --prefix=$(PREFIX) \
- --with-libintl-prefix=$(PREFIX)/lib
+  --disable-languages \
+  --disable-nls
 
-LIBDYLIB=$(SOURCE)/.libs/libgpg-error.dylib
+LIBDYLIB=$(SOURCE)/src/.libs/$(LIBNAME).dylib
 
 CLEAN_FILES=$(ARCHIVE) $(SOURCE)
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
-	make -j $(MAKE_JOBS) -C $(SOURCE)
+	make -C $(SOURCE)/src gen-posix-lock-obj
+	$(SOURCE)/src/gen-posix-lock-obj > $(SOURCE)/src/syscfg/tmp.h
+	mv $(SOURCE)/src/syscfg/tmp.h $(SOURCE)/src/syscfg/$$(awk 'NR==1 {print $$2}' $(SOURCE)/src/syscfg/tmp.h)
+	make -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

@@ -391,6 +391,9 @@ public:
   void ApplyCalibrations();
   void UpdateCalibrations();
 
+  void AddResolutionInfo(const RESOLUTION_INFO &resolution);
+  void ClearCustomResolutions();
+
 protected:
   void GetSources(const TiXmlElement* pRootElement, const CStdString& strTagName, VECSOURCES& items, CStdString& strDefault);
   bool SetSources(TiXmlNode *root, const char *section, const VECSOURCES &shares, const char *defaultPath);

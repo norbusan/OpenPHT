@@ -1,5 +1,18 @@
 <?xml version="1.0"?>
 <includes>
+	<!-- Hide Episode Thumbnails for Unwatched Episodes -->
+	<variable name="EpisodeThumbVar">
+		<value condition="ListItem.Type(episode) + Skin.HasSetting(HideThumbnailForUnwatched) + [ListItem.Status(unwatched) | ListItem.Status(inprogress)]]">$INFO[ListItem.Art(fanart)]</value>
+		<value>$INFO[ListItem.Art(thumb)]</value>
+	</variable>
+	<variable name="OnDeckEpisodeThumbVar">
+		<value condition="Container(11001).ListItem.Type(episode) + Skin.HasSetting(HideThumbnailForUnwatched) + [Container(11001).ListItem.Status(unwatched) | Container(11001).ListItem.Status(inprogress)]]">$INFO[Container(11001).ListItem.Art(fanart)]</value>
+		<value>$INFO[Container(11001).ListItem.Art(thumb)]</value>
+	</variable>
+	<variable name="RecentlyAddedEpisodeThumbVar">
+		<value condition="Container(11000).ListItem.Type(episode) + Skin.HasSetting(HideThumbnailForUnwatched) + [Container(11000).ListItem.Status(unwatched) | Container(11000).ListItem.Status(inprogress)]]">$INFO[Container(11000).ListItem.Art(fanart)]</value>
+		<value>$INFO[Container(11000).ListItem.Art(thumb)]</value>
+	</variable>
 	<!-- Thumbs -->
 	<include name="ListSelectedFanArt">
 		<control type="group">
@@ -11,7 +24,7 @@
 				<height>80</height>
 				<aspectratio scalediffuse="false" align="center">scale</aspectratio>
 				<texture diffuse="mask-wide-big.png" background="true">$INFO[ListItem.Art(fanart)]</texture>
-				<visible>ListItem.Type(movie)</visible>
+				<visible>ListItem.Type(movie) | [ListItem.Type(episode) + [Skin.HasSetting(HideThumbnailForUnwatched) + [ListItem.Status(unwatched) | ListItem.Status(inprogress)]]]</visible>
 			</control>			
 			<control type="image">
 				<include>PosListItem</include>
@@ -19,7 +32,7 @@
 				<height>80</height>
 				<aspectratio scalediffuse="false" align="center">scale</aspectratio>
 				<texture diffuse="mask-wide-big.png" background="true" fallback="default-thumb-small.png">$INFO[ListItem.Art(thumb)]</texture>
-				<visible>ListItem.Type(episode)</visible>
+				<visible>ListItem.Type(episode) + [!Skin.HasSetting(HideThumbnailForUnwatched) | [Skin.HasSetting(HideThumbnailForUnwatched) + ![ListItem.Status(unwatched) | ListItem.Status(inprogress)]]]</visible>
 			</control>
 		</control>
 	</include>
@@ -52,7 +65,7 @@
 		</control>
 		<!-- Episode Thumb -->
 		<control type="group">
-			<visible>Container.PlexContent(HomeMovies) | Container.PlexContent(Episodes) | [Container.PlexContent(Channel) + [ListItem.Type(clip) | ListItem.Type(episode)]]</visible>
+			<visible>[Container.PlexContent(HomeMovies) + !Skin.HasSetting(HomeVideosPortrait)] | Container.PlexContent(Episodes) | [Container.PlexContent(Channel) + [ListItem.Type(clip) | ListItem.Type(episode)]]</visible>
 			<control type="image">
 				<posx>23</posx>
 				<posy>37</posy>
@@ -72,12 +85,12 @@
 				<width>142</width>
 				<height>80</height>
 				<aspectratio scalediffuse="false" align="center">scale</aspectratio>
-				<texture diffuse="mask-wide-big.png" background="true">$INFO[ListItem.Art(thumb)]</texture>
+				<texture diffuse="mask-wide-big.png" background="true">$VAR[EpisodeThumbVar]</texture>
 			</control>
 		</control>
 		<!-- Movies Poster -->
 		<control type="group">
-			<visible>Container.PlexContent(Movies)</visible>
+			<visible>Container.PlexContent(Movies) | [Container.PlexContent(HomeMovies) + Skin.HasSetting(HomeVideosPortrait)]</visible>
 			<control type="image">
 				<posx>23</posx>
 				<posy>37</posy>
@@ -206,7 +219,7 @@
 				<include>White2</include>
 				<align>right</align>
 			</control>
-			<visible>[Container.PlexContent(Movies) + [ListItem.Status(Unwatched) | ListItem.Status(InProgress)] + !Skin.HasSetting(HideUnwatchedIconsMovies)] | [Container.PlexContent(TVShows) + [ListItem.Status(Unwatched) | ListItem.Status(InProgress)] + !Skin.HasSetting(HideUnwatchedIconsTVShows)] | [Container.PlexContent(Seasons) + [ListItem.Status(Unwatched) | ListItem.Status(InProgress)] + !Skin.HasSetting(HideUnwatchedIconsTVShows)]</visible>
+			<visible>[[Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)]] + [ListItem.Status(Unwatched) | ListItem.Status(InProgress)] + !Skin.HasSetting(HideUnwatchedIconsMovies)] | [Container.PlexContent(TVShows) + [ListItem.Status(Unwatched) | ListItem.Status(InProgress)] + !Skin.HasSetting(HideUnwatchedIconsTVShows)] | [Container.PlexContent(Seasons) + [ListItem.Status(Unwatched) | ListItem.Status(InProgress)] + !Skin.HasSetting(HideUnwatchedIconsTVShows)]</visible>
 		</control>
 	</include>
 	<!-- List -->
@@ -254,7 +267,7 @@
 					<scrolltime>200</scrolltime>
 					<pagecontrol>61</pagecontrol>
 					<!-- movies & tv shows -->
-					<itemlayout height="50" condition="Container.PlexContent(Movies) | Container.PlexContent(TVShows) | Container.PlexContent(Seasons)">
+					<itemlayout height="50" condition="[Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)]] | Container.PlexContent(TVShows) | Container.PlexContent(Seasons)">
 						<control type="image">
 							<posx>0</posx>
 							<posy>0</posy>
@@ -272,7 +285,7 @@
 							<textoffsetx>80</textoffsetx>
 						</control>
 					</itemlayout>
-					<focusedlayout height="100" condition="Container.PlexContent(Movies) | Container.PlexContent(TVShows) | Container.PlexContent(Seasons)">
+					<focusedlayout height="100" condition="[Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)]] | Container.PlexContent(TVShows) | Container.PlexContent(Seasons)">
 						<control type="image">
 							<posx>0</posx>
 							<posy>0</posy>
@@ -308,7 +321,7 @@
 							<font>Bold-32</font>
 							<textcolor>orange</textcolor>
 							<shadowcolor>FF222222</shadowcolor>
-							<visible>!Container.PlexContent(TVShows) + !Container.PlexContent(Movies)</visible>
+							<visible>!Container.PlexContent(TVShows) + ![Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)]]</visible>
 							<animation type="Focus" reversible="false">
 								<effect type="zoom" center="0,0" start="90" end="100" time="200" tween="Linear" easing="out"/>
 								<effect type="fade" start="0" end="100" time="450"/>
@@ -324,7 +337,7 @@
 							<font>Bold-32</font>
 							<textcolor>orange</textcolor>
 							<shadowcolor>FF222222</shadowcolor>
-							<visible>Container.PlexContent(Movies)</visible>
+							<visible>[Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)]]</visible>
 							<animation type="Focus" reversible="false">
 								<effect type="zoom" center="0,0" start="90" end="100" time="200" tween="Linear" easing="out"/>
 								<effect type="fade" start="0" end="100" time="450"/>
@@ -419,7 +432,7 @@
 						</control>
 					</focusedlayout>
 					<!-- clips & episodes -->
-					<itemlayout height="50" condition="Container.PlexContent(Clips) | Container.PlexContent(Homemovies) | [Container.PlexContent(Episodes) + [IsEmpty(Container.Property(primaryFilterActivated)) | IsEmpty(Container.Property(mixedParents))]]">
+					<itemlayout height="50" condition="Container.PlexContent(Clips) | [Container.PlexContent(Homemovies) + !Skin.HasSetting(HomeVideosPortrait)] | [Container.PlexContent(Episodes) + [IsEmpty(Container.Property(primaryFilterActivated)) | IsEmpty(Container.Property(mixedParents))]]">
 						<control type="image">
 							<posx>0</posx>
 							<posy>0</posy>
@@ -462,7 +475,7 @@
 							<visible>[Container.PlexContent(Episodes) + !IsEmpty(Container.Property(mixedParents)) + IsEmpty(ListItem.Season)]</visible>
 						</control>
 					</itemlayout>
-					<focusedlayout height="100" condition="Container.PlexContent(Clips) | Container.PlexContent(Homemovies) | [Container.PlexContent(Episodes) + [IsEmpty(Container.Property(primaryFilterActivated)) | IsEmpty(Container.Property(mixedParents))]]">
+					<focusedlayout height="100" condition="Container.PlexContent(Clips) | [Container.PlexContent(Homemovies) + !Skin.HasSetting(HomeVideosPortrait)] | [Container.PlexContent(Episodes) + [IsEmpty(Container.Property(primaryFilterActivated)) | IsEmpty(Container.Property(mixedParents))]]">
 						<control type="image">
 							<posx>0</posx>
 							<posy>0</posy>

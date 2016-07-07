@@ -205,11 +205,11 @@ void CFileCache::Process()
     if (m_seekEvent.WaitMSec(0))
     {
       m_seekEvent.Reset();
-      CLog::Log(LOGDEBUG,"%s, request seek on source to %"PRId64, __FUNCTION__, m_seekPos);
+      CLog::Log(LOGDEBUG,"%s, request seek on source to %" PRId64, __FUNCTION__, m_seekPos);
       m_nSeekResult = m_source.Seek(m_seekPos, SEEK_SET);
       if (m_nSeekResult != m_seekPos)
       {
-        CLog::Log(LOGERROR,"%s, error %d seeking. seek returned %"PRId64, __FUNCTION__, (int)GetLastError(), m_nSeekResult);
+        CLog::Log(LOGERROR,"%s, error %d seeking. seek returned %" PRId64, __FUNCTION__, (int)GetLastError(), m_nSeekResult);
         m_seekPossible = m_source.IoControl(IOCTRL_SEEK_POSSIBLE, NULL);
       }
       else
@@ -227,13 +227,13 @@ void CFileCache::Process()
 
     while (m_writeRate)
     {
-      if (m_writePos - m_readPos < m_writeRate)
+      if (m_writePos - m_readPos < m_writeRate * g_advancedSettings.m_readBufferFactor)
       {
         limiter.Reset(m_writePos);
         break;
       }
 
-      if (limiter.Rate(m_writePos) < m_writeRate)
+      if (limiter.Rate(m_writePos) < m_writeRate * g_advancedSettings.m_readBufferFactor)
         break;
 
       if (m_seekEvent.WaitMSec(100))
@@ -408,14 +408,14 @@ int64_t CFileCache::Seek(int64_t iFilePosition, int iWhence)
     m_seekEvent.Set();
     if (!m_seekEnded.Wait())
     {
-      CLog::Log(LOGWARNING,"%s - seek to %"PRId64" failed.", __FUNCTION__, m_seekPos);
+      CLog::Log(LOGWARNING,"%s - seek to %" PRId64" failed.", __FUNCTION__, m_seekPos);
       return -1;
     }
 
     /* wait for any remainin data */
     if(m_seekPos < iTarget)
     {
-      CLog::Log(LOGDEBUG,"%s - waiting for position %"PRId64".", __FUNCTION__, iTarget);
+      CLog::Log(LOGDEBUG,"%s - waiting for position %" PRId64".", __FUNCTION__, iTarget);
       if(m_pCache->WaitForData((unsigned)(iTarget - m_seekPos), 10000) < iTarget - m_seekPos)
       {
         CLog::Log(LOGWARNING,"%s - failed to get remaining data", __FUNCTION__);

@@ -51,6 +51,54 @@
 #define EXP_D25   2
 #define EXP_D45   3
 
+#ifndef USE_FIXED
+#define USE_FIXED 0
+#endif
+
+#if USE_FIXED
+
+#define FFT_FLOAT 0
+
+#define FIXR(a)                 ((int)((a) * 0 + 0.5))
+#define FIXR12(a)               ((int)((a) * 4096 + 0.5))
+#define FIXR15(a)               ((int)((a) * 32768 + 0.5))
+#define ROUND15(x)              ((x) + 16384) >> 15
+
+#define AC3_RENAME(x)           x ## _fixed
+#define AC3_NORM(norm)          (1<<24)/(norm)
+#define AC3_MUL(a,b)            ((((int64_t) (a)) * (b))>>12)
+#define AC3_RANGE(x)            ((x)|(((x)&128)<<1))
+#define AC3_HEAVY_RANGE(x)      ((x)<<1)
+#define AC3_DYNAMIC_RANGE(x)    (x)
+#define AC3_SPX_BLEND(x)        (x)
+#define AC3_DYNAMIC_RANGE1      0
+
+#define INTFLOAT                int
+#define SHORTFLOAT              int16_t
+
+#else /* USE_FIXED */
+
+#define FIXR(x)                 ((float)(x))
+#define FIXR12(x)               ((float)(x))
+#define FIXR15(x)               ((float)(x))
+#define ROUND15(x)              (x)
+
+#define AC3_RENAME(x)           x
+#define AC3_NORM(norm)          (1.0f/(norm))
+#define AC3_MUL(a,b)            ((a) * (b))
+#define AC3_RANGE(x)            (dynamic_range_tab[(x)])
+#define AC3_HEAVY_RANGE(x)      (heavy_dynamic_range_tab[(x)])
+#define AC3_DYNAMIC_RANGE(x)    (powf(x,  s->drc_scale))
+#define AC3_SPX_BLEND(x)        (x)* (1.0f/32)
+#define AC3_DYNAMIC_RANGE1      1.0f
+
+#define INTFLOAT                float
+#define SHORTFLOAT              float
+
+#endif /* USE_FIXED */
+
+#define AC3_LEVEL(x)            ROUND15((x) * FIXR15(0.7071067811865476))
+
 /* pre-defined gain values */
 #define LEVEL_PLUS_3DB          1.4142135623730950
 #define LEVEL_PLUS_1POINT5DB    1.1892071150027209
@@ -82,6 +130,38 @@ typedef enum {
     AC3_CHMODE_3F2R
 } AC3ChannelMode;
 
+/** Dolby Surround mode */
+typedef enum AC3DolbySurroundMode {
+    AC3_DSURMOD_NOTINDICATED = 0,
+    AC3_DSURMOD_OFF,
+    AC3_DSURMOD_ON,
+    AC3_DSURMOD_RESERVED
+} AC3DolbySurroundMode;
+
+/** Dolby Surround EX mode */
+typedef enum AC3DolbySurroundEXMode {
+    AC3_DSUREXMOD_NOTINDICATED = 0,
+    AC3_DSUREXMOD_OFF,
+    AC3_DSUREXMOD_ON,
+    AC3_DSUREXMOD_PLIIZ
+} AC3DolbySurroundEXMode;
+
+/** Dolby Headphone mode */
+typedef enum AC3DolbyHeadphoneMode {
+    AC3_DHEADPHONMOD_NOTINDICATED = 0,
+    AC3_DHEADPHONMOD_OFF,
+    AC3_DHEADPHONMOD_ON,
+    AC3_DHEADPHONMOD_RESERVED
+} AC3DolbyHeadphoneMode;
+
+/** Preferred Stereo Downmix mode */
+typedef enum AC3PreferredStereoDownmixMode {
+    AC3_DMIXMOD_NOTINDICATED = 0,
+    AC3_DMIXMOD_LTRT,
+    AC3_DMIXMOD_LORO,
+    AC3_DMIXMOD_DPLII // reserved value in A/52, but used by encoders to indicate DPL2
+} AC3PreferredStereoDownmixMode;
+
 typedef struct AC3BitAllocParameters {
     int sr_code;
     int sr_shift;
@@ -93,7 +173,7 @@ typedef struct AC3BitAllocParameters {
  * @struct AC3HeaderInfo
  * Coded AC-3 header values up to the lfeon element, plus derived values.
  */
-typedef struct {
+typedef struct AC3HeaderInfo {
     /** @name Coded elements
      * @{
      */
@@ -110,6 +190,9 @@ typedef struct {
     int surround_mix_level;                 ///< Surround mix level index
     uint16_t channel_map;
     int num_blocks;                         ///< number of audio blocks
+#if AV_HAVE_INCOMPATIBLE_LIBAV_ABI
+    int dolby_surround_mode;
+#endif
     /** @} */
 
     /** @name Derived values
@@ -122,6 +205,9 @@ typedef struct {
     uint16_t frame_size;
     uint64_t channel_layout;
     /** @} */
+#if !AV_HAVE_INCOMPATIBLE_LIBAV_ABI
+    int dolby_surround_mode;
+#endif
 } AC3HeaderInfo;
 
 typedef enum {

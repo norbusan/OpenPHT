@@ -38,7 +38,6 @@ enum DVDStreamType
   DVDSTREAM_TYPE_FFMPEG = 5,
   DVDSTREAM_TYPE_TV     = 6,
   DVDSTREAM_TYPE_RTMP   = 7,
-  DVDSTREAM_TYPE_HTSP   = 8,
   DVDSTREAM_TYPE_MPLS   = 10,
   DVDSTREAM_TYPE_BLURAY = 11,
   DVDSTREAM_TYPE_PVRMANAGER = 12,
@@ -49,7 +48,10 @@ enum DVDStreamType
 #define DVDSTREAM_BLOCK_SIZE_FILE (2048 * 16)
 #define DVDSTREAM_BLOCK_SIZE_DVD  2048
 
-class CPoint;
+namespace XFILE
+{
+  class CFile;
+}
 
 namespace PVR
 {
@@ -67,8 +69,8 @@ public:
     virtual bool NextChannel(bool preview = false) = 0;
     virtual bool PrevChannel(bool preview = false) = 0;
     virtual bool SelectChannelByNumber(unsigned int channel) = 0;
-    virtual bool SelectChannel(const PVR::CPVRChannel &channel) { return false; };
-    virtual bool GetSelectedChannel(PVR::CPVRChannelPtr&) { return false; };
+    virtual bool SelectChannel(const PVR::CPVRChannelPtr &channel) { return false; };
+    virtual PVR::CPVRChannelPtr GetSelectedChannel() { return PVR::CPVRChannelPtr(); };
     virtual bool UpdateItem(CFileItem& item) = 0;
     virtual bool CanRecord() = 0;
     virtual bool IsRecording() = 0;
@@ -98,7 +100,8 @@ public:
     virtual ~IChapter() {};
     virtual int  GetChapter() = 0;
     virtual int  GetChapterCount() = 0;
-    virtual void GetChapterName(std::string& name) = 0;
+    virtual void GetChapterName(std::string& name, int ch=-1) = 0;
+    virtual int64_t GetChapterPos(int ch=-1) = 0;
     virtual bool SeekChapter(int ch) = 0;
   };
 
@@ -120,10 +123,13 @@ public:
     virtual void OnPrevious() = 0;
     virtual bool OnMouseMove(const CPoint &point) = 0;
     virtual bool OnMouseClick(const CPoint &point) = 0;
+    virtual bool HasMenu() = 0;
     virtual bool IsInMenu() = 0;
+    virtual void SkipStill() = 0;
     virtual double GetTimeStampCorrection() = 0;
-    virtual bool GetState(std::string &xmlstate)        { return false; }
-    virtual bool SetState(const std::string &xmlstate)  { return false; }
+    virtual bool GetState(std::string &xmlstate) = 0;
+    virtual bool SetState(const std::string &xmlstate) = 0;
+
   };
 
   class ISeekable
@@ -145,7 +151,7 @@ public:
   virtual ~CDVDInputStream();
   virtual bool Open(const char* strFileName, const std::string& content);
   virtual void Close() = 0;
-  virtual int Read(BYTE* buf, int buf_size) = 0;
+  virtual int Read(uint8_t* buf, int buf_size) = 0;
   virtual int64_t Seek(int64_t offset, int whence) = 0;
   virtual bool Pause(double dTime) = 0;
   virtual int64_t GetLength() = 0;
@@ -170,15 +176,9 @@ public:
 
   bool IsStreamType(DVDStreamType type) const { return m_streamType == type; }
   virtual bool IsEOF() = 0;
-  virtual int GetCurrentGroupId() { return 0; }
   virtual BitstreamStats GetBitstreamStats() const { return m_stats; }
 
   void SetFileItem(const CFileItem& item);
-
-  /* PLEX */
-  void SetError(const CStdString& error) { m_strError = error; }
-  const CStdString& GetError() const { return m_strError; }
-  /* END PLEX */
 
 protected:
   DVDStreamType m_streamType;
@@ -187,8 +187,4 @@ protected:
   BitstreamStats m_stats;
   std::string m_content;
   CFileItem m_item;
-
-  /* PLEX */
-  CStdString m_strError;
-  /* END PLEX */
 };

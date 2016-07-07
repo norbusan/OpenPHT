@@ -6,20 +6,9 @@ if(ENABLE_DVD_DRIVE)
   add_subdirectory(libdvd)
 endif()
 
-if(TARGET_COMMON_LINUX OR TARGET_FREEBSD)
-  add_subdirectory(xbmc-dll-symbols)
-endif()
-
 if(USE_INTERNAL_FFMPEG)
   add_subdirectory(ffmpeg)
 endif(USE_INTERNAL_FFMPEG)
-
-if(TARGET_WIN32)
-  add_subdirectory(win32)
-  add_subdirectory(libmad)
-  add_subdirectory(libass)
-  add_subdirectory(enca)
-endif()
 
 # build our external projects
 set(CMAKE_SHARED_MODULE_PREFIX "")

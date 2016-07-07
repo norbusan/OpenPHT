@@ -23,9 +23,9 @@ void CGUIPlexWindowFocusSaver::SaveFocus(CGUIWindow* window)
   // save current focused controls
   m_lastFocusedControlID = m_window->GetFocusedControlID();
   const CGUIControl* control = m_window->GetControl(m_lastFocusedControlID);
-  if (control->IsContainer())
+  if (control && control->IsContainer())
   {
-    CGUIBaseContainer* container = (CGUIBaseContainer*)control;
+    const CGUIBaseContainer* container = dynamic_cast<const CGUIBaseContainer*>(control);
     if (container)
       m_lastFocusedControlItem = container->GetSelectedItem();
     else

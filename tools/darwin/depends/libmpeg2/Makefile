@@ -1,4 +1,5 @@
 include ../Makefile.include
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=libmpeg2
@@ -7,33 +8,28 @@ SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 
 # configuration settings
-CONFIGURE=./configure --prefix=$(PREFIX) \
-  --disable-sdl
+CONFIGURE=./configure --prefix=$(PREFIX) --disable-sdl
 
-LIBDYLIB=$(SOURCE)/.libs/$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/$(LIBNAME)/.libs/$(LIBNAME).dylib
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
-	cd $(SOURCE); patch -p1 < ../01-libmpeg2-add-asm-leading-underscores.patch
-	if test "$(DARWIN)" = "ios"; then \
-		cd $(SOURCE); patch -p0 < ../02-neon.patch; \
-	fi
-	cd $(SOURCE); patch -p1 < ../03-config-fix.patch
 	cd $(SOURCE); patch -p1 < ../04-clang-fix.patch
+	cd $(SOURCE); patch -p0 < ../05-upstream-motion_comp_arm_s.S-is-not-PIC-enough.patch
 	cd $(SOURCE); autoreconf -vif
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
 	make -j $(MAKE_JOBS) -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

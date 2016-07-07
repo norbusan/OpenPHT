@@ -18,9 +18,9 @@
  *
  */
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
-#elif defined(_WIN32)
+#elif defined(TARGET_WINDOWS)
 #include "system.h"
 #endif
 
@@ -240,8 +240,9 @@ bool COMXVideo::PortSettingsChanged(ResolutionUpdateInfo &resinfo)
 
   if(m_deinterlace)
   {
-    bool advanced_deinterlace = false;
-    bool half_framerate = false;
+    EINTERLACEMETHOD interlace_method = g_renderManager.AutoInterlaceMethod(g_settings.m_currentVideoSettings.m_InterlaceMethod);
+    bool advanced_deinterlace = interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED || interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF;
+    bool half_framerate = interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF || interlace_method == VS_INTERLACEMETHOD_MMAL_BOB_HALF;
     if (!advanced_deinterlace)
     {
       // Image_fx assumed 3 frames of context. simple deinterlace doesn't require this
@@ -416,6 +417,11 @@ bool COMXVideo::Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE de
           m_video_codec_name = "omx-h264";
           break;
       }
+    }
+    if (g_guiSettings.GetBool("videoplayer.supportmvc"))
+    {
+      m_codingType = OMX_VIDEO_CodingMVC;
+      m_video_codec_name = "omx-mvc";
     }
     break;
     case AV_CODEC_ID_MPEG4:
@@ -832,7 +838,7 @@ void COMXVideo::Reset(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect)
+void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect, RENDER_STEREO_MODE video_mode, RENDER_STEREO_MODE display_mode, bool stereo_invert)
 {
   CSingleLock lock (m_critSection);
   if(!m_is_open)
@@ -842,25 +848,37 @@ void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect)
 
   OMX_INIT_STRUCTURE(configDisplay);
   configDisplay.nPortIndex = m_omx_render.GetInputPort();
+  configDisplay.set                 = (OMX_DISPLAYSETTYPE)(OMX_DISPLAY_SET_DEST_RECT|OMX_DISPLAY_SET_SRC_RECT|OMX_DISPLAY_SET_FULLSCREEN|OMX_DISPLAY_SET_NOASPECT|OMX_DISPLAY_SET_MODE|OMX_DISPLAY_SET_TRANSFORM);
+  configDisplay.dest_rect.x_offset  = lrintf(DestRect.x1);
+  configDisplay.dest_rect.y_offset  = lrintf(DestRect.y1);
+  configDisplay.dest_rect.width     = lrintf(DestRect.Width());
+  configDisplay.dest_rect.height    = lrintf(DestRect.Height());
+
+  configDisplay.src_rect.x_offset   = lrintf(SrcRect.x1);
+  configDisplay.src_rect.y_offset   = lrintf(SrcRect.y1);
+  configDisplay.src_rect.width      = lrintf(SrcRect.Width());
+  configDisplay.src_rect.height     = lrintf(SrcRect.Height());
+
   configDisplay.fullscreen = OMX_FALSE;
-  configDisplay.noaspect   = OMX_TRUE;
+  configDisplay.noaspect = OMX_TRUE;
+  configDisplay.mode = OMX_DISPLAY_MODE_LETTERBOX;
+  configDisplay.transform = m_transform;
 
-  configDisplay.set                 = (OMX_DISPLAYSETTYPE)(OMX_DISPLAY_SET_DEST_RECT|OMX_DISPLAY_SET_SRC_RECT|OMX_DISPLAY_SET_FULLSCREEN|OMX_DISPLAY_SET_NOASPECT);
-  configDisplay.dest_rect.x_offset  = (int)(DestRect.x1+0.5f);
-  configDisplay.dest_rect.y_offset  = (int)(DestRect.y1+0.5f);
-  configDisplay.dest_rect.width     = (int)(DestRect.Width()+0.5f);
-  configDisplay.dest_rect.height    = (int)(DestRect.Height()+0.5f);
+  if (video_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_TB);
+  else if (video_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_SBS);
+  else
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_MONO);
 
-  configDisplay.src_rect.x_offset   = (int)(SrcRect.x1+0.5f);
-  configDisplay.src_rect.y_offset   = (int)(SrcRect.y1+0.5f);
-  configDisplay.src_rect.width      = (int)(SrcRect.Width()+0.5f);
-  configDisplay.src_rect.height     = (int)(SrcRect.Height()+0.5f);
+  if (stereo_invert)
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_INVERT);
 
   m_omx_render.SetConfig(OMX_IndexConfigDisplayRegion, &configDisplay);
 
-  CLog::Log(LOGDEBUG, "dest_rect.x_offset %d dest_rect.y_offset %d dest_rect.width %d dest_rect.height %d\n",
-      configDisplay.dest_rect.x_offset, configDisplay.dest_rect.y_offset, 
-      configDisplay.dest_rect.width, configDisplay.dest_rect.height);
+  CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d t:%x", CLASSNAME, __func__,
+      configDisplay.src_rect.x_offset, configDisplay.src_rect.y_offset, configDisplay.src_rect.width, configDisplay.src_rect.height,
+      configDisplay.dest_rect.x_offset, configDisplay.dest_rect.y_offset, configDisplay.dest_rect.width, configDisplay.dest_rect.height, configDisplay.transform);
 }
 
 int COMXVideo::GetInputBufferSize()

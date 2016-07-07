@@ -180,6 +180,15 @@
 								<textcolor>Unfocused</textcolor>
 								<textoffsetx>20</textoffsetx>
 							</control>
+							<control type="label">
+								<posx>560</posx>
+								<width>560</width>
+								<height>50</height>
+								<align>right</align>
+								<info>ListItem.Label2</info>
+								<textcolor>Unfocused</textcolor>
+								<textoffsetx>20</textoffsetx>
+							</control>
 						</itemlayout>
 						<focusedlayout height="50">
 							<control type="image">
@@ -193,6 +202,15 @@
 								<width>560</width>
 								<height>50</height>
 								<info>ListItem.Label</info>
+								<textcolor>Focused</textcolor>
+								<textoffsetx>20</textoffsetx>
+							</control>
+							<control type="label">
+								<posx>560</posx>
+								<width>560</width>
+								<height>50</height>
+								<align>right</align>
+								<info>ListItem.Label2</info>
 								<textcolor>Focused</textcolor>
 								<textoffsetx>20</textoffsetx>
 							</control>

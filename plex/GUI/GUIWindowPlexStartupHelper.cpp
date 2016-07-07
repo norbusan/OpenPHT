@@ -24,8 +24,8 @@
 #include "addons/Skin.h"
 
 #ifdef TARGET_DARWIN_OSX
-#include "cores/AudioEngine/Engines/CoreAudio/CoreAudioDevice.h"
-#include "cores/AudioEngine/Engines/CoreAudio/CoreAudioHardware.h"
+#include "cores/AudioEngine/Sinks/osx/CoreAudioDevice.h"
+#include "cores/AudioEngine/Sinks/osx/CoreAudioHardware.h"
 #endif
 
 #include <boost/foreach.hpp>
@@ -103,8 +103,8 @@ void CGUIWindowPlexStartupHelper::AudioControlSelected(int id)
   if (id == RADIO_BUTTON_ANALOG)
   {
     analog->SetSelected(true);
-    g_guiSettings.SetInt("audiooutput.mode", AUDIO_ANALOG);
     g_guiSettings.SetInt("audiooutput.channels", AE_CH_LAYOUT_2_0);
+    g_guiSettings.SetBool("audiooutput.passthrough", false);
     g_guiSettings.SetBool("audiooutput.ac3passthrough", false);
     g_guiSettings.SetBool("audiooutput.dtspassthrough", false);
 
@@ -115,8 +115,8 @@ void CGUIWindowPlexStartupHelper::AudioControlSelected(int id)
   else if (id == RADIO_BUTTON_OPTICAL)
   {
     optical->SetSelected(true);
-    g_guiSettings.SetInt("audiooutput.mode", AUDIO_IEC958);
     g_guiSettings.SetInt("audiooutput.channels", AE_CH_LAYOUT_5_1);
+    g_guiSettings.SetBool("audiooutput.passthrough", true);
     g_guiSettings.SetBool("audiooutput.ac3passthrough", true);
     g_guiSettings.SetBool("audiooutput.dtspassthrough", true);
 
@@ -127,8 +127,8 @@ void CGUIWindowPlexStartupHelper::AudioControlSelected(int id)
   else if (id == RADIO_BUTTON_HDMI)
   {
     hdmi->SetSelected(true);
-    g_guiSettings.SetInt("audiooutput.mode", AUDIO_HDMI);
     g_guiSettings.SetInt("audiooutput.channels", GetNumberOfHDMIChannels());
+    g_guiSettings.SetBool("audiooutput.passthrough", true);
     g_guiSettings.SetBool("audiooutput.ac3passthrough", true);
     g_guiSettings.SetBool("audiooutput.dtspassthrough", true);
 
@@ -139,7 +139,7 @@ void CGUIWindowPlexStartupHelper::AudioControlSelected(int id)
 
   CAEFactory::VerifyOutputDevice(outputDevice, false);
   g_guiSettings.SetString("audiooutput.audiodevice", outputDevice);
-  CAEFactory::OnSettingsChange("audiooutput.mode");
+  CAEFactory::OnSettingsChange("audiooutput.passthrough");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,4 +1,4 @@
-# XBMC Media Center language file
+# OpenPHT Language File
 msgid ""
 msgstr ""
 "Project-Id-Version: XBMC-Addons\n"
@@ -493,7 +493,7 @@ msgid "General"
 msgstr ""
 
 msgctxt "#31605"
-msgid "Home"
+msgid "Libraries"
 msgstr ""
 
 msgctxt "#31606"
@@ -823,7 +823,7 @@ msgstr ""
 #empty strings from id 31723 to 31799
 
 msgctxt "#31800"
-msgid "About Plex"
+msgid "About OpenPHT"
 msgstr ""
 
 msgctxt "#31801"
@@ -834,84 +834,7 @@ msgctxt "#31802"
 msgid "your media....[COLOR Highlighted]your[/COLOR] way"
 msgstr ""
 
-#empty string with id 31803
-
-msgctxt "#31804"
-msgid "MediaStream is a new user interface for the popular multimedia XBMC.  Created by the newly-formed \"Team RazorFish\", this new interface seeks to combine functionality with form, merging style with substance.  Designed and optimized for the 'High-Def' generation, this interface seeks to bring a new experience to the already popular platform."
-msgstr ""
-
-msgctxt "#31805"
-msgid "Note"
-msgstr ""
-
-msgctxt "#31806"
-msgid "Please ensure that you have the very latest build of XBMC.  We recommend the latest SVN build of XBMC, and would ask that you always download the full skin package."
-msgstr ""
-
-msgctxt "#31807"
-msgid "Skin Credits"
-msgstr ""
-
-msgctxt "#31808"
-msgid "The entire project was a collaborative effort between many talented individuals.  These are as follows: skunkmonkee, manturafs, justmed, timdog82001, wir3d, syphon, jmarshall, jezz_x, blittan, mikebeecham, grrowl, modplug, nuka1195 and aenima99x.  Special thanks goes to emilio (a.k.a. thedeViL), without whom this project would never have happened.  Of course all thanks go to you, the XBMC community... without you there would be no reason to do what we do... keep rocking guys, you're the best!!!"
-msgstr ""
-
-msgctxt "#31809"
-msgid "Special Thanks: entire XBMC team, supporters at the xbmc and xbox-scene forums"
-msgstr ""
-
-msgctxt "#31810"
-msgid "Click \"OK\" to continue and begin using our skin"
-msgstr ""
-
-msgctxt "#31811"
-msgid "Note: This is the only time you will see this message once you hit \"OK\""
-msgstr ""
-
-#empty strings from id 31812 to 31850
-
-msgctxt "#31851"
-msgid "[COLOR=orange]Plex[/COLOR] bridges the gap between your Mac and your home theater, doing so with a visually appealing user interface that provides instant access to your media. [COLOR=orange]Plex[/COLOR] can play a wide range of video, audio and photo formats as well as online streaming audio and video. The real power of [COLOR=orange]Plex[/COLOR] is found in its library features: Organize your media into versatile libraries, automatically retrieve metadata from the Internet and display your library using one of the visually stunning skins."
-msgstr ""
-
-msgctxt "#31852"
-msgid "At Plex, we would like to thank the following projects, without whom none of this would be possible:"
-msgstr ""
-
-msgctxt "#31853"
-msgid "[COLOR=orange]XBMC[/COLOR]: The most important one, for supplying us with a great foundation to build on."
-msgstr ""
-
-msgctxt "#31854"
-msgid "[COLOR=orange]Team RazorFish[/COLOR]: The talented team who created the original MediaStream skin."
-msgstr ""
-
-msgctxt "#31855"
-msgid "[COLOR=orange]FFmpeg[/COLOR]: Without this, there would be no decoding of video inside Plex. A critical component, to be sure."
-msgstr ""
-
-msgctxt "#31856"
-msgid "[COLOR=orange]SQLite[/COLOR]: The media database is stored using this excellent, industry standard free database."
-msgstr ""
-
-msgctxt "#31857"
-msgid "[COLOR=orange]CxImage[/COLOR]: The workhorse code responsible for loading images and photos. It uses lots of other libraries like libPNG, libJPEG, etc."
-msgstr ""
-
-msgctxt "#31858"
-msgid "[COLOR=orange]FreeType[/COLOR]: This code is responsible for the beautiful rendering of fonts within the application."
-msgstr ""
-
-msgctxt "#31859"
-msgid "[COLOR=orange]Python[/COLOR]: The media center embeds the Python interpreter to provide powerful scripting functionality."
-msgstr ""
-
-msgctxt "#31860"
-msgid "Please visit http://www.plexapp.com/credits.php for links and more information."
-msgstr ""
-
-#Profiles
-#empty strings from id 31861 to 31899
+#empty strings from id 31803 to 31899
 
 msgctxt "#31900"
 msgid "Login As"
@@ -933,7 +856,7 @@ msgctxt "#31904"
 msgid "Profile picture"
 msgstr ""
 
-#Plex additions
+#OpenPHT additions
 #empty strings from id 31905 to 31949
 
 msgctxt "#31950"
@@ -1045,7 +968,7 @@ msgstr ""
 #empty string with id 32002
 
 msgctxt "#32003"
-msgid "[B]Welcome to Plex![/B]  [CR][CR]In order to ensure the best experience, let's take a minute to determine some audio settings and get signed in to [B]Plex[/B].  [CR][CR][B]Plex[/B] lets you queue and share online videos, and access shared media from your friends' libraries.  [CR][CR]If you don't already have a free [B]Plex[/B] account, you can create one now at [COLOR=orange]http://www.plex.tv[/COLOR] before continuing."
+msgid "[B]Welcome to OpenPHT![/B]  [CR][CR]In order to ensure the best experience, let's take a minute to determine some audio settings and get signed in to [B]Plex[/B].  [CR][CR][B]Plex[/B] lets you queue and share online videos, and access shared media from your friends' libraries.  [CR][CR]If you don't already have a free [B]Plex[/B] account, you can create one now at [COLOR=orange]http://www.plex.tv[/COLOR] before continuing."
 msgstr ""
 
 #Other
@@ -1154,6 +1077,30 @@ msgstr ""
 msgctxt "#32123"
 msgid "Disable window and dialog fade animation"
 msgstr ""
+
+msgctxt "#32124"
+msgid "Show Play File in Home menu"
+msgstr ""
+
+msgctxt "#32125"
+msgid "Default path for Play File"
+msgstr ""
+
+msgctxt "#32126"
+msgid " - Reset selected path"
+msgstr ""
+
+msgctxt "#32127"
+msgid "Display Home Videos as Portrait"
+msgstr ""
+
+msgctxt "#32128"
+msgid "Hide Thumbnails for Unwatched/In Progress Episodes"
+msgstr ""
+
+msgctxt "#32205"
+msgid "Play File"
+msgstr "Play File"
 
 msgctxt "#41000"
 msgid "System Settings"

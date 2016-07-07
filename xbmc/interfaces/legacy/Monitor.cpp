@@ -19,14 +19,17 @@
  *
  */
 
+#include <algorithm>
 #include "Monitor.h"
+#include <math.h>
 
 namespace XBMCAddon
 {
   namespace xbmc
   {
-    Monitor::Monitor() : AddonCallback("Monitor") 
+    Monitor::Monitor() : AddonCallback("Monitor"), abortEvent(true)
     {
+      TRACE;
       if (languageHook)
       {
         Id = languageHook->GetAddonId();
@@ -34,8 +37,41 @@ namespace XBMCAddon
       }
     }
 
+    void Monitor::OnAbortRequested()
+    {
+      TRACE;
+      abortEvent.Set();
+      invokeCallback(new CallbackFunction<Monitor>(this,&Monitor::onAbortRequested));
+    }
+
+    bool Monitor::waitForAbort(double timeout)
+    {
+      TRACE;
+      int timeoutMS = ceil(timeout * 1000);
+      XbmcThreads::EndTime endTime(timeoutMS > 0 ? timeoutMS : XbmcThreads::EndTime::InfiniteValue);
+      while (!endTime.IsTimePast())
+      {
+        {
+          DelayedCallGuard dg(languageHook);
+          unsigned int t = std::min(endTime.MillisLeft(), 100u);
+          if (abortEvent.WaitMSec(t))
+            return true;
+        }
+        if (languageHook)
+          languageHook->MakePendingCalls();
+      }
+      return false;
+    }
+
+    bool Monitor::abortRequested()
+    {
+      TRACE;
+      return abortEvent.Signaled();
+    }
+
     Monitor::~Monitor()
-    { 
+    {
+      TRACE;
       deallocating();
       DelayedCallGuard dg(languageHook);
       // we're shutting down so unregister me.

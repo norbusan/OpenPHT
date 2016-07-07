@@ -68,6 +68,11 @@
 						<label>$LOCALIZE[31604]</label>
 						<onclick>SetFocus(201)</onclick>
 					</item>
+					<item id="2">
+						<description>Libraries</description>
+						<label>$LOCALIZE[31605]</label>
+						<onclick>SetFocus(201)</onclick>
+					</item>
 				</content>
 			</control>
 			<!-- a hack for highlighting the parent category while in settings list -->
@@ -106,7 +111,7 @@
 				<control type="label">
 					<description>General</description>
 					<posx>140</posx>
-					<posy>265</posy>
+					<posy>185</posy>
 					<width>300</width>
 					<font>Bold-18</font>
 					<height>50</height>
@@ -135,88 +140,137 @@
 				<visible allowhiddenfocus="false">Container(101).HasFocus(1) | ControlGroup(201).HasFocus()</visible>
 				<orientation>vertical</orientation>
 				<control type="radiobutton" id="211">
-					<description>Show Big Posters View in Sections</description>
-					<width>625</width>
-					<label>$LOCALIZE[32113]</label>
-					<onclick>Skin.ToggleSetting(ShowBigPostersLibraryView)</onclick>
-					<selected>Skin.HasSetting(ShowBigPostersLibraryView)</selected>
-				</control>
-				<control type="radiobutton" id="212">
-					<description>Hide plot for Unwatched/In Progress</description>
-					<width>625</width>
-					<label>$LOCALIZE[32114]</label>
-					<onclick>Skin.ToggleSetting(HidePlotForUnwatched)</onclick>
-					<selected>Skin.HasSetting(HidePlotForUnwatched)</selected>
-				</control>
-				<control type="radiobutton" id="213">
-					<description>Hide Unwatched indicators for Movies</description>
-					<width>625</width>
-					<label>$LOCALIZE[32115]</label>
-					<onclick>Skin.ToggleSetting(HideUnwatchedIconsMovies)</onclick>
-					<selected>Skin.HasSetting(HideUnwatchedIconsMovies)</selected>
-				</control>
-				<control type="radiobutton" id="214">
-					<description>Hide Unwatched indicators for TV</description>
-					<width>625</width>
-					<label>$LOCALIZE[32116]</label>
-					<onclick>Skin.ToggleSetting(HideUnwatchedIconsTVShows)</onclick>
-					<selected>Skin.HasSetting(HideUnwatchedIconsTVShows)</selected>
-				</control>
-				<control type="radiobutton" id="215">
 					<description>Show Now playing in viz description</description>
 					<width>625</width>
 					<label>$LOCALIZE[31984]</label>
 					<onclick>Skin.ToggleSetting(HideNowPlayingInViz)</onclick>
 					<selected>!Skin.HasSetting(HideNowPlayingInViz)</selected>
 				</control>
-				<control type="radiobutton" id="216">
+				<control type="radiobutton" id="212">
 					<description>Show Extended Media flags in preplays</description>
 					<width>625</width>
 					<label>$LOCALIZE[32117]</label>
 					<onclick>Skin.ToggleSetting(ShowAllMediaFlags)</onclick>
 					<selected>Skin.HasSetting(ShowAllMediaFlags)</selected>
 				</control>
-				<control type="radiobutton" id="217">
+				<control type="radiobutton" id="213">
 					<description>Hide Quit and Shutdown from Home menu</description>
 					<width>625</width>
 					<label>$LOCALIZE[32118]</label>
 					<onclick>Skin.ToggleSetting(HideQuitShutdown)</onclick>
 					<selected>Skin.HasSetting(HideQuitShutdown)</selected>
 				</control>
-				<control type="radiobutton" id="218">
+				<control type="radiobutton" id="214">
 					<description>Hide Slideshows</description>
 					<width>625</width>
 					<label>$LOCALIZE[32119]</label>
 					<onclick>Skin.ToggleSetting(HideFanart)</onclick>
 					<selected>Skin.HasSetting(HideFanart)</selected>
 				</control>
-				<control type="radiobutton" id="219">
+				<control type="radiobutton" id="215">
 					<description>Hide Secure Server Icons</description>
 					<width>625</width>
 					<label>$LOCALIZE[32120]</label>
 					<onclick>Skin.ToggleSetting(DontIndicateSecureServers)</onclick>
 					<selected>Skin.HasSetting(DontIndicateSecureServers)</selected>
 				</control>
-				<control type="radiobutton" id="220">
+				<control type="radiobutton" id="216">
 					<description>Hide Rotten Tomatoes Rating</description>
 					<width>625</width>
 					<label>$LOCALIZE[32121]</label>
 					<onclick>Skin.ToggleSetting(HideRottenTomatoesRating)</onclick>
 					<selected>Skin.HasSetting(HideRottenTomatoesRating)</selected>
 				</control>
-				<control type="radiobutton" id="221">
+				<control type="radiobutton" id="217">
 					<description>Show Shut Down/Restart to restricted users</description>
 					<width>625</width>
 					<label>$LOCALIZE[32122]</label>
 					<onclick>Skin.ToggleSetting(ShowRestrictedPowerOptions)</onclick>
 					<selected>Skin.HasSetting(ShowRestrictedPowerOptions)</selected>
 				</control>
-				<control type="radiobutton" id="222">
+				<control type="radiobutton" id="218">
 					<description>Disable window and dialog fade animation</description>
 					<width>625</width>
 					<label>$LOCALIZE[32123]</label>
 					<onclick>Skin.ToggleSetting(DisableWindowFade)</onclick>
 					<selected>Skin.HasSetting(DisableWindowFade)</selected>
+				</control>
+				<control type="radiobutton" id="219">
+					<description>Show Play File in Home menu</description>
+					<width>625</width>
+					<label>$LOCALIZE[32124]</label>
+					<onclick>Skin.ToggleSetting(HomeMenuPlayFile)</onclick>
+					<selected>Skin.HasSetting(HomeMenuPlayFile)</selected>
+				</control>
+				<control type="radiobutton" id="220">
+					<description>Default path for Play File</description>
+					<width>625</width>
+					<label>$LOCALIZE[32125]</label>
+					<onclick>Skin.SetPath(HomeMenuPlayFilePath)</onclick>
+					<selected>!IsEmpty(Skin.String(HomeMenuPlayFilePath))</selected>
+					<visible>Skin.HasSetting(HomeMenuPlayFile)</visible>
+				</control>
+				<control type="button" id="221">
+					<description>Reset default path for Play File</description>
+					<width>625</width>
+					<label>$LOCALIZE[32126]</label>
+					<onclick>Skin.Reset(HomeMenuPlayFilePath)</onclick>
+					<visible>Skin.HasSetting(HomeMenuPlayFile) + !IsEmpty(Skin.String(HomeMenuPlayFilePath))</visible>
+				</control>
+			</control>
+			<!-- General Options -->
+			<control type="grouplist" id="202">
+				<posy>0</posy>
+				<posx>105</posx>
+				<width>625</width>
+				<height>500</height>
+				<onup>202</onup>
+				<onleft>101</onleft>
+				<itemgap>0</itemgap>
+				<pagecontrol>61</pagecontrol>
+				<visible allowhiddenfocus="false">Container(101).HasFocus(2) | ControlGroup(202).HasFocus()</visible>
+				<orientation>vertical</orientation>
+				<control type="radiobutton" id="241">
+					<description>Show Big Posters View in Sections</description>
+					<width>625</width>
+					<label>$LOCALIZE[32113]</label>
+					<onclick>Skin.ToggleSetting(ShowBigPostersLibraryView)</onclick>
+					<selected>Skin.HasSetting(ShowBigPostersLibraryView)</selected>
+				</control>
+				<control type="radiobutton" id="242">
+					<description>Hide plot for Unwatched/In Progress</description>
+					<width>625</width>
+					<label>$LOCALIZE[32114]</label>
+					<onclick>Skin.ToggleSetting(HidePlotForUnwatched)</onclick>
+					<selected>Skin.HasSetting(HidePlotForUnwatched)</selected>
+				</control>
+				<control type="radiobutton" id="243">
+					<description>Hide Thumbnails for Unwatched/In Progress</description>
+					<width>625</width>
+					<label>$LOCALIZE[32128]</label>
+					<onclick>Skin.ToggleSetting(HideThumbnailForUnwatched)</onclick>
+					<selected>Skin.HasSetting(HideThumbnailForUnwatched)</selected>
+				</control>
+				<control type="radiobutton" id="244">
+					<description>Hide Unwatched indicators for Movies</description>
+					<width>625</width>
+					<label>$LOCALIZE[32115]</label>
+					<onclick>Skin.ToggleSetting(HideUnwatchedIconsMovies)</onclick>
+					<selected>Skin.HasSetting(HideUnwatchedIconsMovies)</selected>
+				</control>
+				<control type="radiobutton" id="245">
+					<description>Hide Unwatched indicators for TV</description>
+					<width>625</width>
+					<label>$LOCALIZE[32116]</label>
+					<onclick>Skin.ToggleSetting(HideUnwatchedIconsTVShows)</onclick>
+					<selected>Skin.HasSetting(HideUnwatchedIconsTVShows)</selected>
+				</control>
+				<control type="radiobutton" id="246">
+					<description>Display Home Videos as Portrait</description>
+					<width>625</width>
+					<label>$LOCALIZE[32127]</label>
+					<onclick>Skin.ToggleSetting(HomeVideosPortrait)</onclick>
+					<selected>Skin.HasSetting(HomeVideosPortrait)</selected>
 				</control>
 			</control>
 			<!-- Scrollbar -->

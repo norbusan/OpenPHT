@@ -191,7 +191,7 @@ CPlexRemoteResponse CPlexRemotePlayHandler::handle(const CStdString& url, const 
   else if (item->GetPlexDirectoryType() == PLEX_DIR_TYPE_PHOTO)
   {
     /* if we are playing music, we don't need to stop */
-    if (g_application.IsPlayingVideo())
+    if (g_application.m_pPlayer->IsPlayingVideo())
       CApplicationMessenger::Get().MediaStop(true);
 
     CLog::Log(LOGDEBUG, "PlexHTTPRemoteHandler::playMedia photo slideshow with start %s", list.Get(idx)->GetPath().c_str());

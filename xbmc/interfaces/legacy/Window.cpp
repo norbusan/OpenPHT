@@ -634,7 +634,7 @@ namespace XBMCAddon
         throw WindowException("Invalid resolution.");
 
       SingleLockWithDelayGuard gslock(g_graphicsContext,languageHook);
-      ref(window)->SetCoordsRes(g_settings.m_ResInfo[res]);
+      ref(window)->SetCoordsRes(g_graphicsContext.GetResInfo((RESOLUTION)res));
     }
 
     void Window::setProperty(const char* key, const String& value)

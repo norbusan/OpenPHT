@@ -23,6 +23,8 @@
   #include "config.h"
 #endif
 
+#include <algorithm>
+
 #include "Picture.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/GUISettings.h"
@@ -31,12 +33,16 @@
 #include "DllImageLib.h"
 #include "utils/log.h"
 #include "utils/URIUtils.h"
-#include "DllSwScale.h"
 #include "guilib/JpegIO.h"
 #include "guilib/Texture.h"
+#include "cores/FFmpeg.h"
 #if defined(HAS_OMXPLAYER)
 #include "cores/omxplayer/OMXImage.h"
 #endif
+
+extern "C" {
+#include "libswscale/swscale.h"
+}
 
 /* PLEX */
 #include <boost/lexical_cast.hpp>
@@ -65,13 +71,18 @@ bool CPicture::CreateThumbnailFromSurface(const unsigned char *buffer, int width
   return dll.CreateThumbnailFromSurface((BYTE *)buffer, width, height, stride, thumbFile.c_str());
 }
 
-CThumbnailWriter::CThumbnailWriter(unsigned char* buffer, int width, int height, int stride, const CStdString& thumbFile)
+CThumbnailWriter::CThumbnailWriter(unsigned char* buffer, int width, int height, int stride, const CStdString& thumbFile):
+  m_thumbFile(thumbFile)
 {
   m_buffer    = buffer;
   m_width     = width;
   m_height    = height;
   m_stride    = stride;
-  m_thumbFile = thumbFile;
+}
+
+CThumbnailWriter::~CThumbnailWriter()
+{
+  delete m_buffer;
 }
 
 bool CThumbnailWriter::DoWork()
@@ -85,23 +96,29 @@ bool CThumbnailWriter::DoWork()
   }
 
   delete [] m_buffer;
+  m_buffer = NULL;
 
   return success;
 }
 
-bool CPicture::CacheTexture(CBaseTexture *texture, uint32_t &dest_width, uint32_t &dest_height, const std::string &dest)
+bool CPicture::CacheTexture(CBaseTexture *texture, uint32_t &dest_width, uint32_t &dest_height, const std::string &dest,
+  CPictureScalingAlgorithm::Algorithm scalingAlgorithm /* = CPictureScalingAlgorithm::NoAlgorithm */)
 {
   return CacheTexture(texture->GetPixels(), texture->GetWidth(), texture->GetHeight(), texture->GetPitch(),
-                      texture->GetOrientation(), dest_width, dest_height, dest);
+                      texture->GetOrientation(), dest_width, dest_height, dest, scalingAlgorithm);
 }
 
-bool CPicture::CacheTexture(uint8_t *pixels, uint32_t width, uint32_t height, uint32_t pitch, int orientation, uint32_t &dest_width, uint32_t &dest_height, const std::string &dest)
+bool CPicture::CacheTexture(uint8_t *pixels, uint32_t width, uint32_t height, uint32_t pitch, int orientation,
+  uint32_t &dest_width, uint32_t &dest_height, const std::string &dest,
+  CPictureScalingAlgorithm::Algorithm scalingAlgorithm /* = CPictureScalingAlgorithm::NoAlgorithm */)
 {
   // if no max width or height is specified, don't resize
   if (dest_width == 0)
     dest_width = width;
   if (dest_height == 0)
     dest_height = height;
+  if (scalingAlgorithm == CPictureScalingAlgorithm::NoAlgorithm)
+    scalingAlgorithm = g_advancedSettings.m_imageScalingAlgorithm;
 
   uint32_t max_height = g_advancedSettings.m_imageRes;
   if (g_advancedSettings.m_fanartRes > g_advancedSettings.m_imageRes)
@@ -129,7 +146,8 @@ bool CPicture::CacheTexture(uint8_t *pixels, uint32_t width, uint32_t height, ui
     if (buffer)
     {
       if (ScaleImage(pixels, width, height, pitch,
-                     (uint8_t *)buffer, dest_width, dest_height, dest_width * 4))
+                     (uint8_t *)buffer, dest_width, dest_height, dest_width * 4,
+                     scalingAlgorithm))
       {
         if (!orientation || OrientateImage(buffer, dest_width, dest_height, orientation))
         {
@@ -170,7 +188,7 @@ bool CPicture::CreateTiledThumb(const std::vector<std::string> &files, const std
     int y = i / num_across;
     // load in the image
     unsigned int width = tile_width - 2*tile_gap, height = tile_height - 2*tile_gap;
-    CBaseTexture *texture = CTexture::LoadFromFile(files[i], width, height, g_guiSettings.GetBool("pictures.useexifrotation"));
+    CBaseTexture *texture = CTexture::LoadFromFile(files[i], width, height, true);
     if (texture && texture->GetWidth() && texture->GetHeight())
     {
       GetScale(texture->GetWidth(), texture->GetHeight(), width, height);
@@ -197,8 +215,8 @@ bool CPicture::CreateTiledThumb(const std::vector<std::string> &files, const std
         }
       }
       delete[] scaled;
-      delete texture;
     }
+    delete texture;
   }
   // now save to a file
   if (success)
@@ -219,13 +237,12 @@ void CPicture::GetScale(unsigned int width, unsigned int height, unsigned int &o
 }
 
 bool CPicture::ScaleImage(uint8_t *in_pixels, unsigned int in_width, unsigned int in_height, unsigned int in_pitch,
-                          uint8_t *out_pixels, unsigned int out_width, unsigned int out_height, unsigned int out_pitch)
+                          uint8_t *out_pixels, unsigned int out_width, unsigned int out_height, unsigned int out_pitch,
+                          CPictureScalingAlgorithm::Algorithm scalingAlgorithm /* = CPictureScalingAlgorithm::NoAlgorithm */)
 {
-  DllSwScale dllSwScale;
-  dllSwScale.Load();
-  struct SwsContext *context = dllSwScale.sws_getContext(in_width, in_height, PIX_FMT_BGRA,
+  struct SwsContext *context = sws_getContext(in_width, in_height, PIX_FMT_BGRA,
                                                          out_width, out_height, PIX_FMT_BGRA,
-                                                         SWS_FAST_BILINEAR | SwScaleCPUFlags(), NULL, NULL, NULL);
+                                                         CPictureScalingAlgorithm::ToSwscale(scalingAlgorithm) | SwScaleCPUFlags(), NULL, NULL, NULL);
 
   uint8_t *src[] = { in_pixels, 0, 0, 0 };
   int     srcStride[] = { (int)in_pitch, 0, 0, 0 };
@@ -234,8 +251,8 @@ bool CPicture::ScaleImage(uint8_t *in_pixels, unsigned int in_width, unsigned in
 
   if (context)
   {
-    dllSwScale.sws_scale(context, src, srcStride, 0, in_height, dst, dstStride);
-    dllSwScale.sws_freeContext(context);
+    sws_scale(context, src, srcStride, 0, in_height, dst, dstStride);
+    sws_freeContext(context);
     return true;
   }
   return false;

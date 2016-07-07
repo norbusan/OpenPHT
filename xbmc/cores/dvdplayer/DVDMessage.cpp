@@ -18,15 +18,12 @@
  *
  */
 
+#include <algorithm>
 #include "threads/SystemClock.h"
 #include "DVDMessage.h"
 #include "DVDDemuxers/DVDDemuxUtils.h"
-#include "DVDStreamInfo.h"
-#include "utils/TimeUtils.h"
-#include "utils/log.h"
 #include "threads/CriticalSection.h"
 #include "threads/Condition.h"
-#include "threads/SystemClock.h"
 #include "utils/MathUtils.h"
 #include "utils/log.h"
 
@@ -58,7 +55,7 @@ CDVDMsgGeneralSynchronize::~CDVDMsgGeneralSynchronize()
   delete m_p;
 }
 
-bool CDVDMsgGeneralSynchronize::Wait(unsigned long milliseconds, unsigned int source)
+bool CDVDMsgGeneralSynchronize::Wait(unsigned int milliseconds, unsigned int source)
 {
   if (source == 0)
     source = SYNCSOURCE_OWNER;
@@ -94,7 +91,7 @@ bool CDVDMsgGeneralSynchronize::Wait(unsigned long milliseconds, unsigned int so
 
 void CDVDMsgGeneralSynchronize::Wait(volatile bool *abort, unsigned int source)
 {
-  while(!Wait(200, source))
+  while(!Wait(100, source))
   {
     if(abort && *abort)
       return;

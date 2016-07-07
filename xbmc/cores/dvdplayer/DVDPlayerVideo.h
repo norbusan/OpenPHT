@@ -21,8 +21,8 @@
  */
 
 #include "threads/Thread.h"
+#include "IDVDPlayer.h"
 #include "DVDMessageQueue.h"
-#include "DVDDemuxers/DVDDemuxUtils.h"
 #include "DVDCodecs/Video/DVDVideoCodec.h"
 #include "DVDClock.h"
 #include "DVDOverlayContainer.h"
@@ -30,13 +30,32 @@
 #ifdef HAS_VIDEO_PLAYBACK
 #include "cores/VideoRenderers/RenderManager.h"
 #endif
+#include "utils/BitstreamStats.h"
 
 class CDemuxStreamVideo;
-class CDVDOverlayCodecCC;
 
 #define VIDEO_PICTURE_QUEUE_SIZE 1
 
-class CDVDPlayerVideo : public CThread
+class CDroppingStats
+{
+public:
+  void Reset();
+  void AddOutputDropGain(double pts, double frametime);
+  struct CGain
+  {
+    double gain;
+    double pts;
+  };
+  std::deque<CGain> m_gain;
+  double m_totalGain;
+  double m_lastDecoderPts;
+  double m_lastRenderPts;
+  double m_lastPts;
+  unsigned int m_lateFrames;
+  unsigned int m_dropRequests;
+};
+
+class CDVDPlayerVideo : public CThread, public IDVDStreamPlayerVideo
 {
 public:
   CDVDPlayerVideo( CDVDClock* pClock
@@ -45,10 +64,9 @@ public:
   virtual ~CDVDPlayerVideo();
 
   bool OpenStream(CDVDStreamInfo &hint);
-  void OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec);
   void CloseStream(bool bWaitForBuffers);
 
-  void StepFrame();
+  bool StepFrame();
   void Flush();
 
   // waits until all available data has been rendered
@@ -56,15 +74,10 @@ public:
   void WaitForBuffers()                             { m_messageQueue.WaitUntilEmpty(); }
   bool AcceptsData() const                          { return !m_messageQueue.IsFull(); }
   bool HasData() const                              { return m_messageQueue.GetDataSize() > 0; }
-  int  GetLevel();
+  int  GetLevel() const                             { return m_messageQueue.GetLevel(); }
   bool IsInited() const                             { return m_messageQueue.IsInited(); }
   void SendMessage(CDVDMsg* pMsg, int priority = 0) { m_messageQueue.Put(pMsg, priority); }
-
-#ifdef HAS_VIDEO_PLAYBACK
-  void Update(bool bPauseDrawing)                   { g_renderManager.Update(bPauseDrawing); }
-#else
-  void Update(bool bPauseDrawing)                   { }
-#endif
+  void FlushMessages()                              { m_messageQueue.Flush(); }
 
   void EnableSubtitle(bool bEnable)                 { m_bRenderSubs = bEnable; }
   bool IsSubtitleEnabled()                          { return m_bRenderSubs; }
@@ -72,7 +85,7 @@ public:
   void EnableFullscreen(bool bEnable)               { m_bAllowFullscreen = bEnable; }
 
 #ifdef HAS_VIDEO_PLAYBACK
-  void GetVideoRect(CRect& SrcRect, CRect& DestRect)  { g_renderManager.GetVideoRect(SrcRect, DestRect); }
+  void GetVideoRect(CRect& SrcRect, CRect& DestRect, CRect& ViewRect) const { g_renderManager.GetVideoRect(SrcRect, DestRect, ViewRect); }
   float GetAspectRatio()                            { return g_renderManager.GetAspectRatio(); }
 #endif
 
@@ -82,17 +95,17 @@ public:
   double GetSubtitleDelay()                                { return m_iSubtitleDelay; }
   void SetSubtitleDelay(double delay)                      { m_iSubtitleDelay = delay; }
 
-  bool IsStalled()                                  { return m_stalled; }
-  int GetNrOfDroppedFrames()                        { return m_iDroppedFrames; }
+  bool IsStalled() const                            { return m_stalled; }
+  bool IsEOS()                                      { return false; }
+  bool SubmittedEOS() const                         { return false; }
 
-  bool InitializedOutputDevice();
-
-  double GetCurrentPts()                           { return m_iCurrentPts; }
-  int    GetPullupCorrection()                     { return m_pullupCorrection.GetPatternLength(); }
+  double GetCurrentPts();
 
   double GetOutputDelay(); /* returns the expected delay, from that a packet is put in queue */
+  int GetDecoderFreeSpace() { return 0; }
   std::string GetPlayerInfo();
   int GetVideoBitrate();
+  std::string GetStereoMode();
 
   void SetSpeed(int iSpeed);
 
@@ -109,6 +122,7 @@ protected:
 #define EOS_ABORT 1
 #define EOS_DROPPED 2
 #define EOS_VERYLATE 4
+#define EOS_BUFFER_LEVEL 8
 
   void AutoCrop(DVDVideoPicture* pPicture);
   void AutoCrop(DVDVideoPicture *pPicture, RECT &crop);
@@ -118,15 +132,15 @@ protected:
 #ifdef HAS_VIDEO_PLAYBACK
   void ProcessOverlays(DVDVideoPicture* pSource, double pts);
 #endif
-  void ProcessVideoUserData(DVDVideoUserData* pVideoUserData, double pts);
+  void OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec);
 
   CDVDMessageQueue m_messageQueue;
   CDVDMessageQueue& m_messageParent;
 
-  double m_iCurrentPts; // last pts displayed
   double m_iVideoDelay;
   double m_iSubtitleDelay;
   double m_FlipTimeStamp; // time stamp of last flippage. used to play at a forced framerate
+  double m_FlipTimePts;   // pts of the last flipped page
 
   int m_iLateFrames;
   int m_iDroppedFrames;
@@ -134,6 +148,7 @@ protected:
 
   void   ResetFrameRateCalc();
   void   CalcFrameRate();
+  int    CalcDropRequirement(double pts, bool updateOnly);
 
   double m_fFrameRate;       //framerate of the video currently playing
   bool   m_bCalcFrameRate;  //if we should calculate the framerate from the timestamps
@@ -159,6 +174,7 @@ protected:
     unsigned int chroma_position;
     unsigned int color_primaries;
     unsigned int color_transfer;
+    unsigned int stereo_flags;
     double       framerate;
   } m_output; //holds currently configured output
 
@@ -170,29 +186,22 @@ protected:
   int m_iNrOfPicturesNotToSkip;
   int m_speed;
 
-  double m_droptime;
-  double m_dropbase;
-
   bool m_stalled;
   bool m_started;
   std::string m_codecname;
-
-  /* autosync decides on how much of clock we should use when deciding sleep time */
-  /* the value is the same as 63% timeconstant, ie that the step response of */
-  /* iSleepTime will be at 63% of iClockSleep after autosync frames */
-  unsigned int m_autosync;
 
   BitstreamStats m_videoStats;
 
   // classes
   CDVDStreamInfo m_hints;
   CDVDVideoCodec* m_pVideoCodec;
-  CDVDOverlayCodecCC* m_pOverlayCodecCC;
 
   DVDVideoPicture* m_pTempOverlayPicture;
 
   CPullupCorrection m_pullupCorrection;
 
   std::list<DVDMessageListItem> m_packets;
+
+  CDroppingStats m_droppingStats;
 };
 

@@ -22,13 +22,15 @@
 
 #include "parser.h"
 #include "mpegaudiodecheader.h"
-
+#include "libavutil/common.h"
+#include "libavformat/id3v1.h" // for ID3v1_TAG_SIZE
 
 typedef struct MpegAudioParseContext {
     ParseContext pc;
     int frame_size;
     uint32_t header;
     int header_count;
+    int no_bitrate;
 } MpegAudioParseContext;
 
 #define MPA_HEADER_SIZE 4
@@ -47,6 +49,7 @@ static int mpegaudio_parse(AVCodecParserContext *s1,
     uint32_t state= pc->state;
     int i;
     int next= END_NOT_FOUND;
+    int flush = !buf_size;
 
     for(i=0; i<buf_size; ){
         if(s->frame_size){
@@ -62,26 +65,42 @@ static int mpegaudio_parse(AVCodecParserContext *s1,
         }else{
             while(i<buf_size){
                 int ret, sr, channels, bit_rate, frame_size;
+                enum AVCodecID codec_id = avctx->codec_id;
 
                 state= (state<<8) + buf[i++];
 
-                ret = avpriv_mpa_decode_header(avctx, state, &sr, &channels, &frame_size, &bit_rate);
+                ret = avpriv_mpa_decode_header2(state, &sr, &channels, &frame_size, &bit_rate, &codec_id);
                 if (ret < 4) {
-                    if(i > 4)
-                        s->header_count= -2;
+                    if (i > 4)
+                        s->header_count = -2;
                 } else {
+                    int header_threshold = avctx->codec_id != AV_CODEC_ID_NONE && avctx->codec_id != codec_id;
                     if((state&SAME_HEADER_MASK) != (s->header&SAME_HEADER_MASK) && s->header)
                         s->header_count= -3;
                     s->header= state;
                     s->header_count++;
                     s->frame_size = ret-4;
 
-                    if(s->header_count > 1){
+                    if (s->header_count > header_threshold) {
                         avctx->sample_rate= sr;
                         avctx->channels   = channels;
-                        avctx->frame_size = frame_size;
-                        avctx->bit_rate   = bit_rate;
+                        s1->duration      = frame_size;
+                        avctx->codec_id   = codec_id;
+                        if (s->no_bitrate || !avctx->bit_rate) {
+                            s->no_bitrate = 1;
+                            avctx->bit_rate += (bit_rate - avctx->bit_rate) / (s->header_count - header_threshold);
+                        }
                     }
+
+                    if (s1->flags & PARSER_FLAG_COMPLETE_FRAMES) {
+                        s->frame_size = 0;
+                        next = buf_size;
+                    } else if (codec_id == AV_CODEC_ID_MP3ADU) {
+                        avpriv_report_missing_feature(avctx,
+                            "MP3ADU full parser");
+                        return AVERROR_PATCHWELCOME;
+                    }
+
                     break;
                 }
             }
@@ -95,6 +114,12 @@ static int mpegaudio_parse(AVCodecParserContext *s1,
         return buf_size;
     }
 
+    if (flush && buf_size >= ID3v1_TAG_SIZE && memcmp(buf, "TAG", 3) == 0) {
+        *poutbuf = NULL;
+        *poutbuf_size = 0;
+        return next;
+    }
+
     *poutbuf = buf;
     *poutbuf_size = buf_size;
     return next;
@@ -102,7 +127,7 @@ static int mpegaudio_parse(AVCodecParserContext *s1,
 
 
 AVCodecParser ff_mpegaudio_parser = {
-    .codec_ids      = { CODEC_ID_MP1, CODEC_ID_MP2, CODEC_ID_MP3 },
+    .codec_ids      = { AV_CODEC_ID_MP1, AV_CODEC_ID_MP2, AV_CODEC_ID_MP3, AV_CODEC_ID_MP3ADU },
     .priv_data_size = sizeof(MpegAudioParseContext),
     .parser_parse   = mpegaudio_parse,
     .parser_close   = ff_parse_close,

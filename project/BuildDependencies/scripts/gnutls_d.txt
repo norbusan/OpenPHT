@@ -1,2 +1,0 @@
-; filename                        source of the file
-gnutls-3.4.7-w32.7z               https://rasplex.blob.core.windows.net/build-deps/win32

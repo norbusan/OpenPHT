@@ -23,6 +23,7 @@
 #include "DVDDemux.h"
 
 #include <memory>
+#include <vector>
 
 class CDVDOverlayCodecFFmpeg;
 class CDVDInputStream;
@@ -40,19 +41,12 @@ public:
   virtual DemuxPacket*  Read();
   virtual bool          SeekTime(int time, bool backwords, double* startpts = NULL);
   virtual void          SetSpeed(int speed) {}
-#ifndef __PLEX__
   virtual CDemuxStream* GetStream(int index) { return m_Streams[index]; }
-#endif
   virtual int           GetNrOfStreams()     { return m_Streams.size(); }
   virtual int           GetStreamLength()    { return 0; }
   virtual std::string   GetFileName()        { return m_Filename; }
 
   bool                  Open(const std::string& filename, int source, const std::string& subfilename);
-
-  /* PLEX */
-  virtual int GetStreamBitrate() { return 0; };
-  virtual CDemuxStream* GetStream(int index) { if (index >= 0 && size_t(index) < m_Streams.size()) return m_Streams[index]; return 0; }
-  /* END PLEX */
 
 private:
   class CStream
@@ -77,8 +71,8 @@ private:
   } STimestamp;
 
   std::string                        m_Filename;
-  std::auto_ptr<CDVDInputStream>     m_Input;
-  std::auto_ptr<CDVDDemuxFFmpeg>     m_Demuxer;
+  std::unique_ptr<CDVDInputStream>     m_Input;
+  std::unique_ptr<CDVDDemuxFFmpeg>     m_Demuxer;
   std::vector<STimestamp>            m_Timestamps;
   std::vector<STimestamp>::iterator  m_Timestamp;
   std::vector<CStream*> m_Streams;

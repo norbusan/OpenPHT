@@ -1,4 +1,4 @@
-set(subdirs cores addons cdrip dbwrappers dialogs filesystem guilib input interfaces music network
+set(subdirs cores contrib/kissfft addons dbwrappers dialogs filesystem guilib input interfaces music network
 peripherals pictures playlists powermanagement programs rendering settings storage threads
 utils video windowing windows pvr commons epg main test)
 
@@ -43,7 +43,7 @@ set(SRCS ${xbmc_SRCS} ${ALL_SRCS})
 ADD_MSVC_PRECOMPILED_HEADER("pch.h" "win32/pch.cpp" SRCS)
 #ADD_MSVC_PRECOMPILED_HEADER("${root}/xbmc/win32/pch.h" "${root}/xbmc/win32/pch.cpp" ALL_SRCS)
 
-if(TARGET_RPI)
+if(TARGET_RPI OR TARGET_AML)
   enable_language(ASM)
   set_property(SOURCE ./cores/VideoRenderers/yuv2rgb.neon.S PROPERTY LANGUAGE ASM)
   list(APPEND SRCS ./cores/VideoRenderers/yuv2rgb.neon.S)

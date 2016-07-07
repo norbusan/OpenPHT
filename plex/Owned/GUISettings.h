@@ -38,6 +38,7 @@ class TiXmlElement;
 #define RENDER_METHOD_SOFTWARE  3
 #define RENDER_METHOD_D3D_PS    4
 #define RENDER_METHOD_DXVA      5
+#define RENDER_METHOD_DXVAHD    6
 #define RENDER_OVERLAYS         99   // to retain compatibility
 
 // Scaling options.
@@ -175,6 +176,7 @@ class TiXmlElement;
 #define SYNC_DISCON 0
 #define SYNC_SKIPDUP 1
 #define SYNC_RESAMPLE 2
+#define SYNC_PLLADJUST 3
 
 //adjust refreshrate options
 #define ADJUST_REFRESHRATE_OFF            0
@@ -524,7 +526,12 @@ public:
   void LoadMasterLock(TiXmlElement *pRootElement);
 
   RESOLUTION GetResolution() const;
+  void SetCurrentResolution(RESOLUTION resolution, bool save = false);
+  static std::string ModeFlagsToString(unsigned int flags, bool identifier);
   static RESOLUTION GetResFromString(const CStdString &res);
+  static CStdString GetStringFromRes(RESOLUTION resolution, float refreshrate = 0.0f);
+  static RESOLUTION FindBestMatchingResolution(const std::map<RESOLUTION, RESOLUTION_INFO> &resolutionInfos, int screen, int width, int height, float refreshrate, unsigned flags);
+  RESOLUTION GetResolutionForScreen();
   void SetResolution(RESOLUTION res);
   bool SetLanguage(const CStdString &strLanguage);
 

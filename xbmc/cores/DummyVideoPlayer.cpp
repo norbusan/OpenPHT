@@ -28,11 +28,11 @@
 #include "settings/AdvancedSettings.h"
 #include "windowing/WindowingFactory.h"
 #include "utils/log.h"
-#include "utils/TimeUtils.h"
+#include "utils/StringUtils.h"
 
 CDummyVideoPlayer::CDummyVideoPlayer(IPlayerCallback& callback)
     : IPlayer(callback),
-      CThread("CDummyVideoPlayer")
+      CThread("DummyVideoPlayer")
 {
   m_paused = false;
   m_clock = 0;
@@ -141,7 +141,7 @@ bool CDummyVideoPlayer::CanSeek()
   return GetTotalTime() > 0;
 }
 
-void CDummyVideoPlayer::Seek(bool bPlus, bool bLargeStep)
+void CDummyVideoPlayer::Seek(bool bPlus, bool bLargeStep, bool bChapterOverride)
 {
   if (g_advancedSettings.m_videoUseTimeSeeking && GetTotalTime() > 2000*g_advancedSettings.m_videoTimeSeekForwardBig)
   {
@@ -259,7 +259,7 @@ CStdString CDummyVideoPlayer::GetPlayerState()
   return "";
 }
 
-bool CDummyVideoPlayer::SetPlayerState(CStdString state)
+bool CDummyVideoPlayer::SetPlayerState(const CStdString& state)
 {
   return true;
 }

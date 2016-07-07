@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2010-2012 Team XBMC
+ *      Copyright (C) 2010-2013 Team XBMC
  *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,16 +19,10 @@
  *
  */
 
-#include "Interfaces/AE.h"
-#include "threads/Thread.h"
+#include <utility>
+#include <vector>
 
-enum AEEngine
-{
-  AE_ENGINE_NULL,
-  AE_ENGINE_SOFT,
-  AE_ENGINE_COREAUDIO,
-  AE_ENGINE_PULSE
-};
+#include "Interfaces/AE.h"
 
 class CAEFactory
 {
@@ -48,7 +42,16 @@ public:
   static void EnumerateOutputDevices(AEDeviceList &devices, bool passthrough);
   static void VerifyOutputDevice(std::string &device, bool passthrough);
   static std::string GetDefaultDevice(bool passthrough);
-  static bool SupportsRaw();
+  static bool SupportsRaw(AEDataFormat format, int samplerate);
+  static bool SupportsSilenceTimeout();
+  static bool HasStereoAudioChannelCount();
+  static bool HasHDAudioChannelCount();
+
+  /**
+   * Returns true if current AudioEngine supports at lest two basic quality levels
+   * @return true if quality setting is supported, otherwise false
+   */
+  static bool SupportsQualitySetting(void);
   static void SetMute(const bool enabled);
   static bool IsMuted();
   static float GetVolume();
@@ -58,8 +61,15 @@ public:
     unsigned int encodedSampleRate, CAEChannelInfo channelLayout, unsigned int options = 0);
   static IAEStream *FreeStream(IAEStream *stream);
   static void GarbageCollect();
+
+  static bool IsSettingVisible(const std::string &value);
+  static void KeepConfiguration(unsigned int millis);
+  static void DeviceChange();
+
+  static void RegisterAudioCallback(IAudioCallback* pCallback);
+  static void UnregisterAudioCallback();
+
 private:
-  static bool LoadEngine(enum AEEngine engine);
   static IAE *AE;
 };
 

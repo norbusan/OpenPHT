@@ -24,6 +24,7 @@
 #include "devices/Peripheral.h"
 #include "threads/CriticalSection.h"
 #include "threads/Thread.h"
+#include "utils/Observer.h"
 
 class CFileItemList;
 class CSetting;
@@ -36,7 +37,7 @@ namespace PERIPHERALS
 {
   #define g_peripherals CPeripherals::Get()
 
-  class CPeripherals
+  class CPeripherals :  public Observable
   {
   public:
     static CPeripherals &Get(void);

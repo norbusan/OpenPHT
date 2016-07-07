@@ -25,6 +25,7 @@
 #include "windowing/XBMC_events.h"
 #include "input/XBMC_keyboard.h"
 #include "threads/SingleLock.h"
+#include "threads/Thread.h"
 
 struct KeymapEntry
 {
@@ -38,7 +39,7 @@ struct KeymapEntry
 class CLinuxInputDevice
 {
 public:
-  CLinuxInputDevice(const std::string fileName, int index);
+  CLinuxInputDevice(const std::string& fileName, int index);
   ~CLinuxInputDevice();
   XBMC_Event ReadEvent();
   const std::string& GetFileName();
@@ -89,12 +90,24 @@ public:
   XBMC_Event ReadEvent();
   bool IsRemoteLowBattery();
   bool IsRemoteNotPaired();
+  size_t Size() { return m_devices.size(); }
 private:
   CCriticalSection m_devicesListLock;
   bool CheckDevice(const char *device);
   std::vector<CLinuxInputDevice*> m_devices;
   bool m_bReInitialize;
-  time_t m_lastHotplugCheck;
+};
+
+class CLinuxInputDevicesCheckHotplugged : protected CThread
+{
+public:
+  CLinuxInputDevicesCheckHotplugged(CLinuxInputDevices &parent);
+  ~CLinuxInputDevicesCheckHotplugged();
+private:
+  CLinuxInputDevices &m_parent;
+  CEvent m_quitEvent;
+protected:
+  virtual void Process();
 };
 
 #endif /* LINUXINPUTDEVICES_H_ */

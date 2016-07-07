@@ -31,6 +31,7 @@
 #include "addons/GUIDialogAddonSettings.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "guilib/GUIKeyboardFactory.h"
+#include "guilib/StereoscopicsManager.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "dialogs/GUIDialogNumeric.h"
 #include "dialogs/GUIDialogProgress.h"
@@ -233,6 +234,7 @@ const BUILT_IN commands[] = {
   { "ToggleDebug",                false,  "Enables/disables debug mode" },
   { "StartPVRManager",            false,  "(Re)Starts the PVR manager" },
   { "StopPVRManager",             false,  "Stops the PVR manager" },
+  { "SetStereoMode",              true,   "Changes the stereo mode of the GUI. Params can be: toggle, next, previous, select, tomono or any of the supported stereomodes (off, split_vertical, split_horizontal, row_interleaved, hardware_based, anaglyph_cyan_red, anaglyph_green_magenta, anaglyph_yellow_blue, monoscopic)" }
 };
 
 bool CBuiltins::HasCommand(const CStdString& execString)
@@ -488,7 +490,7 @@ int CBuiltins::Execute(const CStdString& execString)
     else if (parameter.Equals("1080i")) res = RES_HDTV_1080i;
     if (g_graphicsContext.IsValidResolution(res))
     {
-      g_guiSettings.SetResolution(res);
+      g_guiSettings.SetCurrentResolution(res, true);
       g_graphicsContext.SetVideoResolution(res);
       g_application.ReloadSkin();
     }
@@ -533,6 +535,10 @@ int CBuiltins::Execute(const CStdString& execString)
   {
     if (params.size())
     {
+#ifdef TARGET_OPENELEC
+      if (params[0].Equals("service.openelec.settings"))
+        params[0] = "service.libreelec.settings";
+#endif
       AddonPtr addon;
       if (CAddonMgr::Get().GetAddon(params[0],addon) && addon)
       {
@@ -711,10 +717,10 @@ int CBuiltins::Execute(const CStdString& execString)
     if (parameter.Equals("play"))
     { // play/pause
       // either resume playing, or pause
-      if (g_application.IsPlaying())
+      if (g_application.m_pPlayer->IsPlaying())
       {
-        if (g_application.GetPlaySpeed() != 1)
-          g_application.SetPlaySpeed(1);
+        if (g_application.m_pPlayer->GetPlaySpeed() != 1)
+          g_application.m_pPlayer->SetPlaySpeed(1, g_settings.m_bMute);
         else
           g_application.m_pPlayer->Pause();
       }
@@ -725,9 +731,9 @@ int CBuiltins::Execute(const CStdString& execString)
     }
     else if (parameter.Equals("rewind") || parameter.Equals("forward"))
     {
-      if (g_application.IsPlaying() && !g_application.m_pPlayer->IsPaused())
+      if (g_application.m_pPlayer->IsPlaying() && !g_application.m_pPlayer->IsPaused())
       {
-        int iPlaySpeed = g_application.GetPlaySpeed();
+        int iPlaySpeed = g_application.m_pPlayer->GetPlaySpeed();
         if (parameter.Equals("rewind") && iPlaySpeed == 1) // Enables Rewinding
           iPlaySpeed *= -2;
         else if (parameter.Equals("rewind") && iPlaySpeed > 1) //goes down a notch if you're FFing
@@ -743,7 +749,7 @@ int CBuiltins::Execute(const CStdString& execString)
         if (iPlaySpeed > 32 || iPlaySpeed < -32)
           iPlaySpeed = 1;
 
-        g_application.SetPlaySpeed(iPlaySpeed);
+        g_application.m_pPlayer->SetPlaySpeed(iPlaySpeed, g_settings.m_bMute);
       }
     }
     else if (parameter.Equals("next"))
@@ -756,23 +762,31 @@ int CBuiltins::Execute(const CStdString& execString)
     }
     else if (parameter.Equals("bigskipbackward"))
     {
-      if (g_application.IsPlaying())
+      if (g_application.m_pPlayer->IsPlaying())
         g_application.m_pPlayer->Seek(false, true);
     }
     else if (parameter.Equals("bigskipforward"))
     {
-      if (g_application.IsPlaying())
+      if (g_application.m_pPlayer->IsPlaying())
         g_application.m_pPlayer->Seek(true, true);
     }
     else if (parameter.Equals("smallskipbackward"))
     {
-      if (g_application.IsPlaying())
+#ifndef __PLEX__
+      if (g_application.m_pPlayer->IsPlaying())
         g_application.m_pPlayer->Seek(false, false);
+#else
+      g_application.OnAction(CAction(ACTION_STEP_BACK));
+#endif
     }
     else if (parameter.Equals("smallskipforward"))
     {
-      if (g_application.IsPlaying())
+#ifndef __PLEX__
+      if (g_application.m_pPlayer->IsPlaying())
         g_application.m_pPlayer->Seek(true, false);
+#else
+      g_application.OnAction(CAction(ACTION_STEP_FORWARD));
+#endif
     }
     else if (parameter.Left(14).Equals("seekpercentage"))
     {
@@ -789,18 +803,18 @@ int CBuiltins::Execute(const CStdString& execString)
         offsetpercent = (float) atof(offset.c_str());
         if (offsetpercent < 0 || offsetpercent > 100)
           CLog::Log(LOGERROR,"PlayerControl(seekpercentage(n)) argument, %f, must be 0-100", offsetpercent);
-        else if (g_application.IsPlaying())
+        else if (g_application.m_pPlayer->IsPlaying())
           g_application.SeekPercentage(offsetpercent);
       }
     }
     else if( parameter.Equals("showvideomenu") )
     {
-      if( g_application.IsPlaying() && g_application.m_pPlayer )
+      if( g_application.m_pPlayer->IsPlaying() )
         g_application.m_pPlayer->OnAction(CAction(ACTION_SHOW_VIDEOMENU));
     }
     else if( parameter.Equals("record") )
     {
-      if( g_application.IsPlaying() && g_application.m_pPlayer && g_application.m_pPlayer->CanRecord())
+      if( g_application.m_pPlayer->IsPlaying() && g_application.m_pPlayer->CanRecord())
         g_application.m_pPlayer->Record(!g_application.m_pPlayer->IsRecording());
     }
     else if (parameter.Left(9).Equals("partymode"))
@@ -911,10 +925,10 @@ int CBuiltins::Execute(const CStdString& execString)
   }
   else if (execute.Equals("setvolume"))
   {
-    int oldVolume = g_application.GetVolume();
-    int volume = atoi(parameter.c_str());
+    float oldVolume = g_application.GetVolume();
+    float volume = (float)strtod(parameter.c_str(), NULL);
 
-    g_application.SetVolume((float)volume);
+    g_application.SetVolume(volume);
     if(oldVolume != volume)
     {
       if(params.size() > 1 && params[1].Equals("showVolumeBar"))    
@@ -958,7 +972,7 @@ int CBuiltins::Execute(const CStdString& execString)
     // play the desired offset
     int pos = atol(strPos.c_str());
     // playlist is already playing
-    if (g_application.IsPlaying())
+    if (g_application.m_pPlayer->IsPlaying())
       g_playlistPlayer.PlayNext(pos);
     // we start playing the 'other' playlist so we need to use play to initialize the player state
     else
@@ -1661,6 +1675,17 @@ int CBuiltins::Execute(const CStdString& execString)
   else if (execute.Equals("stoppvrmanager"))
   {
     g_application.StopPVRManager();
+  }
+  else if (execute.Equals("setstereomode") && !parameter.empty())
+  {
+    CAction action = CStereoscopicsManager::Get().ConvertActionCommandToAction(execute, parameter);
+    if (action.GetID() != ACTION_NONE)
+      CApplicationMessenger::Get().SendAction(action);
+    else
+    {
+      CLog::Log(LOGERROR,"Builtin 'SetStereoMode' called with unknown parameter: %s", parameter.c_str());
+      return -2;
+    }
   }
   /* PLEX */
 #if defined(TARGET_DARWIN_OSX) || defined(TARGET_WINDOWS) || defined(TARGET_OPENELEC)

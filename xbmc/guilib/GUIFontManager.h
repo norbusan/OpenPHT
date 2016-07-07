@@ -28,6 +28,8 @@
  *
  */
 
+#include <utility>
+
 #include "GraphicContext.h"
 #include "IMsgTargetCallback.h"
 #include "utils/GlobalsHandling.h"
@@ -47,10 +49,6 @@ struct OrigFontInfo
    RESOLUTION_INFO sourceRes;
    bool preserveAspect;
    bool border;
-
-   /* PLEX */
-   CStdString variant;
-   /* END PLEX */
 };
 
 /*!
@@ -67,11 +65,7 @@ public:
 
   void Unload(const CStdString& strFontName);
   void LoadFonts(const CStdString& strFontSet);
-#ifndef __PLEX__
   CGUIFont* LoadTTF(const CStdString& strFontName, const CStdString& strFilename, color_t textColor, color_t shadowColor, const int iSize, const int iStyle, bool border = false, float lineSpacing = 1.0f, float aspect = 1.0f, const RESOLUTION_INFO *res = NULL, bool preserveAspect = false);
-#else
-  CGUIFont* LoadTTF(const CStdString& strFontName, const CStdString& strFilename, color_t textColor, color_t shadowColor, const int iSize, int iStyle, bool border = false, float lineSpacing = 1.0f, float aspect = 1.0f, RESOLUTION_INFO *res = NULL, bool preserveAspect = false, const CStdString& variant = "");
-#endif
   CGUIFont* GetFont(const CStdString& strFontName, bool fallback = true);
 
   /*! \brief return a default font
@@ -83,36 +77,18 @@ public:
   void Clear();
   void FreeFontFile(CGUIFontTTFBase *pFont);
 
-  bool IsFontSetUnicode() { return m_fontsetUnicode; }
-  bool IsFontSetUnicode(const CStdString& strFontSet);
-  bool GetFirstFontSetUnicode(CStdString& strFontSet);
-
-  void ReloadTTFFonts();
-  void UnloadTTFFonts();
-
-  /* PLEX */
-  std::vector<std::string> GetSystemFontNames();
-  /* END PLEX */
-
 protected:
-  void RescaleFontSizeAndAspect(float *size, float *aspect, const RESOLUTION_INFO &sourceRes, bool preserveAspect) const;
+  void ReloadTTFFonts();
+  static void RescaleFontSizeAndAspect(float *size, float *aspect, const RESOLUTION_INFO &sourceRes, bool preserveAspect);
   void LoadFonts(const TiXmlNode* fontNode);
   CGUIFontTTFBase* GetFontFile(const CStdString& strFontFile);
-  bool OpenFontFile(CXBMCTinyXML& xmlDoc);
+  static void GetStyle(const TiXmlNode *fontNode, int &iStyle);
 
   std::vector<CGUIFont*> m_vecFonts;
   std::vector<CGUIFontTTFBase*> m_vecFontFiles;
   std::vector<OrigFontInfo> m_vecFontInfo;
-  bool m_fontsetUnicode;
   RESOLUTION_INFO m_skinResolution;
   bool m_canReload;
-
-  /* PLEX */
-  bool FindSystemFontPath(const CStdString& strFilename, CStdString *fontPath);
-  bool GetFontAlias(const CStdString& strFontName, const CStdString& strVariant, CStdString& strAlias, int& aliasStyle);
-
-  std::map<std::string, std::pair<std::string, int> > m_fontAliasMap;
-  /* END PLEX */
 };
 
 /*!

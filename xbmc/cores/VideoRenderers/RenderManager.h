@@ -26,32 +26,23 @@
 #include "guilib/Geometry.h"
 #include "guilib/Resolution.h"
 #include "threads/SharedSection.h"
-#include "threads/Thread.h"
 #include "settings/VideoSettings.h"
 #include "OverlayRenderer.h"
-
-/* PLEX */
-#ifdef TARGET_WINDOWS
-#include "cores/VideoRenderers/WinRenderer.h"
-#else
-#ifdef TARGET_RASPBERRY_PI
-#include "cores/VideoRenderers/LinuxRendererGLES.h"
-#else
-#include "cores/VideoRenderers/LinuxRendererGL.h"
-#endif //raspberry pi
-#endif
-/* END PLEX */
+#include <deque>
+#include "PlatformDefs.h"
+#include "threads/Event.h"
 
 class CRenderCapture;
 
 namespace DXVA { class CProcessor; }
 namespace VAAPI { class CSurfaceHolder; }
-class CVDPAU;
+namespace VDPAU { class CVdpauRenderPicture; }
 struct DVDVideoPicture;
 
 #define ERRORBUFFSIZE 30
 
 class CWinRenderer;
+class CMMALRenderer;
 class CLinuxRenderer;
 class CLinuxRendererGL;
 class CLinuxRendererGLES;
@@ -63,10 +54,16 @@ public:
   ~CXBMCRenderManager();
 
   // Functions called from the GUI
-  void GetVideoRect(CRect &source, CRect &dest);
+  void GetVideoRect(CRect &source, CRect &dest, CRect &view);
   float GetAspectRatio();
-  void Update(bool bPauseDrawing);
-  void RenderUpdate(bool clear, DWORD flags = 0, DWORD alpha = 255);
+  void Update();
+  void FrameMove();
+  void FrameFinish();
+  void FrameWait(int ms);
+  bool HasFrame();
+  void Render(bool clear, DWORD flags = 0, DWORD alpha = 255, bool gui = true);
+  bool IsGuiLayer();
+  bool IsVideoLayer();
   void SetupScreenshot();
 
   CRenderCapture* AllocRenderCapture();
@@ -77,20 +74,51 @@ public:
   void SetViewMode(int iViewMode);
 
   // Functions called from mplayer
-  bool Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format,  unsigned int orientation);
-  bool IsConfigured();
+  /**
+   * Called by video player to configure renderer
+   * @param width width of decoded frame
+   * @param height height of decoded frame
+   * @param d_width displayed width of frame (aspect ratio)
+   * @param d_height displayed height of frame
+   * @param fps frames per second of video
+   * @param flags see RenderFlags.h
+   * @param format see RenderFormats.h
+   * @param extended_format used by DXVA
+   * @param orientation
+   * @param numbers of kept buffer references
+   */
+  bool Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format,  unsigned int orientation, int buffers = 0);
+  bool IsConfigured() const;
 
   int AddVideoPicture(DVDVideoPicture& picture);
 
-  void FlipPage(volatile bool& bStop, double timestamp = 0.0, int source = -1, EFIELDSYNC sync = FS_NONE);
+  /**
+   * Called by video player to flip render buffers
+   * If buffering is enabled this method does not block. In case of disabled buffering
+   * this method blocks waiting for the render thread to pass by.
+   * When buffering is used there might be no free buffer available after the call to
+   * this method. Player has to call WaitForBuffer. A free buffer will become
+   * available after the main thread has flipped front / back buffers.
+   *
+   * @param bStop reference to stop flag of calling thread
+   * @param timestamp of frame delivered with AddVideoPicture
+   * @param pts used for lateness detection
+   * @param source depreciated
+   * @param sync signals frame, top, or bottom field
+   */
+  void FlipPage(volatile bool& bStop, double timestamp = 0.0, double pts = 0.0, int source = -1, EFIELDSYNC sync = FS_NONE);
   unsigned int PreInit();
   void UnInit();
   bool Flush();
 
   void AddOverlay(CDVDOverlay* o, double pts)
   {
+    { CSingleLock lock(m_presentlock);
+      if (m_free.empty())
+        return;
+    }
     CSharedLock lock(m_sharedSection);
-    m_overlays.AddOverlay(o, pts);
+    m_overlays.AddOverlay(o, pts, m_free.front());
   }
 
   void AddCleanup(OVERLAY::COverlay* o)
@@ -103,10 +131,10 @@ public:
 
   RESOLUTION GetResolution();
 
-  float GetMaximumFPS();
-  inline bool Paused() { return m_bPauseDrawing; };
+  static float GetMaximumFPS();
   inline bool IsStarted() { return m_bIsStarted;}
   double GetDisplayLatency() { return m_displayLatency; }
+  int    GetSkippedFrames()  { return m_QueueSkip; }
 
   bool Supports(ERENDERFEATURE feature);
   bool Supports(EDEINTERLACEMODE method);
@@ -115,15 +143,17 @@ public:
 
   EINTERLACEMETHOD AutoInterlaceMethod(EINTERLACEMETHOD mInt);
 
-  double GetPresentTime();
+  static double GetPresentTime();
   void  WaitPresentTime(double presenttime);
 
-  CStdString GetVSyncState();
+  std::string GetVSyncState();
 
   void UpdateResolution();
 
 #ifdef HAS_GL
   CLinuxRendererGL    *m_pRenderer;
+#elif defined(HAS_MMAL)
+  CMMALRenderer       *m_pRenderer;
 #elif HAS_GLES == 2
   CLinuxRendererGLES  *m_pRenderer;
 #elif defined(HAS_DX)
@@ -132,44 +162,53 @@ public:
   CLinuxRenderer      *m_pRenderer;
 #endif
 
-  unsigned int GetProcessorSize();
+  // Get renderer info, can be called before configure
+  CRenderInfo GetRenderInfo();
 
-  // Supported pixel formats, can be called before configure
-  std::vector<ERenderFormat> SupportedFormats();
-
-  void Present();
   void Recover(); // called after resolution switch if something special is needed
 
   CSharedSection& GetSection() { return m_sharedSection; };
 
   void RegisterRenderUpdateCallBack(const void *ctx, RenderUpdateCallBackFn fn);
+  void RegisterRenderFeaturesCallBack(const void *ctx, RenderFeaturesCallBackFn fn);
 
-  /* PLEX */
-  inline void SetRGB32Image(const char *image, int nHeight, int nWidth, int nPitch)
-  {
-    if (!image)
-      return;
+  /**
+   * If player uses buffering it has to wait for a buffer before it calls
+   * AddVideoPicture and AddOverlay. It waits for max 50 ms before it returns -1
+   * in case no buffer is available. Player may call this in a loop and decides
+   * by itself when it wants to drop a frame.
+   * If no buffering is requested in Configure, player does not need to call this,
+   * because FlipPage will block.
+   */
+  int WaitForBuffer(volatile bool& bStop, int timeout = 100);
 
-    CSharedLock lock(m_sharedSection);
-    if (m_pRenderer)
-      m_pRenderer->SetRGB32Image(image, nHeight, nWidth, nPitch);
-  }
-  /* END PLEX */
+  /**
+   * Can be called by player for lateness detection. This is done best by
+   * looking at the end of the queue.
+   */
+  bool GetStats(double &sleeptime, double &pts, int &queued, int &discard);
+
+  /**
+   * Video player call this on flush in oder to discard any queued frames
+   */
+  void DiscardBuffer();
+
 protected:
-  void Render(bool clear, DWORD flags, DWORD alpha);
 
   void PresentSingle(bool clear, DWORD flags, DWORD alpha);
   void PresentFields(bool clear, DWORD flags, DWORD alpha);
   void PresentBlend(bool clear, DWORD flags, DWORD alpha);
 
+  void PrepareNextRender();
+
   EINTERLACEMETHOD AutoInterlaceMethodInternal(EINTERLACEMETHOD mInt);
 
-  bool m_bPauseDrawing;   // true if we should pause rendering
-
-  bool m_bIsStarted;
   CSharedSection m_sharedSection;
 
+  bool m_bIsStarted;
   bool m_bReconfigured;
+  bool m_bRenderGUI;
+  int m_waitForBufferCount;
 
   int m_rendermethod;
 
@@ -179,6 +218,7 @@ protected:
   , PRESENT_FLIP
   , PRESENT_FRAME
   , PRESENT_FRAME2
+  , PRESENT_READY
   };
 
   enum EPRESENTMETHOD
@@ -192,28 +232,46 @@ protected:
   double m_displayLatency;
   void UpdateDisplayLatency();
 
-  double     m_presenttime;
-  double     m_presentcorr;
-  double     m_presenterr;
-  double     m_errorbuff[ERRORBUFFSIZE];
-  int        m_errorindex;
-  EFIELDSYNC m_presentfield;
-  EPRESENTMETHOD m_presentmethod;
-  EPRESENTSTEP     m_presentstep;
-  int        m_presentsource;
-  CEvent     m_presentevent;
-  CEvent     m_flushEvent;
+  int m_QueueSize;
+  int m_QueueSkip;
 
+  struct SPresent
+  {
+    double         pts;
+    double         timestamp;
+    EFIELDSYNC     presentfield;
+    EPRESENTMETHOD presentmethod;
+  } m_Queue[NUM_BUFFERS];
+
+  std::deque<int> m_free;
+  std::deque<int> m_queued;
+  std::deque<int> m_discard;
+
+  ERenderFormat m_format;
+
+  double m_sleeptime;
+  double m_presentpts;
+  double m_presentcorr;
+  double m_presenterr;
+  double m_errorbuff[ERRORBUFFSIZE];
+  int m_errorindex;
+  EPRESENTSTEP m_presentstep;
+  int m_presentsource;
+  XbmcThreads::ConditionVariable  m_presentevent;
+  CCriticalSection m_presentlock;
+  CEvent m_flushEvent;
+  double m_clock_framefinish;
 
   OVERLAY::CRenderer m_overlays;
+  bool m_renderedOverlay;
 
   void RenderCapture(CRenderCapture* capture);
   void RemoveCapture(CRenderCapture* capture);
-  CCriticalSection           m_captCritSect;
+  CCriticalSection m_captCritSect;
   std::list<CRenderCapture*> m_captures;
   //set to true when adding something to m_captures, set to false when m_captures is made empty
   //std::list::empty() isn't thread safe, using an extra bool will save a lock per render when no captures are requested
-  bool                       m_hasCaptures; 
+  bool m_hasCaptures;
 };
 
 extern CXBMCRenderManager g_renderManager;

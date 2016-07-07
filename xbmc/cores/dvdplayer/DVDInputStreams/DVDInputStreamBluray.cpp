@@ -43,8 +43,6 @@ void DllLibbluray::file_close(BD_FILE_H *file)
 {
   if (file)
   {
-    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - Closed file (%p)\n", file);
-    
     delete static_cast<CFile*>(file->internal);
     delete file;
   }
@@ -70,7 +68,7 @@ int DllLibbluray::file_eof(BD_FILE_H *file)
 
 int64_t DllLibbluray::file_read(BD_FILE_H *file, uint8_t *buf, int64_t size)
 {
-  return static_cast<CFile*>(file->internal)->Read(buf, size);
+  return static_cast<CFile*>(file->internal)->Read(buf, size); // TODO: fix size cast
 }
 
 int64_t DllLibbluray::file_write(BD_FILE_H *file, const uint8_t *buf, int64_t size)
@@ -132,7 +130,7 @@ int DllLibbluray::dir_read(BD_DIR_H *dir, BD_DIRENT *entry)
     if(state->curr >= state->list.Size())
       return 1;
 
-    strncpy(entry->d_name, state->list[state->curr]->GetLabel(), sizeof(entry->d_name));
+    strncpy(entry->d_name, state->list[state->curr]->GetLabel().c_str(), sizeof(entry->d_name));
     entry->d_name[sizeof(entry->d_name)-1] = 0;
     state->curr++;
 
@@ -144,7 +142,7 @@ BD_DIR_H *DllLibbluray::dir_open(const char* dirname)
     CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - Opening dir %s\n", dirname);
     SDirState *st = new SDirState();
 
-    CStdString strDirname(dirname);
+    std::string strDirname(dirname);
 
     if(!CDirectory::GetDirectory(strDirname, st->list))
     {
@@ -794,12 +792,12 @@ int64_t CDVDInputStreamBluray::Seek(int64_t offset, int whence)
   int64_t pos = m_dll->bd_seek(m_bd, offset);
   if(pos < 0)
   {
-    CLog::Log(LOGERROR, "CDVDInputStreamBluray::Seek - seek to %"PRId64", failed with %"PRId64, offset, pos);
+    CLog::Log(LOGERROR, "CDVDInputStreamBluray::Seek - seek to %" PRId64", failed with %" PRId64, offset, pos);
     return -1;
   }
 
   if(pos != offset)
-    CLog::Log(LOGWARNING, "CDVDInputStreamBluray::Seek - seek to %"PRId64", ended at %"PRId64, offset, pos);
+    CLog::Log(LOGWARNING, "CDVDInputStreamBluray::Seek - seek to %" PRId64", ended at %" PRId64, offset, pos);
 
   return offset;
 #else

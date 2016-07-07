@@ -23,19 +23,24 @@
 
 #pragma once
 
-#include "WinEvents.h"
+#include "windowing/WinEvents.h"
+#include "input/MouseStat.h"
 
-class CWinEventsWin32 : public CWinEventsBase
+class CWinEventsWin32 : public IWinEvents
 {
 public:
-  static bool MessagePump();
+  void MessagePush(XBMC_Event *newEvent);
+  bool MessagePump();
+  virtual size_t GetQueueSize();
   static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
 private:
   static void RegisterDeviceInterfaceToHwnd(GUID InterfaceClassGuid, HWND hWnd, HDEVNOTIFY *hDeviceNotify);
   static void WindowFromScreenCoords(HWND hWnd, POINT *point);
   static void OnGestureNotify(HWND hWnd, LPARAM lParam);
   static void OnGesture(HWND hWnd, LPARAM lParam);
 
+  static PHANDLE_EVENT_FUNC m_pEventFunc;
   static int m_lastGesturePosX;
   static int m_lastGesturePosY;
 };

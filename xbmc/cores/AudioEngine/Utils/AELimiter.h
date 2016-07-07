@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2010-2012 Team XBMC
+ *      Copyright (C) 2010-2013 Team XBMC
  *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
  */
 
 #include <algorithm>
+#include "AEAudioFormat.h"
 
 class CAELimiter
 {
@@ -48,5 +49,5 @@ class CAELimiter
       m_samplerate = (float)samplerate;
     }
 
-    float Run(float* frame, int channels);
+    float Run(float* frame[AE_CH_MAX], int channels, int offset = 0, bool planar = false);
 };

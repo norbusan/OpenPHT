@@ -115,10 +115,10 @@
 		<control type="group" id="777">
 			<include>FadeDialog</include>
 			<include>rightSideSlide</include>
-			<visible>Container.PlexContent(Clips) | Container.PlexContent(Homemovies)</visible>
+			<visible>Container.PlexContent(Clips) | [Container.PlexContent(Homemovies) + !Skin.HasSetting(HomeVideosPortrait)]</visible>
 			<control type="panel" id="80">
 				<viewtype label="ClipThumbs">panel</viewtype>
-				<visible>Container.PlexContent(Clips) | Container.PlexContent(Homemovies)</visible>
+				<visible>Container.PlexContent(Clips) | [Container.PlexContent(Homemovies) + !Skin.HasSetting(HomeVideosPortrait)]</visible>
 				<onup>80</onup>
 				<ondown>80</ondown>
 				<onright condition="Container.PlexContent(homemovies)">Container.NextViewMode</onright>
@@ -140,14 +140,6 @@
 					<include>ClipThumbUnwatchedOverlay</include>
 				</itemlayout>
 				<focusedlayout width="292" height="224">
-					<!--<control type="image">
-						<posx>0</posx>
-						<posy>0</posy>
-						<width>208</width>
-						<height>317</height>
-						<include>BlackRounded</include>
-						<animation effect="fade" start="0" end="40" time="0" condition="true">Conditional</animation>
-					</control>-->
 					<include>ClipThumbCard</include>
 					<include>ClipThumb</include>
 					<include>ClipSourceIcon</include>

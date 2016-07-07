@@ -39,7 +39,7 @@
 #include "GUIUserMessages.h"              // for callback
 #include "utils/StringUtils.h"
 #include "dialogs/GUIDialogKaiToast.h"
-#include "dialogs/GUIDialogProgress.h"
+#include "dialogs/GUIDialogBusy.h"
 #include "URL.h"
 #include "pvr/PVRManager.h"
 
@@ -163,44 +163,56 @@ bool CAddonInstaller::Cancel(const CStdString &addonID)
 
 bool CAddonInstaller::PromptForInstall(const CStdString &addonID, AddonPtr &addon)
 {
+#ifndef __PLEX__
   // we assume that addons that are enabled don't get to this routine (i.e. that GetAddon() has been called)
   if (CAddonMgr::Get().GetAddon(addonID, addon, ADDON_UNKNOWN, false))
     return false; // addon is installed but disabled, and the user has specifically activated something that needs
                   // the addon - should we enable it?
+#endif
 
   // check we have it available
   CAddonDatabase database;
   database.Open();
   if (database.GetAddon(addonID, addon))
   { // yes - ask user if they want it installed
+#ifndef __PLEX__
     if (!CGUIDialogYesNo::ShowAndGetInput(g_localizeStrings.Get(24076), g_localizeStrings.Get(24100),
                                           addon->Name().c_str(), g_localizeStrings.Get(24101)))
+#else
+    if (!CGUIDialogYesNo::ShowAndGetInput(addon->Name(), g_localizeStrings.Get(24101), "", ""))
+#endif
       return false;
     if (Install(addonID, true))
     {
-      CGUIDialogProgress *progress = (CGUIDialogProgress *)g_windowManager.GetWindow(WINDOW_DIALOG_PROGRESS);
-      if (progress)
+      /* PLEX */
+      CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+      if (dialog)
       {
-        progress->SetHeading(13413); // Downloading
-        progress->SetLine(0, "");
-        progress->SetLine(1, addon->Name());
-        progress->SetLine(2, "");
-        progress->SetPercentage(0);
-        progress->StartModal();
+        dialog->Show();
         while (true)
         {
-          progress->Progress();
+          g_windowManager.ProcessRenderLoop(false);
+
           unsigned int percent;
-          if (progress->IsCanceled())
+          if (!GetProgress(addonID, percent))
+            break;
+          if (percent > 0)
+            dialog->SetProgress(percent);
+
+          if (dialog->IsCanceled())
           {
             Cancel(addonID);
             break;
           }
-          if (!GetProgress(addonID, percent))
-            break;
-          progress->SetPercentage(percent);
+
+#ifdef TARGET_RASPBERRY_PI
+          Sleep(100);
+#else
+          Sleep(20);
+#endif
         }
-        progress->Close();
+        dialog->Close();
+        /* END PLEX */
       }
       return CAddonMgr::Get().GetAddon(addonID, addon);
     }
@@ -355,7 +367,6 @@ bool CAddonInstaller::CheckDependencies(const AddonPtr &addon,
 
 void CAddonInstaller::UpdateRepos(bool force, bool wait)
 {
-#ifndef __PLEX__
   CSingleLock lock(m_critSection);
   if (m_repoUpdateJob)
   {
@@ -393,7 +404,6 @@ void CAddonInstaller::UpdateRepos(bool force, bool wait)
       return;
     }
   }
-#endif
 }
 
 bool CAddonInstaller::HasJob(const CStdString& ID) const
@@ -667,8 +677,12 @@ void CAddonInstallJob::OnPostInstall(bool reloadAddon)
   }
   if (m_addon->Type() == ADDON_SKIN)
   {
+#ifndef __PLEX__
     if (reloadAddon || (!m_update && CGUIDialogYesNo::ShowAndGetInput(m_addon->Name(),
                                                         g_localizeStrings.Get(24099),"","")))
+#else
+    if (reloadAddon)
+#endif
     {
       g_guiSettings.SetString("lookandfeel.skin",m_addon->ID().c_str());
       CGUIDialogKaiToast *toast = (CGUIDialogKaiToast *)g_windowManager.GetWindow(WINDOW_DIALOG_KAI_TOAST);

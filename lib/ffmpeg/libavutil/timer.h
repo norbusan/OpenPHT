@@ -28,21 +28,34 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "config.h"
 
+#if HAVE_MACH_MACH_TIME_H
+#include <mach/mach_time.h>
+#endif
+
+#include "log.h"
+
 #if   ARCH_ARM
 #   include "arm/timer.h"
-#elif ARCH_BFIN
-#   include "bfin/timer.h"
 #elif ARCH_PPC
 #   include "ppc/timer.h"
 #elif ARCH_X86
 #   include "x86/timer.h"
 #endif
 
-#if !defined(AV_READ_TIME) && HAVE_GETHRTIME
-#   define AV_READ_TIME gethrtime
+#if !defined(AV_READ_TIME)
+#   if HAVE_GETHRTIME
+#       define AV_READ_TIME gethrtime
+#   elif HAVE_MACH_ABSOLUTE_TIME
+#       define AV_READ_TIME mach_absolute_time
+#   endif
+#endif
+
+#ifndef FF_TIMER_UNITS
+#   define FF_TIMER_UNITS "UNITS"
 #endif
 
 #ifdef AV_READ_TIME
@@ -56,6 +69,8 @@
         static uint64_t tsum   = 0;                                       \
         static int tcount      = 0;                                       \
         static int tskip_count = 0;                                       \
+        static int thistogram[32] = {0};                                  \
+        thistogram[av_log2(tend - tstart)]++;                             \
         if (tcount < 2                        ||                          \
             tend - tstart < 8 * tsum / tcount ||                          \
             tend - tstart < 2000) {                                       \
@@ -64,9 +79,13 @@
         } else                                                            \
             tskip_count++;                                                \
         if (((tcount + tskip_count) & (tcount + tskip_count - 1)) == 0) { \
+            int i;                                                        \
             av_log(NULL, AV_LOG_ERROR,                                    \
-                   "%"PRIu64" decicycles in %s, %d runs, %d skips\n",     \
+                   "%7"PRIu64" " FF_TIMER_UNITS " in %s,%8d runs,%7d skips",          \
                    tsum * 10 / tcount, id, tcount, tskip_count);          \
+            for (i = 0; i < 32; i++)                                      \
+                av_log(NULL, AV_LOG_VERBOSE, " %2d", av_log2(2*thistogram[i]));\
+            av_log(NULL, AV_LOG_ERROR, "\n");                             \
         }                                                                 \
     }
 #else

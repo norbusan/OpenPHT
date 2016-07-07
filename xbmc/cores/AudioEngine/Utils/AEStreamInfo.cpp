@@ -1,6 +1,6 @@
 /*
- *      Copyright (C) 2010-2012 Team XBMC
- *      http://www.xbmc.org
+ *      Copyright (C) 2010-2013 Team XBMC
+ *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,6 +19,9 @@
  */
 
 #include "AEStreamInfo.h"
+#include "utils/log.h"
+#include <algorithm>
+#include <string.h>
 
 #define IEC61937_PREAMBLE1 0xF872
 #define IEC61937_PREAMBLE2 0x4E1F
@@ -85,13 +88,11 @@ CAEStreamInfo::CAEStreamInfo() :
   m_dataIsLE      (false),
   m_packFunc      (NULL)
 {
-  m_dllAvUtil.Load();
-  m_dllAvUtil.av_crc_init(m_crcTrueHD, 0, 16, 0x2D, sizeof(m_crcTrueHD));
+  av_crc_init(m_crcTrueHD, 0, 16, 0x2D, sizeof(m_crcTrueHD));
 }
 
 CAEStreamInfo::~CAEStreamInfo()
 {
-  m_dllAvUtil.Unload();
 }
 
 int CAEStreamInfo::AddData(uint8_t *data, unsigned int size, uint8_t **buffer/* = NULL */, unsigned int *bufferSize/* = 0 */)
@@ -103,7 +104,6 @@ int CAEStreamInfo::AddData(uint8_t *data, unsigned int size, uint8_t **buffer/* 
     return 0;
   }
 
-  unsigned int consumed = 0;
   if (m_skipBytes)
   {
     unsigned int canSkip = std::min(size, m_skipBytes);
@@ -126,6 +126,7 @@ int CAEStreamInfo::AddData(uint8_t *data, unsigned int size, uint8_t **buffer/* 
   }
   else
   {
+    unsigned int consumed = 0;
     unsigned int offset = 0;
     unsigned int room = sizeof(m_buffer) - m_bufferSize;
     while(1)
@@ -360,7 +361,7 @@ unsigned int CAEStreamInfo::SyncAC3(uint8_t *data, unsigned int size)
         crc_size = (framesize >> 1) + (framesize >> 3) - 1;
 
       if (crc_size <= size - skip)
-        if (m_dllAvUtil.av_crc(m_dllAvUtil.av_crc_get_table(AV_CRC_16_ANSI), 0, &data[2], crc_size * 2))
+        if (av_crc(av_crc_get_table(AV_CRC_16_ANSI), 0, &data[2], crc_size * 2))
           continue;
 
       /* if we get here, we can sync */
@@ -679,7 +680,7 @@ unsigned int CAEStreamInfo::SyncTrueHD(uint8_t *data, unsigned int size)
         return skip;
 
       /* verify the crc of the audio unit */
-      uint16_t crc = m_dllAvUtil.av_crc(m_crcTrueHD, 0, data + 4, major_sync_size - 4);
+      uint16_t crc = av_crc(m_crcTrueHD, 0, data + 4, major_sync_size - 4);
       crc ^= (data[4 + major_sync_size - 3] << 8) | data[4 + major_sync_size - 4];
       if (((data[4 + major_sync_size - 1] << 8) | data[4 + major_sync_size - 2]) != crc)
         continue;

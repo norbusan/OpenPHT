@@ -57,11 +57,7 @@ extern FILE *fmemopen(void *buf, size_t len, const char *pMode);
 #endif
 			 
 #ifdef LINUX
-#define projectM_isnan isnan
-#endif
-
-#ifdef LINUX
-#define projectM_isnan isnan
+#define projectM_isnan std::isnan
 #endif
 
 #ifdef WIN32

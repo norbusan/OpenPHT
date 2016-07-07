@@ -20,53 +20,49 @@ CXXFLAGS += -D__STDC_LIMIT_MACROS
 
 SRCS  = AEFactory.cpp
 
-ifeq ($(findstring osx,@ARCH@),osx)
-SRCS += Engines/CoreAudio/CoreAudioAE.cpp
-SRCS += Engines/CoreAudio/CoreAudioAEHAL.cpp
-SRCS += Engines/CoreAudio/CoreAudioAEHALOSX.cpp
-SRCS += Engines/CoreAudio/CoreAudioAESound.cpp
-SRCS += Engines/CoreAudio/CoreAudioAEStream.cpp
-SRCS += Engines/CoreAudio/CoreAudioChannelLayout.cpp
-SRCS += Engines/CoreAudio/CoreAudioDevice.cpp
-SRCS += Engines/CoreAudio/CoreAudioGraph.cpp
-SRCS += Engines/CoreAudio/CoreAudioHardware.cpp
-SRCS += Engines/CoreAudio/CoreAudioMixMap.cpp
-SRCS += Engines/CoreAudio/CoreAudioStream.cpp
-SRCS += Engines/CoreAudio/CoreAudioUnit.cpp
-else
-
 SRCS += AESinkFactory.cpp
 SRCS += Sinks/AESinkNULL.cpp
-SRCS += Sinks/AESinkProfiler.cpp
 
 SRCS += Sinks/AESinkPi.cpp
 
-SRCS += Engines/SoftAE/SoftAE.cpp
-SRCS += Engines/SoftAE/SoftAEStream.cpp
-SRCS += Engines/SoftAE/SoftAESound.cpp
+SRCS += AEResampleFactory.cpp
+
+SRCS += Engines/ActiveAE/ActiveAE.cpp
+SRCS += Engines/ActiveAE/ActiveAESink.cpp
+SRCS += Engines/ActiveAE/ActiveAEStream.cpp
+SRCS += Engines/ActiveAE/ActiveAESound.cpp
+SRCS += Engines/ActiveAE/ActiveAEResampleFFMPEG.cpp
+SRCS += Engines/ActiveAE/ActiveAEResamplePi.cpp
+SRCS += Engines/ActiveAE/ActiveAEBuffer.cpp
 
 ifeq (@USE_ANDROID@,1)
 SRCS += Sinks/AESinkAUDIOTRACK.cpp
+else ifeq ($(findstring ios,@ARCH@),ios)
+SRCS += Sinks/AESinkDARWINIOS.cpp
+else ifeq ($(findstring osx,@ARCH@),osx)
+SRCS += Sinks/AESinkDARWINOSX.cpp
+SRCS += Sinks/osx/AEDeviceEnumerationOSX.cpp
+SRCS += Sinks/osx/CoreAudioChannelLayout.cpp
+SRCS += Sinks/osx/CoreAudioDevice.cpp
+SRCS += Sinks/osx/CoreAudioHardware.cpp
+SRCS += Sinks/osx/CoreAudioHelpers.cpp
+SRCS += Sinks/osx/CoreAudioStream.cpp
 else
 SRCS += Sinks/AESinkALSA.cpp
+SRCS += Sinks/alsa/ALSADeviceMonitor.cpp
+SRCS += Sinks/alsa/ALSAHControlMonitor.cpp
 SRCS += Sinks/AESinkOSS.cpp
 ifeq (@USE_PULSE@,1)
-SRCS += Engines/PulseAE/PulseAE.cpp
-SRCS += Engines/PulseAE/PulseAEStream.cpp
-SRCS += Engines/PulseAE/PulseAESound.cpp
-endif
+SRCS += Sinks/AESinkPULSE.cpp
 endif
 endif
 
 SRCS += Utils/AEChannelInfo.cpp
 SRCS += Utils/AEBuffer.cpp
-SRCS += Utils/AEConvert.cpp
-SRCS += Utils/AERemap.cpp
 SRCS += Utils/AEUtil.cpp
 SRCS += Utils/AEStreamInfo.cpp
 SRCS += Utils/AEPackIEC61937.cpp
 SRCS += Utils/AEBitstreamPacker.cpp
-SRCS += Utils/AEWAVLoader.cpp
 SRCS += Utils/AEELDParser.cpp
 SRCS += Utils/AEDeviceInfo.cpp
 SRCS += Utils/AELimiter.cpp

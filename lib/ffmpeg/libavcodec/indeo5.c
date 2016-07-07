@@ -30,9 +30,8 @@
 #define BITSTREAM_READER_LE
 #include "avcodec.h"
 #include "get_bits.h"
-#include "dsputil.h"
+#include "ivi.h"
 #include "ivi_dsp.h"
-#include "ivi_common.h"
 #include "indeo5data.h"
 
 /**
@@ -98,7 +97,7 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
     }
 
     if (ctx->gop_flags & 2) {
-        av_log_missing_feature(avctx, "YV12 picture format", 0);
+        avpriv_report_missing_feature(avctx, "YV12 picture format");
         return AVERROR_PATCHWELCOME;
     }
 
@@ -114,7 +113,7 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
 
     /* check if picture layout was changed and reallocate buffers */
     if (ivi_pic_config_cmp(&pic_conf, &ctx->pic_conf) || ctx->gop_invalid) {
-        result = ff_ivi_init_planes(ctx->planes, &pic_conf);
+        result = ff_ivi_init_planes(ctx->planes, &pic_conf, 0);
         if (result < 0) {
             av_log(avctx, AV_LOG_ERROR, "Couldn't reallocate color planes!\n");
             return result;
@@ -134,6 +133,11 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
             blk_size = 8 >> get_bits1(&ctx->gb);
             mb_size  = blk_size << !mb_size;
 
+            if (p==0 && blk_size==4) {
+                av_log(avctx, AV_LOG_ERROR, "4x4 luma blocks are unsupported!\n");
+                return AVERROR_PATCHWELCOME;
+            }
+
             blk_size_changed = mb_size != band->mb_size || blk_size != band->blk_size;
             if (blk_size_changed) {
                 band->mb_size  = mb_size;
@@ -141,7 +145,7 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
             }
 
             if (get_bits1(&ctx->gb)) {
-                av_log_missing_feature(avctx, "Extended transform info", 0);
+                avpriv_report_missing_feature(avctx, "Extended transform info");
                 return AVERROR_PATCHWELCOME;
             }
 
@@ -186,8 +190,10 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
             band->is_2d_trans = band->inv_transform == ff_ivi_inverse_slant_8x8 ||
                                 band->inv_transform == ff_ivi_inverse_slant_4x4;
 
-            if (band->transform_size != band->blk_size)
+            if (band->transform_size != band->blk_size) {
+                av_log(avctx, AV_LOG_ERROR, "transform and block size mismatch (%d != %d)\n", band->transform_size, band->blk_size);
                 return AVERROR_INVALIDDATA;
+            }
 
             /* select dequant matrix according to plane and band number */
             if (!p) {
@@ -237,6 +243,7 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
         band2->inv_transform = band1->inv_transform;
         band2->dc_transform  = band1->dc_transform;
         band2->is_2d_trans   = band1->is_2d_trans;
+        band2->transform_size= band1->transform_size;
     }
 
     /* reallocate internal structures if needed */
@@ -282,14 +289,18 @@ static int decode_gop_header(IVI45DecContext *ctx, AVCodecContext *avctx)
  *
  *  @param[in,out]  gb  the GetBit context
  */
-static inline void skip_hdr_extension(GetBitContext *gb)
+static inline int skip_hdr_extension(GetBitContext *gb)
 {
     int i, len;
 
     do {
         len = get_bits(gb, 8);
+        if (8*len > get_bits_left(gb))
+            return AVERROR_INVALIDDATA;
         for (i = 0; i < len; i++) skip_bits(gb, 8);
     } while(len);
+
+    return 0;
 }
 
 
@@ -325,6 +336,12 @@ static int decode_pic_hdr(IVI45DecContext *ctx, AVCodecContext *avctx)
             return ret;
         }
         ctx->gop_invalid = 0;
+    }
+
+    if (ctx->frame_type == FRAMETYPE_INTER_SCAL && !ctx->is_scalable) {
+        av_log(avctx, AV_LOG_ERROR, "Scalable inter frame in non scalable stream\n");
+        ctx->frame_type = FRAMETYPE_INTER;
+        return AVERROR_INVALIDDATA;
     }
 
     if (ctx->frame_type != FRAMETYPE_NULL) {
@@ -437,7 +454,7 @@ static int decode_mb_info(IVI45DecContext *ctx, IVIBandDesc *band,
                           IVITile *tile, AVCodecContext *avctx)
 {
     int         x, y, mv_x, mv_y, mv_delta, offs, mb_offset,
-                mv_scale, blks_per_mb;
+                mv_scale, blks_per_mb, s;
     IVIMbInfo   *mb, *ref_mb;
     int         row_offset = band->mb_size * band->pitch;
 
@@ -543,6 +560,15 @@ static int decode_mb_info(IVI45DecContext *ctx, IVIBandDesc *band,
                 }
             }
 
+            s= band->is_halfpel;
+            if (mb->type)
+            if ( x +  (mb->mv_x   >>s) +                 (y+               (mb->mv_y   >>s))*band->pitch < 0 ||
+                 x + ((mb->mv_x+s)>>s) + band->mb_size - 1
+                   + (y+band->mb_size - 1 +((mb->mv_y+s)>>s))*band->pitch > band->bufsize - 1) {
+                av_log(avctx, AV_LOG_ERROR, "motion vector %d %d outside reference\n", x*s + mb->mv_x, y*s + mb->mv_y);
+                return AVERROR_INVALIDDATA;
+            }
+
             mb++;
             if (ref_mb)
                 ref_mb++;
@@ -631,9 +657,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
     ctx->pic_conf.tile_height   = avctx->height;
     ctx->pic_conf.luma_bands    = ctx->pic_conf.chroma_bands = 1;
 
-    avcodec_get_frame_defaults(&ctx->frame);
-
-    result = ff_ivi_init_planes(ctx->planes, &ctx->pic_conf);
+    result = ff_ivi_init_planes(ctx->planes, &ctx->pic_conf, 0);
     if (result) {
         av_log(avctx, AV_LOG_ERROR, "Couldn't allocate color planes!\n");
         return AVERROR_INVALIDDATA;
@@ -648,19 +672,21 @@ static av_cold int decode_init(AVCodecContext *avctx)
     ctx->switch_buffers   = switch_buffers;
     ctx->is_nonnull_frame = is_nonnull_frame;
 
-    avctx->pix_fmt = PIX_FMT_YUV410P;
+    ctx->is_indeo4 = 0;
+
+    avctx->pix_fmt = AV_PIX_FMT_YUV410P;
 
     return 0;
 }
 
-
 AVCodec ff_indeo5_decoder = {
     .name           = "indeo5",
+    .long_name      = NULL_IF_CONFIG_SMALL("Intel Indeo Video Interactive 5"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_INDEO5,
+    .id             = AV_CODEC_ID_INDEO5,
     .priv_data_size = sizeof(IVI45DecContext),
     .init           = decode_init,
     .close          = ff_ivi_decode_close,
     .decode         = ff_ivi_decode_frame,
-    .long_name      = NULL_IF_CONFIG_SMALL("Intel Indeo Video Interactive 5"),
+    .capabilities   = AV_CODEC_CAP_DR1,
 };

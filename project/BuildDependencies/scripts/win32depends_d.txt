@@ -1,2 +1,2 @@
 ; filename                        source of the file
-plex-depends-v110.7z                   https://rasplex.blob.core.windows.net/build-deps/win32
+plex-depends-v120.7z              http://sources.openpht.tv/build-deps/win32/

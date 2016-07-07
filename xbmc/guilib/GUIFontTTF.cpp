@@ -27,6 +27,8 @@
 #include "utils/MathUtils.h"
 #include "utils/log.h"
 #include "windowing/WindowingFactory.h"
+#include "URL.h"
+#include "filesystem/File.h"
 
 #include <math.h>
 
@@ -39,7 +41,7 @@
 
 #define USE_RELEASE_LIBS
 
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 #pragma comment(lib, "freetype246MT.lib")
 #endif
 
@@ -67,11 +69,7 @@ public:
       FT_Done_FreeType(m_library);
   }
 
-#ifndef __PLEX__
-  FT_Face GetFont(const CStdString &filename, float size, float aspect)
-#else
-  FT_Face GetFont(const CStdString &filename, float size, float aspect, const CStdString& variant)
-#endif
+  FT_Face GetFont(const CStdString &filename, float size, float aspect, XUTILS::auto_buffer& memoryBuf)
   {
     // don't have it yet - create it
     if (!m_library)
@@ -82,52 +80,16 @@ public:
       return NULL;
     }
 
-    FT_Face face = NULL;
+    FT_Face face;
 
-#ifndef __PLEX__
     // ok, now load the font face
-    if (FT_New_Face( m_library, CSpecialProtocol::TranslatePath(filename).c_str(), 0, &face ))
+    CURL realFile(CSpecialProtocol::TranslatePath(filename));
+    if (realFile.GetFileName().empty())
       return NULL;
-#else
-    // Iterate through the available faces if we're requesting a specific variant.
-    if (variant.size() > 0)
-    {
-      int numVariants = 0;
-      bool found = false;
-      if (FT_New_Face(m_library, filename, -1, &face) == 0)
-      {
-        numVariants = face->num_faces;
-        FT_Done_Face(face);
-      }
-      else
-        return NULL;
 
-      CLog::Log(LOGINFO, "We have %d variants to open for %s", numVariants, filename.c_str());
-      for (int i=0; i < numVariants; i++)
-      {
-        if (FT_New_Face(m_library, filename, i, &face) != 0)
-          break;
-
-        if (variant == face->style_name)
-        {
-          found = true;
-          break;
-        }
-
-        FT_Done_Face(face);
-      }
-
-      if (found == false)
-        return 0;
-    }
-    else
-    {
-      // ok, now load the font face
-     if (FT_New_Face( m_library, CSpecialProtocol::TranslatePath(filename), 0, &face ) != 0)
-        return NULL;
-    }
-#endif
-
+    memoryBuf.clear();
+    if (FT_New_Face( m_library, realFile.GetFileName().c_str(), 0, &face ))
+      return NULL;
 
     unsigned int ydpi = 72; // 72 points to the inch is the freetype default
     unsigned int xdpi = (unsigned int)MathUtils::round_int(ydpi * aspect);
@@ -141,8 +103,6 @@ public:
       FT_Done_Face(face);
       return NULL;
     }
-
-    CLog::Log(LOGINFO, "Loaded %s(%x) with %d variants", filename.c_str(), face, face->num_faces);
 
     return face;
   };
@@ -159,13 +119,13 @@ public:
     return stroker;
   };
 
-  void ReleaseFont(FT_Face face)
+  static void ReleaseFont(FT_Face face)
   {
     assert(face);
     FT_Done_Face(face);
   };
   
-  void ReleaseStroker(FT_Stroker stroker)
+  static void ReleaseStroker(FT_Stroker stroker)
   {
     assert(stroker);
     FT_Stroker_Done(stroker);
@@ -185,7 +145,6 @@ CGUIFontTTFBase::CGUIFontTTFBase(const CStdString& strFileName)
   m_maxChars = 0;
   m_nestedBeginCount = 0;
 
-  m_bTextureLoaded = false;
   m_vertex_size   = 4*1024;
   m_vertex        = (SVertex*)malloc(m_vertex_size * sizeof(SVertex));
 
@@ -266,21 +225,16 @@ void CGUIFontTTFBase::Clear()
   free(m_vertex);
   m_vertex = NULL;
   m_vertex_count = 0;
+
+  m_strFileName.clear();
+  m_fontFileInMemory.clear();
 }
 
-#ifndef __PLEX__
 bool CGUIFontTTFBase::Load(const CStdString& strFilename, float height, float aspect, float lineSpacing, bool border)
-#else
-bool CGUIFontTTFBase::Load(const CStdString &strFilename, float height, float aspect, float lineSpacing, bool border, const CStdString &variant)
-#endif
 {
   // we now know that this object is unique - only the GUIFont objects are non-unique, so no need
   // for reference tracking these fonts
-#ifndef __PLEX__
-  m_face = g_freeTypeLibrary.GetFont(strFilename, height, aspect);
-#else
-  m_face = g_freeTypeLibrary.GetFont(strFilename, height, aspect, variant);
-#endif
+  m_face = g_freeTypeLibrary.GetFont(strFilename, height, aspect, m_fontFileInMemory);
 
   if (!m_face)
     return false;
@@ -408,7 +362,7 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
     // first compute the size of the text to render in both characters and pixels
     unsigned int lineChars = 0;
     float linePixels = 0;
-    for (vecText::const_iterator pos = text.begin(); pos != text.end(); pos++)
+    for (vecText::const_iterator pos = text.begin(); pos != text.end(); ++pos)
     {
       Character *ch = GetCharacter(*pos);
       if (ch)
@@ -422,7 +376,7 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
   }
   float cursorX = 0; // current position along the line
 
-  for (vecText::const_iterator pos = text.begin(); pos != text.end(); pos++)
+  for (vecText::const_iterator pos = text.begin(); pos != text.end(); ++pos)
   {
     // If starting text on a new line, determine justification effects
     // Get the current letter in the CStdString
@@ -541,10 +495,9 @@ CGUIFontTTFBase::Character* CGUIFontTTFBase::GetCharacter(character_t chr)
 
   int low = 0;
   int high = m_numChars - 1;
-  int mid;
   while (low <= high)
   {
-    mid = (low + high) >> 1;
+    int mid = (low + high) >> 1;
     if (ch > m_char[mid].letterAndStyle)
       low = mid + 1;
     else if (ch < m_char[mid].letterAndStyle)
@@ -790,7 +743,7 @@ void CGUIFontTTFBase::RenderCharacter(float posX, float posY, const Character *c
     if (!m_vertex)
     {
       free(old);
-      CLog::Log(LOGSEVERE, "%s: can't allocate %"PRIdS" bytes for texture", __FUNCTION__ , m_vertex_size * sizeof(SVertex));
+      CLog::Log(LOGSEVERE, "%s: can't allocate %" PRIdS" bytes for texture", __FUNCTION__ , m_vertex_size * sizeof(SVertex));
       return;
     }
   }

@@ -1,9 +1,10 @@
 include ../Makefile.include
 include ../config.site.mk
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=openssl
-VERSION=1.0.2g
+VERSION=1.0.2h
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 
@@ -19,14 +20,14 @@ else
   endif
 endif
 
-LIBDYLIB=$(SOURCE)/src/.libs/lib$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/libssl.dylib
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	-rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
@@ -43,7 +44,7 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 $(LIBDYLIB): $(SOURCE)
 	make -j 1 -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install_sw
 	touch $@
 

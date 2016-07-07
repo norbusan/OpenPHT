@@ -29,6 +29,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#ifdef TARGET_WINDOWS
+#include "win32/PlatformDefs.h"
+#define _SSIZE_T_DEFINED
+#endif
 #include <microhttpd.h>
 
 class CWebServer;

@@ -20,7 +20,6 @@
  */
 #include "libavutil/common.h"
 #include "get_bits.h"
-#include "dsputil.h"
 #include "rtjpeg.h"
 
 #define PUT_COEFF(c) \
@@ -44,7 +43,7 @@
  * aligned this could be done faster in a different way, e.g. as it is done
  * in MPlayer libmpcodecs/native/rtjpegn.c.
  */
-static inline int get_block(GetBitContext *gb, DCTELEM *block, const uint8_t *scan,
+static inline int get_block(GetBitContext *gb, int16_t *block, const uint8_t *scan,
                             const uint32_t *quant) {
     int coeff, i, n;
     int8_t ac;
@@ -57,11 +56,11 @@ static inline int get_block(GetBitContext *gb, DCTELEM *block, const uint8_t *sc
     // number of non-zero coefficients
     coeff = get_bits(gb, 6);
     if (get_bits_left(gb) < (coeff << 1))
-        return -1;
+        return AVERROR_INVALIDDATA;
 
     // normally we would only need to clear the (63 - coeff) last values,
     // but since we do not know where they are we just clear the whole block
-    memset(block, 0, 64 * sizeof(DCTELEM));
+    memset(block, 0, 64 * sizeof(int16_t));
 
     // 2 bits per coefficient
     while (coeff) {
@@ -74,7 +73,7 @@ static inline int get_block(GetBitContext *gb, DCTELEM *block, const uint8_t *sc
     // 4 bits per coefficient
     ALIGN(4);
     if (get_bits_left(gb) < (coeff << 2))
-        return -1;
+        return AVERROR_INVALIDDATA;
     while (coeff) {
         ac = get_sbits(gb, 4);
         if (ac == -8)
@@ -85,7 +84,7 @@ static inline int get_block(GetBitContext *gb, DCTELEM *block, const uint8_t *sc
     // 8 bits per coefficient
     ALIGN(8);
     if (get_bits_left(gb) < (coeff << 3))
-        return -1;
+        return AVERROR_INVALIDDATA;
     while (coeff) {
         ac = get_sbits(gb, 8);
         PUT_COEFF(ac);
@@ -97,21 +96,24 @@ static inline int get_block(GetBitContext *gb, DCTELEM *block, const uint8_t *sc
 
 /**
  * @brief decode one rtjpeg YUV420 frame
- * @param c context, must be initialized via rtjpeg_decode_init
+ * @param c context, must be initialized via ff_rtjpeg_decode_init
  * @param f AVFrame to place decoded frame into. If parts of the frame
  *          are not coded they are left unchanged, so consider initializing it
  * @param buf buffer containing input data
  * @param buf_size length of input data in bytes
  * @return number of bytes consumed from the input buffer
  */
-int rtjpeg_decode_frame_yuv420(RTJpegContext *c, AVFrame *f,
-                               const uint8_t *buf, int buf_size) {
+int ff_rtjpeg_decode_frame_yuv420(RTJpegContext *c, AVFrame *f,
+                                  const uint8_t *buf, int buf_size) {
     GetBitContext gb;
     int w = c->w / 16, h = c->h / 16;
-    int x, y;
+    int x, y, ret;
     uint8_t *y1 = f->data[0], *y2 = f->data[0] + 8 * f->linesize[0];
     uint8_t *u = f->data[1], *v = f->data[2];
-    init_get_bits(&gb, buf, buf_size * 8);
+
+    if ((ret = init_get_bits8(&gb, buf, buf_size)) < 0)
+        return ret;
+
     for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
 #define BLOCK(quant, dst, stride) do { \
@@ -119,9 +121,9 @@ int rtjpeg_decode_frame_yuv420(RTJpegContext *c, AVFrame *f,
     if (res < 0) \
         return res; \
     if (res > 0) \
-        c->dsp->idct_put(dst, stride, block); \
+        c->idsp.idct_put(dst, stride, block); \
 } while (0)
-            DCTELEM *block = c->block;
+            int16_t *block = c->block;
             BLOCK(c->lquant, y1, f->linesize[0]);
             y1 += 8;
             BLOCK(c->lquant, y1, f->linesize[0]);
@@ -146,7 +148,6 @@ int rtjpeg_decode_frame_yuv420(RTJpegContext *c, AVFrame *f,
 /**
  * @brief initialize an RTJpegContext, may be called multiple times
  * @param c context to initialize
- * @param dsp specifies the idct to use for decoding
  * @param width width of image, will be rounded down to the nearest multiple
  *              of 16 for decoding
  * @param height height of image, will be rounded down to the nearest multiple
@@ -154,21 +155,29 @@ int rtjpeg_decode_frame_yuv420(RTJpegContext *c, AVFrame *f,
  * @param lquant luma quantization table to use
  * @param cquant chroma quantization table to use
  */
-void rtjpeg_decode_init(RTJpegContext *c, DSPContext *dsp,
-                        int width, int height,
-                        const uint32_t *lquant, const uint32_t *cquant) {
+void ff_rtjpeg_decode_init(RTJpegContext *c, int width, int height,
+                           const uint32_t *lquant, const uint32_t *cquant) {
     int i;
-    c->dsp = dsp;
     for (i = 0; i < 64; i++) {
-        int z = ff_zigzag_direct[i];
-        int p = c->dsp->idct_permutation[i];
-        z = ((z << 3) | (z >> 3)) & 63; // rtjpeg uses a transposed variant
-
-        // permute the scan and quantization tables for the chosen idct
-        c->scan[i] = c->dsp->idct_permutation[z];
+        int p = c->idsp.idct_permutation[i];
         c->lquant[p] = lquant[i];
         c->cquant[p] = cquant[i];
     }
     c->w = width;
     c->h = height;
+}
+
+void ff_rtjpeg_init(RTJpegContext *c, AVCodecContext *avctx)
+{
+    int i;
+
+    ff_idctdsp_init(&c->idsp, avctx);
+
+    for (i = 0; i < 64; i++) {
+        int z = ff_zigzag_direct[i];
+        z = ((z << 3) | (z >> 3)) & 63; // rtjpeg uses a transposed variant
+
+        // permute the scan and quantization tables for the chosen idct
+        c->scan[i] = c->idsp.idct_permutation[z];
+    }
 }

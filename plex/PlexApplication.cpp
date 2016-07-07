@@ -359,7 +359,7 @@ void PlexApplication::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char* 
 
   if ((stricmp(message, "OnScreensaverDeactivated") == 0) && (stricmp(sender, "xbmc") == 0))
   {
-    if (!g_application.IsPlaying() && g_plexApplication.myPlexManager->IsPinProtected() && !g_guiSettings.GetBool("myplex.automaticlogin"))
+    if (!g_application.m_pPlayer->IsPlaying() && g_plexApplication.myPlexManager->IsPinProtected() && !g_guiSettings.GetBool("myplex.automaticlogin"))
     {
       m_hasAuthed = false;
       CLog::Log(LOGDEBUG, "PlexApplication::Announce resuming from screensaver");

@@ -37,4 +37,3 @@ int ff_msrle_decode(AVCodecContext *avctx, AVPicture *pic,
                     int depth, GetByteContext *gb);
 
 #endif /* AVCODEC_MSRLEDEC_H */
-

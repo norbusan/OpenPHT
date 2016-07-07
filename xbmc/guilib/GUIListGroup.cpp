@@ -21,8 +21,6 @@
 #include "GUIListGroup.h"
 #include "GUIListLabel.h"
 #include "GUIMultiSelectText.h"
-#include "GUIBorderedImage.h"
-#include "GUIControlProfiler.h"
 #include "utils/log.h"
 
 CGUIListGroup::CGUIListGroup(int parentID, int controlID, float posX, float posY, float width, float height)
@@ -63,7 +61,6 @@ void CGUIListGroup::AddControl(CGUIControl *control, int position /*= -1*/)
 
 void CGUIListGroup::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
-  CPoint pos(GetPosition());
   g_graphicsContext.SetOrigin(m_posX, m_posY);
 
   CRect rect;
@@ -119,16 +116,16 @@ void CGUIListGroup::UpdateInfo(const CGUIListItem *item)
 
 void CGUIListGroup::EnlargeWidth(float difference)
 {
-  // Alters the width of the controls that have an ID of 1
+  // Alters the width of the controls that have an ID of 1 to 14
   for (iControls it = m_children.begin(); it != m_children.end(); it++)
   {
     CGUIControl *child = *it;
     if (child->GetID() >= 1 && child->GetID() <= 14)
     {
-      if (child->GetID() == 1) // label
+      if (child->GetID() == 1)
       {
-        child->SetWidth(child->GetWidth() + difference - 10);
-        child->SetVisible(child->GetWidth() > 10); ///
+        child->SetWidth(child->GetWidth() + difference);
+        child->SetVisible(child->GetWidth() > 10);
       }
       else
       {
@@ -141,16 +138,16 @@ void CGUIListGroup::EnlargeWidth(float difference)
 
 void CGUIListGroup::EnlargeHeight(float difference)
 {
-  // Alters the width of the controls that have an ID of 1
+  // Alters the height of the controls that have an ID of 1 to 14
   for (iControls it = m_children.begin(); it != m_children.end(); it++)
   {
     CGUIControl *child = *it;
     if (child->GetID() >= 1 && child->GetID() <= 14)
     {
-      if (child->GetID() == 1) // label
+      if (child->GetID() == 1)
       {
         child->SetHeight(child->GetHeight() + difference);
-        child->SetVisible(child->GetHeight() > 10); ///
+        child->SetVisible(child->GetHeight() > 10);
       }
       else
       {
@@ -217,9 +214,9 @@ bool CGUIListGroup::MoveRight()
 {
   for (iControls it = m_children.begin(); it != m_children.end(); it++)
   {
-    if ((*it)->GetControlType() == CGUIControl::GUICONTROL_MULTISELECT && ((CGUIMultiSelectTextControl *)(*it))->MoveLeft())
+    if ((*it)->GetControlType() == CGUIControl::GUICONTROL_MULTISELECT && ((CGUIMultiSelectTextControl *)(*it))->MoveRight())
       return true;
-    else if ((*it)->GetControlType() == CGUIControl::GUICONTROL_LISTGROUP && ((CGUIListGroup *)(*it))->MoveLeft())
+    else if ((*it)->GetControlType() == CGUIControl::GUICONTROL_LISTGROUP && ((CGUIListGroup *)(*it))->MoveRight())
       return true;
   }
   return false;
@@ -235,14 +232,8 @@ void CGUIListGroup::SetState(bool selected, bool focused)
       label->SetSelected(selected);
       label->SetScrolling(focused);
     }
-
-    /* PLEX */
-    // recurse in List groups to update their control states
-    if ((*it)->GetControlType() == CGUIControl::GUICONTROL_LISTGROUP)
-    {
-      ((CGUIListGroup*)(*it))->SetState(selected,focused);
-    }
-    /* END PLEX */
+    else if ((*it)->GetControlType() == CGUIControl::GUICONTROL_LISTGROUP)
+      ((CGUIListGroup *)(*it))->SetState(selected, focused);
   }
 }
 

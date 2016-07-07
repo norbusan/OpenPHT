@@ -25,6 +25,7 @@
 #include "DVDSubtitleLineCollection.h"
 
 #include <string>
+#include <stdio.h>
 
 class CDVDStreamInfo;
 
@@ -42,10 +43,7 @@ class CDVDSubtitleParserCollection
   : public CDVDSubtitleParser
 {
 public:
-  CDVDSubtitleParserCollection(const std::string& strFile)
-  {
-    m_filename = strFile;
-  }
+  CDVDSubtitleParserCollection(const std::string& strFile) : m_filename(strFile) {}
   virtual ~CDVDSubtitleParserCollection() { }
   virtual CDVDOverlay* Parse(double iPts)
   {

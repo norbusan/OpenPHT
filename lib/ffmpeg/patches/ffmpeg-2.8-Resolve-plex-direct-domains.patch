@@ -1,0 +1,37 @@
+commit eb2a7e1eb920cd9e44223607978344cf4b95d990
+Author: Jonas Karlman <jonas@kwiboo.se>
+Date:   Tue Jun 16 02:47:28 2015 +0200
+
+    Resolve .plex.direct domains
+
+diff --git a/libavformat/tcp.c b/libavformat/tcp.c
+index 3c3f4f5..e543c06 100644
+--- a/libavformat/tcp.c
++++ b/libavformat/tcp.c
+@@ -67,6 +67,8 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
+     int ret;
+     char hostname[1024],proto[1024],path[1024];
+     char portstr[10];
++    size_t len;
++    char *c;
+     s->open_timeout = 5000000;
+ 
+     av_url_split(proto, sizeof(proto), NULL, 0, hostname, sizeof(hostname),
+@@ -102,6 +104,17 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
+     snprintf(portstr, sizeof(portstr), "%d", port);
+     if (s->listen)
+         hints.ai_flags |= AI_PASSIVE;
++    len = strlen(hostname);
++    if (len > 12 && !strcmp(hostname + len - 12, ".plex.direct")) {
++        for (c = hostname; *c; c++) {
++            if (*c == '-') {
++                *c = '.';
++            } else if (*c == '.') {
++                *c = '\0';
++                break;
++            }
++        }
++    }
+     if (!hostname[0])
+         ret = getaddrinfo(NULL, portstr, &hints, &ai);
+     else

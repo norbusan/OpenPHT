@@ -101,7 +101,7 @@
       <button id="8">XBMC.ActivateWindow(Home)</button>
       <!-- Left stick click activates the shutdown menu. -->
       <button id="9">XBMC.ActivateWindow(ShutdownMenu)</button>
-      <button id="10">XBMC.ActivateWindow(PlayerControls)</button>
+      <!--<button id="10">XBMC.ActivateWindow(PlayerControls)</button>-->
       <button id="11">Up</button>
       <button id="12">Down</button>
       <button id="13">Left</button>

@@ -1031,14 +1031,14 @@
 									<effect type="fade" start="0" end="100" time="650"/>
 								</animation>
 							</control>
-							<control type="group">
+							<!--<control type="group">
 								<posy>25</posy>
 								<include>ListMovieTVUnwatchedOverlay</include>
 								<animation type="Focus" reversible="false">
 									<effect type="zoom" center="150,0" start="85" end="100" time="200" tween="Linear" easing="out"/>
 									<effect type="fade" start="0" end="100" time="650"/>
 								</animation>
-							</control>
+							</control>-->
 							<control type="image">
 								<posy>40</posy>
 								<posx>35</posx>

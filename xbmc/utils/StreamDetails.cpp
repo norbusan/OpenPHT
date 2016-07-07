@@ -49,6 +49,7 @@ void CStreamDetailVideo::Archive(CArchive& ar)
     ar << m_iHeight;
     ar << m_iWidth;
     ar << m_iDuration;
+    ar << m_strStereoMode;
   }
   else
   {
@@ -57,6 +58,7 @@ void CStreamDetailVideo::Archive(CArchive& ar)
     ar >> m_iHeight;
     ar >> m_iWidth;
     ar >> m_iDuration;
+    ar >> m_strStereoMode;
   }
 }
 void CStreamDetailVideo::Serialize(CVariant& value) const
@@ -66,6 +68,7 @@ void CStreamDetailVideo::Serialize(CVariant& value) const
   value["height"] = m_iHeight;
   value["width"] = m_iWidth;
   value["duration"] = m_iDuration;
+  value["stereomode"] = m_strStereoMode;
 }
 
 bool CStreamDetailVideo::IsWorseThan(CStreamDetail *that)
@@ -280,6 +283,9 @@ int CStreamDetails::GetSubtitleStreamCount(void) const
 
 CStreamDetails::CStreamDetails(const CStreamDetails &that)
 {
+  m_pBestVideo = NULL;
+  m_pBestAudio = NULL;
+  m_pBestSubtitle = NULL;
   *this = that;
 }
 
@@ -377,6 +383,22 @@ int CStreamDetails::GetVideoDuration(int idx) const
     return item->m_iDuration;
   else
     return 0;
+}
+
+void CStreamDetails::SetVideoDuration(int idx, const int duration)
+{
+  CStreamDetailVideo *item = (CStreamDetailVideo *)GetNthStream(CStreamDetail::VIDEO, idx);
+  if (item)
+    item->m_iDuration = duration;
+}
+
+CStdString CStreamDetails::GetStereoMode(int idx) const
+{
+  CStreamDetailVideo *item = (CStreamDetailVideo *)GetNthStream(CStreamDetail::VIDEO, idx);
+  if (item)
+    return item->m_strStereoMode;
+  else
+    return "";
 }
 
 CStdString CStreamDetails::GetAudioCodec(int idx) const
@@ -528,8 +550,13 @@ CStdString CStreamDetails::VideoDimsToResolutionDescription(int iWidth, int iHei
   else if (iWidth <= 1280 && iHeight <= 720)
     return "720";
   // 1920x1080
-  else
+  else if (iWidth <= 1920 && iHeight <= 1080)
     return "1080";
+  // 4K
+  else if (iWidth * iHeight >= 6000000)
+    return "4K";
+  else
+    return "";
 }
 
 CStdString CStreamDetails::VideoAspectToAspectDescription(float fAspect)
@@ -541,8 +568,10 @@ CStdString CStreamDetails::VideoAspectToAspectDescription(float fAspect)
   // aspect ratios, particularly when cropping prior to video encoding is taken into account
   // the best we can do is take the "common" aspect ratios, and return the closest one available.
   // The cutoffs are the geometric mean of the two aspect ratios either side.
-  if (fAspect < 1.4859f) // sqrt(1.33*1.66)
+  if (fAspect < 1.3499f) // sqrt(1.33*1.37)
     return "1.33";
+  else if (fAspect < 1.5080f) // sqrt(1.37*1.66)
+    return "1.37";
   else if (fAspect < 1.7190f) // sqrt(1.66*1.78)
     return "1.66";
   else if (fAspect < 1.8147f) // sqrt(1.78*1.85)
@@ -551,5 +580,11 @@ CStdString CStreamDetails::VideoAspectToAspectDescription(float fAspect)
     return "1.85";
   else if (fAspect < 2.2738f) // sqrt(2.20*2.35)
     return "2.20";
-  return "2.35";
+  else if (fAspect < 2.3749f) // sqrt(2.35*2.40)
+    return "2.35";
+  else if (fAspect < 2.4739f) // sqrt(2.40*2.55)
+    return "2.40";
+  else if (fAspect < 2.6529f) // sqrt(2.55*2.76)
+    return "2.55";
+  return "2.76";
 }

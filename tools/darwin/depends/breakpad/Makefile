@@ -1,6 +1,6 @@
 include ../Makefile.include
 include ../config.site.mk
-DEPS= ../Makefile.include ../config.site.mk Makefile cmake.patch
+DEPS= Makefile cmake.patch
 
 # lib name, version
 BASE_URL=https://chromium.googlesource.com/breakpad/breakpad/+archive
@@ -10,9 +10,9 @@ SOURCE=$(LIBNAME)-$(VERSION)
 FILENAME=$(VERSION).tar.gz
 ARCHIVE=$(SOURCE).tar.gz
 
-LIBDYLIB=$(SOURCE)/build/src/lib$(LIBNAME)_client.a
+LIBDYLIB=$(SOURCE)/build/src/client/lib$(LIBNAME)_client.a
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(FILENAME)
@@ -35,7 +35,7 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 $(LIBDYLIB): $(SOURCE)
 	make -j 1 -C $(SOURCE)/build
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE)/build install
 	touch $@
 

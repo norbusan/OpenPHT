@@ -1682,7 +1682,7 @@ namespace VIDEO
       if (time)
       {
         CStdString hash;
-        hash.Format("fast%"PRId64, time);
+        hash.Format("fast%" PRId64, time);
         return hash;
       }
     }

@@ -20,16 +20,21 @@
  *
  */
 
+#include <utility>
+#include <vector>
+
 #include "guilib/Resolution.h"
 #include "guilib/Geometry.h"
 #include "RenderFormats.h"
+#include "RenderFeatures.h"
 
 #define MAX_PLANES 3
 #define MAX_FIELDS 3
+#define NUM_BUFFERS 6
 
 typedef struct YV12Image
 {
-  BYTE *   plane[MAX_PLANES];
+  uint8_t* plane[MAX_PLANES];
   int      planesize[MAX_PLANES];
   unsigned stride[MAX_PLANES];
   unsigned width;
@@ -48,24 +53,8 @@ enum EFIELDSYNC
   FS_BOT
 };
 
-enum ERENDERFEATURE
-{
-  RENDERFEATURE_GAMMA,
-  RENDERFEATURE_BRIGHTNESS,
-  RENDERFEATURE_CONTRAST,
-  RENDERFEATURE_NOISE,
-  RENDERFEATURE_SHARPNESS,
-  RENDERFEATURE_NONLINSTRETCH,
-  RENDERFEATURE_ROTATION,
-  RENDERFEATURE_STRETCH,
-  RENDERFEATURE_CROP,
-  RENDERFEATURE_ZOOM,
-  RENDERFEATURE_VERTICAL_SHIFT,
-  RENDERFEATURE_PIXEL_RATIO,
-  RENDERFEATURE_POSTPROCESS
-};
-
 typedef void (*RenderUpdateCallBackFn)(const void *ctx, const CRect &SrcRect, const CRect &DestRect);
+typedef void (*RenderFeaturesCallBackFn)(const void *ctx, Features &renderFeatures);
 
 struct DVDVideoPicture;
 
@@ -77,27 +66,40 @@ public:
 
   void SetViewMode(int viewMode);
   RESOLUTION GetResolution() const;
-  void GetVideoRect(CRect &source, CRect &dest);
+
+  /*! \brief Get video rectangle and view window
+  \param source is original size of the video
+  \param dest is the target rendering area honoring aspect ratio of source
+  \param view is the entire target rendering area for the video (including black bars)
+  */
+  void GetVideoRect(CRect &source, CRect &dest, CRect &view);
   float GetAspectRatio() const;
 
-  virtual bool AddVideoPicture(DVDVideoPicture* picture) { return false; }
+  virtual bool AddVideoPicture(DVDVideoPicture* picture, int index) { return false; }
   virtual void Flush() {};
 
-  virtual unsigned int GetProcessorSize() { return 0; }
+  /**
+   * Returns number of references a single buffer can retain when rendering a single frame
+   */
+  virtual void         SetBufferSize(int numBuffers) { }
+  virtual void         ReleaseBuffer(int idx) { }
+  virtual bool         NeedBufferForRef(int idx) { return false; }
+  virtual bool         IsGuiLayer() { return true; }
 
   virtual bool Supports(ERENDERFEATURE feature) { return false; }
 
-  // Supported pixel formats, can be called before configure
-  std::vector<ERenderFormat> SupportedFormats()  { return std::vector<ERenderFormat>(); }
+  // Render info, can be called before configure
+  virtual CRenderInfo GetRenderInfo() { return CRenderInfo(); }
 
   virtual void RegisterRenderUpdateCallBack(const void *ctx, RenderUpdateCallBackFn fn);
+  virtual void RegisterRenderFeaturesCallBack(const void *ctx, RenderFeaturesCallBackFn fn);
 
 protected:
   void       ChooseBestResolution(float fps);
   bool       FindResolutionFromOverride(float fps, float& weight, bool fallback);
   void       FindResolutionFromFpsMatch(float fps, float& weight);
   RESOLUTION FindClosestResolution(float fps, float multiplier, RESOLUTION current, float& weight);
-  float      RefreshWeight(float refresh, float fps);
+  static float      RefreshWeight(float refresh, float fps);
   void       CalcNormalDisplayRect(float offsetX, float offsetY, float screenWidth, float screenHeight, float inputFrameRatio, float zoomAmount, float verticalShift);
   void       CalculateFrameAspectRatio(unsigned int desired_width, unsigned int desired_height);
   void       ManageDisplay();
@@ -125,10 +127,15 @@ protected:
   CRect m_destRect;
   CRect m_oldDestRect; // destrect of the previous frame
   CRect m_sourceRect;
+  CRect m_viewRect;
 
   // rendering flags
   unsigned m_iFlags;
+  ERenderFormat m_format;
 
   const void* m_RenderUpdateCallBackCtx;
   RenderUpdateCallBackFn m_RenderUpdateCallBackFn;
+
+  const void* m_RenderFeaturesCallBackCtx;
+  RenderFeaturesCallBackFn m_RenderFeaturesCallBackFn;
 };

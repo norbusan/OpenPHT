@@ -20,10 +20,11 @@
 
 #include "DVDVideoPPFFmpeg.h"
 #include "utils/log.h"
+#include "cores/FFmpeg.h"
 
-CDVDVideoPPFFmpeg::CDVDVideoPPFFmpeg(const CStdString& mType)
+CDVDVideoPPFFmpeg::CDVDVideoPPFFmpeg(const CStdString& mType):
+  m_sType(mType)
 {
-  m_sType = mType;
   m_pMode = m_pContext = NULL;
   m_pSource = m_pTarget = NULL;
   m_iInitWidth = m_iInitHeight = 0;
@@ -38,12 +39,12 @@ void CDVDVideoPPFFmpeg::Dispose()
 {
   if (m_pMode)
   {
-    m_dll.pp_free_mode(m_pMode);
+    pp_free_mode(m_pMode);
     m_pMode = NULL;
   }
   if(m_pContext)
   {
-    m_dll.pp_free_context(m_pContext);
+    pp_free_context(m_pContext);
     m_pContext = NULL;
   }
 
@@ -63,14 +64,10 @@ void CDVDVideoPPFFmpeg::Dispose()
 
   m_iInitWidth = 0;
   m_iInitHeight = 0;
-
-  m_dll.Unload();
 }
 
 bool CDVDVideoPPFFmpeg::CheckInit(int iWidth, int iHeight)
 {
-  if (!m_dll.IsLoaded() && !m_dll.Load()) return false;
-
   if(m_iInitWidth != iWidth || m_iInitHeight != iHeight)
   {
     if(m_pContext || m_pMode)
@@ -78,12 +75,12 @@ bool CDVDVideoPPFFmpeg::CheckInit(int iWidth, int iHeight)
       Dispose();
     }
 
-    m_pContext = m_dll.pp_get_context(m_pSource->iWidth, m_pSource->iHeight, PPCPUFlags() | PP_FORMAT_420);
+    m_pContext = pp_get_context(m_pSource->iWidth, m_pSource->iHeight, PPCPUFlags() | PP_FORMAT_420);
 
     m_iInitWidth = m_pSource->iWidth;
     m_iInitHeight = m_pSource->iHeight;
 
-    m_pMode = m_dll.pp_get_mode_by_name_and_quality((char *)m_sType.c_str(), PP_QUALITY_MAX);
+    m_pMode = pp_get_mode_by_name_and_quality((char *)m_sType.c_str(), PP_QUALITY_MAX);
   }
 
 
@@ -134,10 +131,10 @@ bool CDVDVideoPPFFmpeg::Process(DVDVideoPicture* pPicture)
   int pict_type = (m_pSource->qscale_type != DVP_QSCALE_MPEG1) ?
                    PP_PICT_TYPE_QP2 : 0;
 
-  m_dll.pp_postprocess(m_pSource->data, m_pSource->iLineSize,
+  pp_postprocess((const uint8_t**)m_pSource->data, m_pSource->iLineSize,
                 m_pTarget->data, m_pTarget->iLineSize,
                 m_pSource->iWidth, m_pSource->iHeight,
-                m_pSource->qscale_table, m_pSource->qscale_stride,
+                m_pSource->qp_table, m_pSource->qstride,
                 m_pMode, m_pContext,
                 pict_type); //m_pSource->iFrameType);
 
@@ -146,15 +143,14 @@ bool CDVDVideoPPFFmpeg::Process(DVDVideoPicture* pPicture)
   if (m_deinterlace)
     m_pTarget->iFlags &= ~DVP_FLAG_INTERLACED;
   m_pTarget->iFrameType = m_pSource->iFrameType;
-  m_pTarget->iRepeatPicture = m_pSource->iRepeatPicture;;
+  m_pTarget->iRepeatPicture = m_pSource->iRepeatPicture;
   m_pTarget->iDuration = m_pSource->iDuration;
-  m_pTarget->qscale_table = m_pSource->qscale_table;
-  m_pTarget->qscale_stride = m_pSource->qscale_stride;
+  m_pTarget->qp_table = m_pSource->qp_table;
+  m_pTarget->qstride = m_pSource->qstride;
   m_pTarget->qscale_type = m_pSource->qscale_type;
   m_pTarget->iDisplayHeight = m_pSource->iDisplayHeight;
   m_pTarget->iDisplayWidth = m_pSource->iDisplayWidth;
   m_pTarget->pts = m_pSource->pts;
-  m_pTarget->iGroupId = m_pSource->iGroupId;
   m_pTarget->format = RENDER_FMT_YUV420P;
   return true;
 }
@@ -186,9 +182,9 @@ bool CDVDVideoPPFFmpeg::CheckFrameBuffer(const DVDVideoPicture* pSource)
     m_FrameBuffer.iWidth = pSource->iWidth;
     m_FrameBuffer.iHeight = pSource->iHeight;
 
-    m_FrameBuffer.data[0] = (BYTE*)_aligned_malloc(m_FrameBuffer.iLineSize[0] * m_FrameBuffer.iHeight  , 16);
-    m_FrameBuffer.data[1] = (BYTE*)_aligned_malloc(m_FrameBuffer.iLineSize[1] * m_FrameBuffer.iHeight/2, 16);
-    m_FrameBuffer.data[2] = (BYTE*)_aligned_malloc(m_FrameBuffer.iLineSize[2] * m_FrameBuffer.iHeight/2, 16);
+    m_FrameBuffer.data[0] = (uint8_t*)_aligned_malloc(m_FrameBuffer.iLineSize[0] * m_FrameBuffer.iHeight  , 16);
+    m_FrameBuffer.data[1] = (uint8_t*)_aligned_malloc(m_FrameBuffer.iLineSize[1] * m_FrameBuffer.iHeight/2, 16);
+    m_FrameBuffer.data[2] = (uint8_t*)_aligned_malloc(m_FrameBuffer.iLineSize[2] * m_FrameBuffer.iHeight/2, 16);
 
     if( !m_FrameBuffer.data[0] || !m_FrameBuffer.data[1] || !m_FrameBuffer.data[2])
     {

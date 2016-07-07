@@ -25,13 +25,14 @@
  * Microsoft XMV demuxer
  */
 
-#include <stdint.h>
+#include <inttypes.h>
 
 #include "libavutil/intreadwrite.h"
 
 #include "avformat.h"
 #include "internal.h"
 #include "riff.h"
+#include "libavutil/avassert.h"
 
 /** The min size of an XMV header. */
 #define XMV_MIN_HEADER_SIZE 36
@@ -78,10 +79,10 @@ typedef struct XMVAudioPacket {
     uint16_t bits_per_sample; ///< Bits per compressed sample.
     uint32_t bit_rate;        ///< Bits of compressed data per second.
     uint16_t flags;           ///< Flags
-    uint16_t block_align;     ///< Bytes per compressed block.
+    unsigned block_align;     ///< Bytes per compressed block.
     uint16_t block_samples;   ///< Decompressed samples per compressed block.
 
-    enum CodecID codec_id; ///< The codec ID of the compression scheme.
+    enum AVCodecID codec_id; ///< The codec ID of the compression scheme.
 
     uint32_t data_size;   ///< The size of the remaining audio data.
     uint64_t data_offset; ///< The offset of the audio data within the file.
@@ -129,13 +130,12 @@ static int xmv_read_close(AVFormatContext *s)
 {
     XMVDemuxContext *xmv = s->priv_data;
 
-    av_free(xmv->audio);
+    av_freep(&xmv->audio);
 
     return 0;
 }
 
-static int xmv_read_header(AVFormatContext *s,
-                           AVFormatParameters *ap)
+static int xmv_read_header(AVFormatContext *s)
 {
     XMVDemuxContext *xmv = s->priv_data;
     AVIOContext     *pb  = s->pb;
@@ -155,7 +155,7 @@ static int xmv_read_header(AVFormatContext *s,
 
     file_version = avio_rl32(pb);
     if ((file_version != 4) && (file_version != 2))
-        av_log_ask_for_sample(s, "Found uncommon version %d\n", file_version);
+        avpriv_request_sample(s, "Uncommon version %"PRIu32"", file_version);
 
 
     /* Video track */
@@ -167,7 +167,7 @@ static int xmv_read_header(AVFormatContext *s,
     avpriv_set_pts_info(vst, 32, 1, 1000);
 
     vst->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    vst->codec->codec_id   = CODEC_ID_WMV2;
+    vst->codec->codec_id   = AV_CODEC_ID_WMV2;
     vst->codec->codec_tag  = MKBETAG('W', 'M', 'V', '2');
     vst->codec->width      = avio_rl32(pb);
     vst->codec->height     = avio_rl32(pb);
@@ -182,7 +182,7 @@ static int xmv_read_header(AVFormatContext *s,
 
     avio_skip(pb, 2); /* Unknown (padding?) */
 
-    xmv->audio = av_malloc(xmv->audio_track_count * sizeof(XMVAudioPacket));
+    xmv->audio = av_malloc_array(xmv->audio_track_count, sizeof(XMVAudioPacket));
     if (!xmv->audio) {
         ret = AVERROR(ENOMEM);
         goto fail;
@@ -219,7 +219,7 @@ static int xmv_read_header(AVFormatContext *s,
 
         if (!packet->channels || !packet->sample_rate ||
              packet->channels >= UINT16_MAX / XMV_BLOCK_ALIGN_SIZE) {
-            av_log(s, AV_LOG_ERROR, "Invalid parameters for audio track %d.\n",
+            av_log(s, AV_LOG_ERROR, "Invalid parameters for audio track %"PRIu16".\n",
                    audio_track);
             ret = AVERROR_INVALIDDATA;
             goto fail;
@@ -294,6 +294,7 @@ static int xmv_process_packet_header(AVFormatContext *s)
 {
     XMVDemuxContext *xmv = s->priv_data;
     AVIOContext     *pb  = s->pb;
+    int ret;
 
     uint8_t  data[8];
     uint16_t audio_track;
@@ -318,7 +319,7 @@ static int xmv_process_packet_header(AVFormatContext *s)
      * short for every audio track. But as playing around with XMV files with
      * ADPCM audio showed, taking the extra 4 bytes from the audio data gives
      * you either completely distorted audio or click (when skipping the
-     * remaining 68 bytes of the ADPCM block). Substracting 4 bytes for every
+     * remaining 68 bytes of the ADPCM block). Subtracting 4 bytes for every
      * audio track from the video data works at least for the audio. Probably
      * some alignment thing?
      * The video data has (always?) lots of padding, so it should work out...
@@ -378,14 +379,13 @@ static int xmv_process_packet_header(AVFormatContext *s)
             if (xmv->video.stream_index >= 0) {
                 AVStream *vst = s->streams[xmv->video.stream_index];
 
-                assert(xmv->video.stream_index < s->nb_streams);
+                av_assert0(xmv->video.stream_index < s->nb_streams);
 
                 if (vst->codec->extradata_size < 4) {
-                    av_free(vst->codec->extradata);
+                    av_freep(&vst->codec->extradata);
 
-                    vst->codec->extradata =
-                        av_malloc(4 + FF_INPUT_BUFFER_PADDING_SIZE);
-                    vst->codec->extradata_size = 4;
+                    if ((ret = ff_alloc_extradata(vst->codec, 4)) < 0)
+                        return ret;
                 }
 
                 memcpy(vst->codec->extradata, xmv->video.extradata, 4);
@@ -401,6 +401,9 @@ static int xmv_fetch_new_packet(AVFormatContext *s)
     XMVDemuxContext *xmv = s->priv_data;
     AVIOContext     *pb  = s->pb;
     int result;
+
+    if (xmv->this_packet_offset == xmv->next_packet_offset)
+        return AVERROR_EOF;
 
     /* Seek to it */
     xmv->this_packet_offset = xmv->next_packet_offset;
@@ -546,16 +549,17 @@ static int xmv_read_packet(AVFormatContext *s,
         /* Fetch a video frame */
 
         result = xmv_fetch_video_packet(s, pkt);
-        if (result)
-            return result;
-
     } else {
         /* Fetch an audio frame */
 
         result = xmv_fetch_audio_packet(s, pkt, xmv->current_stream - 1);
-        if (result)
-            return result;
     }
+    if (result) {
+        xmv->current_stream = 0;
+        xmv->video.current_frame = xmv->video.frame_count;
+        return result;
+    }
+
 
     /* Increase our counters */
     if (++xmv->current_stream >= xmv->stream_count) {

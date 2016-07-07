@@ -464,7 +464,7 @@ int createBundle(const std::string& InputDir, const std::string& OutputFile, dou
       {
         CXBTFFrame frame = createXBTFFrame(image, writer, maxMSE, flags);
 
-        printf("%s%c (%d,%d @ %"PRIu64" bytes)\n", GetFormatString(frame.GetFormat()), frame.HasAlpha() ? ' ' : '*',
+        printf("%s%c (%d,%d @ %" PRIu64" bytes)\n", GetFormatString(frame.GetFormat()), frame.HasAlpha() ? ' ' : '*',
           frame.GetWidth(), frame.GetHeight(), frame.GetUnpackedSize());
 
         file.SetLoop(0);
@@ -504,7 +504,7 @@ int createBundle(const std::string& InputDir, const std::string& OutputFile, dou
           CXBTFFrame frame = createXBTFFrame(gpAG[j].surface, writer, maxMSE, flags);
           frame.SetDuration(gpAG[j].delay);
           file.GetFrames().push_back(frame);
-          printf("%s%c (%d,%d @ %"PRIu64" bytes)\n", GetFormatString(frame.GetFormat()), frame.HasAlpha() ? ' ' : '*',
+          printf("%s%c (%d,%d @ %" PRIu64" bytes)\n", GetFormatString(frame.GetFormat()), frame.HasAlpha() ? ' ' : '*',
             frame.GetWidth(), frame.GetHeight(), frame.GetUnpackedSize());
         }
       }

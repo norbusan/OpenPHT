@@ -31,6 +31,8 @@
 #include "XbmcContext.h"
 #include "GUIInfoManager.h"
 #include "utils/StringUtils.h"
+#include <mmdeviceapi.h>
+#include "win32/IMMNotificationClient.h"
 
 #ifndef _DEBUG
 #define XBMC_TRACK_EXCEPTIONS
@@ -114,6 +116,8 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR commandLine, INT )
 
     CStdString* strargvA = new CStdString[argc];
     const char** argv = (const char**) LocalAlloc(LMEM_FIXED, argc*sizeof(char*));
+    if (!argv)
+      return 20;
     for (int i = 0; i < argc; i++)
     {
       g_charsetConverter.wToUTF8(argvW[i], strargvA[i]);
@@ -218,12 +222,27 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR commandLine, INT )
   }
 #endif
 
+  IMMDeviceEnumerator *pEnumerator = NULL;
+  CMMNotificationClient cMMNC;
+  HRESULT hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
+  if(SUCCEEDED(hr))
+  {
+    pEnumerator->RegisterEndpointNotificationCallback(&cMMNC);
+    SAFE_RELEASE(pEnumerator);
+  }
+
   g_application.Run();
 
   // clear previously set timer resolution
   timeEndPeriod(1);		
 
   // the end
+  hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
+  if(SUCCEEDED(hr))
+  {
+    pEnumerator->UnregisterEndpointNotificationCallback(&cMMNC);
+    SAFE_RELEASE(pEnumerator);
+  }
   WSACleanup();
   CoUninitialize();
 

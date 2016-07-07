@@ -19,23 +19,56 @@
  *
  */
 
+#include <map>
+#include <utility>
+#include <vector>
+
+#include "guilib/Key.h"
+#include "interfaces/IActionListener.h"
+#include "threads/CriticalSection.h"
 #include "utils/Stopwatch.h"
 
-class CSeekHandler
+enum SeekType
+{
+  SEEK_TYPE_VIDEO = 0,
+  SEEK_TYPE_MUSIC = 1
+};
+
+class CSeekHandler : public IActionListener
 {
 public:
-  CSeekHandler();
+  static CSeekHandler& GetInstance();
+  
+  virtual bool OnAction(const CAction &action) override;
 
-  void Seek(bool forward, float amount, float duration = 0);
+  void Seek(bool forward, float amount, float duration = 0, bool analogSeek = false, SeekType type = SEEK_TYPE_VIDEO);
+  void SeekSeconds(int seconds);
   void Process();
   void Reset();
+  void Configure();
 
-  float GetPercent() const;
+  int GetSeekSize() const;
   bool InProgress() const;
+
+protected:
+  CSeekHandler();
+  CSeekHandler(const CSeekHandler&);
+  CSeekHandler& operator=(CSeekHandler const&);
+  virtual ~CSeekHandler();
+
 private:
-  static const int time_before_seek = 500;
-  static const int time_for_display = 2000; // TODO: WTF?
-  bool       m_requireSeek;
-  float      m_percent;
+  static const int analogSeekDelay = 500;
+  
+  int GetSeekStepSize(SeekType type, int step);
+  int m_seekDelay;
+  std::map<SeekType, int > m_seekDelays;
+  bool m_requireSeek;
+  bool m_analogSeek;
+  int m_seekSize;
+  int m_seekStep;
+  std::map<SeekType, std::vector<int> > m_forwardSeekSteps;
+  std::map<SeekType, std::vector<int> > m_backwardSeekSteps;
   CStopWatch m_timer;
+
+  CCriticalSection m_critSection;
 };

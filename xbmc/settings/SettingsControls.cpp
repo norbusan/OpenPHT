@@ -166,6 +166,10 @@ void CButtonSettingControl::Update()
     ADDON::AddonPtr addon;
     if (ADDON::CAddonMgr::Get().GetAddon(strText, addon))
       strText = addon->Name();
+    /* PLEX */
+    if (strText == "visualization.nowplaying")
+      strText = "Now Playing";
+    /* END PLEX */
     if (strText.IsEmpty())
       strText = g_localizeStrings.Get(231); // None
   }

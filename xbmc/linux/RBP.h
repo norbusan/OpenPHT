@@ -65,9 +65,7 @@ public:
   DllOMX *GetDllOMX() { return m_OMX ? m_OMX->GetDll() : NULL; }
   void WaitVsync();
   double AdjustHDMIClock(double adjust);
-
-  void SuspendVideoOutput();
-  void ResumeVideoOutput();
+  double GetAdjustHDMIClock() { return m_last_pll_adjust; }
 
 private:
   DllBcmHost *m_DllBcmHost;
@@ -84,6 +82,7 @@ private:
   CEvent     m_vsync;
   class DllLibOMXCore;
   CCriticalSection m_critSection;
+  double m_last_pll_adjust;
 };
 
 extern CRBP g_RBP;

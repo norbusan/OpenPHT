@@ -25,14 +25,11 @@
 #include "guilib/GUITexture.h"
 #include "settings/Settings.h"
 #include "Application.h"
-#include "DllAvFormat.h"
-#include "DllAvCodec.h"
-#include "DllAvUtil.h"
-#include "DllSwScale.h"
 #include "filesystem/SpecialProtocol.h"
 #include "settings/AdvancedSettings.h"
 #include "video/FFmpegVideoDecoder.h"
 #include "system.h"
+#include "utils/log.h"
 
 KaraokeVideoBackground::KaraokeVideoBackground()
 {

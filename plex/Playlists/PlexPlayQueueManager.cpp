@@ -24,8 +24,12 @@ using namespace PLAYLIST;
 bool CPlexPlayQueueManager::create(const CFileItem& container, const CStdString& uri,
                                    const CPlexPlayQueueOptions& options)
 {
+  ePlexMediaType mediaType = PlexUtils::GetMediaTypeFromItem(container);
+  if (mediaType == PLEX_MEDIA_TYPE_UNKNOWN)
+    return false;
+
   // look for existing PQ of same type
-  CPlexPlayQueuePtr pq = getPlayQueueOfType(PlexUtils::GetMediaTypeFromItem(container));
+  CPlexPlayQueuePtr pq = getPlayQueueOfType(mediaType);
   
   if (pq && pq->getVersion() > 1 && options.showPrompts)
   {
@@ -48,7 +52,7 @@ bool CPlexPlayQueueManager::create(const CFileItem& container, const CStdString&
   pq = getImpl(container);
   if (pq)
   {
-    m_playQueues[PlexUtils::GetMediaTypeFromItem(container)] = pq;
+    m_playQueues[mediaType] = pq;
     return pq->create(container, uri, options);
   }
 
@@ -431,8 +435,8 @@ void CPlexPlayQueueManager::QueueItem(const CFileItemPtr& item, bool next)
     options.startPlaying = false;
     success = create(*item, "", options);
 
-    if ((g_application.IsPlayingAudio() && isItemVideo) ||
-        (g_application.IsPlayingVideo() && isItemAudio))
+    if ((g_application.m_pPlayer->IsPlayingAudio() && isItemVideo) ||
+        (g_application.m_pPlayer->IsPlayingVideo() && isItemAudio))
       CApplicationMessenger::Get().MediaStop();
   }
   else

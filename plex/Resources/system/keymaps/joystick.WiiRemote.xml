@@ -47,7 +47,7 @@
       <button id="8">XBMC.ActivateWindow(Home)</button>
       <button id="9">VolumeUp</button>
       <button id="10">ContextMenu</button>
-      <button id="11">XBMC.ActivateWindow(PlayerControls)</button>
+      <!--<button id="11">XBMC.ActivateWindow(PlayerControls)</button>-->
     </joystick>
   </global>
   <Home>

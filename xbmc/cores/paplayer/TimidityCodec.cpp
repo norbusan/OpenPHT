@@ -106,7 +106,6 @@ bool TimidityCodec::Init(const CStdString &strFile, unsigned int filecache)
   if ( m_mid )
     m_dll.FreeMID( m_mid );
 
-  CStdString file = strFile;
   CURL url(strFile);
   if (!url.IsLocal())
   {

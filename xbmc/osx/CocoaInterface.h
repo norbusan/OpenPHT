@@ -47,7 +47,7 @@ extern "C"
   // Devices
   //
   char* Cocoa_MountPoint2DeviceName(char *path);
-  bool Cocoa_GetVolumeNameFromMountPoint(const char *mountPoint, CStdString &volumeName);
+  bool Cocoa_GetVolumeNameFromMountPoint(const CStdString &mountPoint, CStdString &volumeName);
 
   // Mouse.
   //
@@ -60,10 +60,6 @@ extern "C"
   bool Cocoa_HasVDADecoder();
   bool Cocoa_GPUForDisplayIsNvidiaPureVideo3();
   int Cocoa_GetOSVersion();
-
-
-  void  Cocoa_MakeChildWindow();
-  void  Cocoa_DestroyChildWindow();
 
   const char *Cocoa_Paste() ;
 

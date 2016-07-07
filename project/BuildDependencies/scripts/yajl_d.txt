@@ -1,2 +1,0 @@
-; filename                          source of the file
-yajl.zip           					 https://nightlies.plex.tv/plex-dependencies/plex-home-theater-dependencies/win32/

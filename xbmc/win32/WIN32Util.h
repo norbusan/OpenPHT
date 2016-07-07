@@ -26,8 +26,9 @@
 #include "Cfgmgr32.h"
 #endif
 #include "MediaSource.h"
-#include "utils/Stopwatch.h"
 #include "guilib/Geometry.h"
+#include "powermanagement/PowerManager.h"
+#include "utils/Stopwatch.h"
 
 enum Drive_Types
 {
@@ -80,8 +81,6 @@ public:
   static bool Is64Bit();
   static LONG UtilRegGetValue( const HKEY hKey, const char *const pcKey, DWORD *const pdwType, char **const ppcBuffer, DWORD *const pdwSizeBuff, const DWORD dwSizeAdd );
   static bool UtilRegOpenKeyEx( const HKEY hKeyParent, const char *const pcKey, const REGSAM rsAccessRights, HKEY *hKey, const bool bReadX64= false );
-
-  static bool GetCrystalHDLibraryPath(CStdString &strPath);
 
   static bool GetFocussedProcess(CStdString &strProcessFile);
   static void CropSource(CRect& src, CRect& dst, CRect target);

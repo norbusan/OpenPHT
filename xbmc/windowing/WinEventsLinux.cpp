@@ -30,8 +30,6 @@
 #include "utils/log.h"
 #include "powermanagement/PowerManager.h"
 
-PHANDLE_EVENT_FUNC CWinEventsBase::m_pEventFunc = NULL;
-
 bool CWinEventsLinux::m_initialized = false;
 CLinuxInputDevices CWinEventsLinux::m_devices;
 
@@ -55,6 +53,7 @@ bool CWinEventsLinux::MessagePump()
   if (!m_initialized)
   {
     m_devices.InitAvailable();
+    m_checkHotplug = std::unique_ptr<CLinuxInputDevicesCheckHotplugged>(new CLinuxInputDevicesCheckHotplugged(m_devices));
     m_initialized = true;
   }
 
@@ -74,6 +73,16 @@ bool CWinEventsLinux::MessagePump()
   }
 
   return ret;
+}
+
+size_t CWinEventsLinux::GetQueueSize()
+{
+  return m_devices.Size();
+}
+
+void CWinEventsLinux::MessagePush(XBMC_Event *ev)
+{
+  g_application.OnEvent(*ev);
 }
 
 #endif

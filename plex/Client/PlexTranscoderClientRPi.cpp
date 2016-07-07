@@ -47,6 +47,7 @@ CPlexTranscoderClientRPi::CPlexTranscoderClientRPi()
   }
 
 #ifdef TARGET_RASPBERRY_PI_2
+    m_knownVideoCodecs.insert("hevc");
     m_knownAudioCodecs.insert("truehd");
 #endif
 
@@ -143,6 +144,12 @@ bool CPlexTranscoderClientRPi::ShouldTranscode(CPlexServerPtr server, const CFil
 
   // check if video resolution is to large
   if (videoWidth > 1920 || videoHeight > 1080)
+  {
+    bShouldTranscode = true;
+    ReasonWhy.Format("Video resolution to large: %dx%d", videoWidth, videoHeight);
+  }
+  // check if video resolution is to large for hevc
+  else if (videoCodec == "hevc" && videoWidth > g_guiSettings.GetInt("plexmediaserver.limithevc"))
   {
     bShouldTranscode = true;
     ReasonWhy.Format("Video resolution to large: %dx%d", videoWidth, videoHeight);

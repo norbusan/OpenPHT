@@ -20,11 +20,16 @@
 
 #include "mpegvideo.h"
 #include "h263.h"
+#include "mpegvideodata.h"
 
 /* don't understand why they choose a different header ! */
 int ff_intel_h263_decode_picture_header(MpegEncContext *s)
 {
     int format;
+
+    if (get_bits_left(&s->gb) == 64) { /* special dummy frames */
+        return FRAME_SKIPPED;
+    }
 
     /* picture header */
     if (get_bits_long(&s->gb, 22) != 0x20) {
@@ -33,8 +38,7 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
     }
     s->picture_number = get_bits(&s->gb, 8); /* picture timestamp */
 
-    if (get_bits1(&s->gb) != 1) {
-        av_log(s->avctx, AV_LOG_ERROR, "Bad marker\n");
+    if (check_marker(&s->gb, "after picture_number") != 1) {
         return -1;      /* marker */
     }
     if (get_bits1(&s->gb) != 0) {
@@ -54,14 +58,14 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
 
     s->pict_type = AV_PICTURE_TYPE_I + get_bits1(&s->gb);
 
-    s->unrestricted_mv = get_bits1(&s->gb);
-    s->h263_long_vectors = s->unrestricted_mv;
+    s->h263_long_vectors = get_bits1(&s->gb);
 
     if (get_bits1(&s->gb) != 0) {
         av_log(s->avctx, AV_LOG_ERROR, "SAC not supported\n");
         return -1;      /* SAC: off */
     }
     s->obmc= get_bits1(&s->gb);
+    s->unrestricted_mv = s->obmc || s->h263_long_vectors;
     s->pb_frame = get_bits1(&s->gb);
 
     if (format < 6) {
@@ -90,7 +94,7 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
     if(format == 6){
         int ar = get_bits(&s->gb, 4);
         skip_bits(&s->gb, 9); // display width
-        skip_bits1(&s->gb);
+        check_marker(&s->gb, "in dimensions");
         skip_bits(&s->gb, 9); // display height
         if(ar == 15){
             s->avctx->sample_aspect_ratio.num = get_bits(&s->gb, 8); // aspect ratio - width
@@ -111,9 +115,8 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
     }
 
     /* PEI */
-    while (get_bits1(&s->gb) != 0) {
-        skip_bits(&s->gb, 8);
-    }
+    if (skip_1stop_8data_bits(&s->gb) < 0)
+        return AVERROR_INVALIDDATA;
     s->f_code = 1;
 
     s->y_dc_scale_table=
@@ -126,14 +129,16 @@ int ff_intel_h263_decode_picture_header(MpegEncContext *s)
 
 AVCodec ff_h263i_decoder = {
     .name           = "h263i",
+    .long_name      = NULL_IF_CONFIG_SMALL("Intel H.263"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_H263I,
+    .id             = AV_CODEC_ID_H263I,
     .priv_data_size = sizeof(MpegEncContext),
     .init           = ff_h263_decode_init,
     .close          = ff_h263_decode_end,
     .decode         = ff_h263_decode_frame,
-    .capabilities   = CODEC_CAP_DRAW_HORIZ_BAND | CODEC_CAP_DR1,
-    .long_name = NULL_IF_CONFIG_SMALL("Intel H.263"),
-    .pix_fmts= ff_pixfmt_list_420,
+    .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1,
+    .pix_fmts       = (const enum AVPixelFormat[]) {
+        AV_PIX_FMT_YUV420P,
+        AV_PIX_FMT_NONE
+    },
 };
-

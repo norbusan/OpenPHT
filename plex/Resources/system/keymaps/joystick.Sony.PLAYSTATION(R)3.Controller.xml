@@ -50,7 +50,7 @@
       <button id="7">Down</button>
       <button id="2">Screenshot</button>
       <button id="3">XBMC.ActivateWindow(ShutdownMenu)</button>
-      <button id="4">XBMC.ActivateWindow(PlayerControls)</button>
+      <!--<button id="4">XBMC.ActivateWindow(PlayerControls)</button>-->
       <axis limit="+1" id="4">VolumeDown</axis>
       <axis limit="-1" id="4">VolumeUp</axis>
       <axis limit="+1" id="1">AnalogSeekForward</axis>

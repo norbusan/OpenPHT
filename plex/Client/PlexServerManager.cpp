@@ -47,7 +47,7 @@ CPlexServerManager::CPlexServerManager() : m_stopped(false), m_reachabilityTestE
   _myPlexServer->SetActiveConnection(conn);
 
   _nodeServer = CPlexServerPtr(new CPlexServer("node", "plexNode", true));
-  conn = CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, "node.plexapp.com", 32400));
+  conn = CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, "node.plexapp.com", 32443, "https"));
   _nodeServer->AddConnection(conn);
   _nodeServer->SetActiveConnection(conn);
 
@@ -90,13 +90,13 @@ CPlexServerPtr CPlexServerManager::FindByUUID(const CStdString &uuid)
 
   CSingleLock lk(m_serverManagerLock);
 
-  if (uuid.Equals("myplex"))
+  if (uuid.Equals("myplex") || uuid.Equals("plex.tv"))
     return _myPlexServer;
 
   if (uuid.Equals("local"))
     return _localServer;
   
-  if (uuid.Equals("node") || uuid.Equals("com.plexapp.node"))
+  if (uuid.Equals("node") || uuid.Equals("com.plexapp.node") || uuid.Equals("node.plexapp.com"))
     return _nodeServer;
 
   if (uuid.Equals("best"))

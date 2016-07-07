@@ -485,7 +485,7 @@
 						<description>OE Settings Button</description>
 						<label> $LOCALIZE[41000] </label>
 						<onclick>Dialog.Close(4998)</onclick>
-						<onclick>RunAddon(service.openelec.settings)</onclick>
+						<onclick>RunAddon(service.libreelec.settings)</onclick>
 						<visible>System.isSystem(openelec) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="102">
@@ -507,14 +507,14 @@
 						<label>$LOCALIZE[31960]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>Plex.Suspend</onclick>
-						<visible>!System.isSystem(rasplex)</visible>
+						<visible>System.CanSuspend + !System.isSystem(rasplex)</visible>
 					</item>
 					<item id="113">
 						<description>Shut Down</description>
 						<label>$LOCALIZE[31961]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>Plex.Powerdown</onclick>
-						<visible>!System.UserIsRestricted | Skin.HasSetting(ShowRestrictedPowerOptions)</visible>
+						<visible>System.CanPowerDown + [!System.UserIsRestricted | Skin.HasSetting(ShowRestrictedPowerOptions)]</visible>
 					</item>
 					<item id="114">
 						<description>Restart</description>
@@ -615,7 +615,7 @@
 						<description>OE Settings Button</description>
 						<label> $LOCALIZE[41000] </label>
 						<onclick>Dialog.Close(4998)</onclick>
-						<onclick>RunAddon(service.openelec.settings)</onclick>
+						<onclick>RunAddon(service.libreelec.settings)</onclick>
 						<visible>System.isSystem(openelec) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="102">
@@ -630,7 +630,7 @@
 						<label>$LOCALIZE[31960]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>Plex.Suspend</onclick>
-						<visible>!System.isSystem(rasplex)</visible>
+						<visible>System.CanSuspend + !System.isSystem(rasplex)</visible>
 					</item>
 					<item id="114">
 						<description>Restart</description>
@@ -781,17 +781,6 @@
 					<onfocus>Skin.SetString(DialogPos,rate)</onfocus>
 					<onunfocus>Skin.Reset(DialogPos)</onunfocus>
 				</control>
-				<!-- Recommend -->
-				<!--><control type="button" id="106">
-					<texturefocus>b-pp-recommend-s.png</texturefocus>
-					<texturenofocus>b-pp-recommend.png</texturenofocus>
-					<onup>105</onup>
-					<ondown>107</ondown>
-					<include>leftMenuBarButton</include>
-					<visible>!IsEmpty(ListItem(0).Property(canRecommend))</visible>
-					<onfocus>Skin.SetString(DialogPos,recommend)</onfocus>
-					<onunfocus>Skin.Reset(DialogPos)</onunfocus>
-				</control>-->
 				<!-- Share -->
 				<control type="button" id="107">
 					<texturefocus>b-pp-share-s.png</texturefocus>

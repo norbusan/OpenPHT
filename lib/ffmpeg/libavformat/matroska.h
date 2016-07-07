@@ -1,6 +1,6 @@
 /*
  * Matroska constants
- * Copyright (c) 2003-2004 The ffmpeg Project
+ * Copyright (c) 2003-2004 The FFmpeg Project
  *
  * This file is part of FFmpeg.
  *
@@ -24,6 +24,7 @@
 
 #include "libavcodec/avcodec.h"
 #include "metadata.h"
+#include "internal.h"
 
 /* EBML version supported */
 #define EBML_VERSION 1
@@ -90,6 +91,8 @@
 #define MATROSKA_ID_CODECINFOURL 0x3B4040
 #define MATROSKA_ID_CODECDOWNLOADURL 0x26B240
 #define MATROSKA_ID_CODECDECODEALL 0xAA
+#define MATROSKA_ID_CODECDELAY 0x56AA
+#define MATROSKA_ID_SEEKPREROLL 0x56BB
 #define MATROSKA_ID_TRACKNAME  0x536E
 #define MATROSKA_ID_TRACKLANGUAGE 0x22B59C
 #define MATROSKA_ID_TRACKFLAGENABLED 0xB9
@@ -117,6 +120,7 @@
 #define MATROSKA_ID_VIDEODISPLAYUNIT 0x54B2
 #define MATROSKA_ID_VIDEOFLAGINTERLACED 0x9A
 #define MATROSKA_ID_VIDEOSTEREOMODE 0x53B8
+#define MATROSKA_ID_VIDEOALPHAMODE 0x53C0
 #define MATROSKA_ID_VIDEOASPECTRATIO 0x54B3
 #define MATROSKA_ID_VIDEOCOLORSPACE 0x2EB524
 
@@ -135,6 +139,15 @@
 #define MATROSKA_ID_ENCODINGCOMPALGO 0x4254
 #define MATROSKA_ID_ENCODINGCOMPSETTINGS 0x4255
 
+#define MATROSKA_ID_ENCODINGENCRYPTION 0x5035
+#define MATROSKA_ID_ENCODINGENCAESSETTINGS 0x47E7
+#define MATROSKA_ID_ENCODINGENCALGO 0x47E1
+#define MATROSKA_ID_ENCODINGENCKEYID 0x47E2
+#define MATROSKA_ID_ENCODINGSIGALGO 0x47E5
+#define MATROSKA_ID_ENCODINGSIGHASHALGO 0x47E6
+#define MATROSKA_ID_ENCODINGSIGKEYID 0x47E4
+#define MATROSKA_ID_ENCODINGSIGNATURE 0x47E3
+
 /* ID in the cues master */
 #define MATROSKA_ID_POINTENTRY 0xBB
 
@@ -145,6 +158,8 @@
 /* IDs in the cuetrackposition master */
 #define MATROSKA_ID_CUETRACK   0xF7
 #define MATROSKA_ID_CUECLUSTERPOSITION 0xF1
+#define MATROSKA_ID_CUERELATIVEPOSITION 0xF0
+#define MATROSKA_ID_CUEDURATION 0xB2
 #define MATROSKA_ID_CUEBLOCKNUMBER 0x5378
 
 /* IDs in the tags master */
@@ -174,12 +189,18 @@
 #define MATROSKA_ID_CLUSTERPOSITION 0xA7
 #define MATROSKA_ID_CLUSTERPREVSIZE 0xAB
 #define MATROSKA_ID_BLOCKGROUP 0xA0
+#define MATROSKA_ID_BLOCKADDITIONS 0x75A1
+#define MATROSKA_ID_BLOCKMORE 0xA6
+#define MATROSKA_ID_BLOCKADDID 0xEE
+#define MATROSKA_ID_BLOCKADDITIONAL 0xA5
 #define MATROSKA_ID_SIMPLEBLOCK 0xA3
 
 /* IDs in the blockgroup master */
 #define MATROSKA_ID_BLOCK      0xA1
 #define MATROSKA_ID_BLOCKDURATION 0x9B
 #define MATROSKA_ID_BLOCKREFERENCE 0xFB
+#define MATROSKA_ID_CODECSTATE 0xA4
+#define MATROSKA_ID_DISCARDPADDING 0x75A2
 
 /* IDs in the attachments master */
 #define MATROSKA_ID_ATTACHEDFILE        0x61A7
@@ -214,6 +235,7 @@ typedef enum {
   MATROSKA_TRACK_TYPE_LOGO     = 0x10,
   MATROSKA_TRACK_TYPE_SUBTITLE = 0x11,
   MATROSKA_TRACK_TYPE_CONTROL  = 0x20,
+  MATROSKA_TRACK_TYPE_METADATA = 0x21,
 } MatroskaTrackType;
 
 typedef enum {
@@ -239,6 +261,7 @@ typedef enum {
   MATROSKA_VIDEO_STEREOMODE_TYPE_ANAGLYPH_GREEN_MAG = 12,
   MATROSKA_VIDEO_STEREOMODE_TYPE_BOTH_EYES_BLOCK_LR = 13,
   MATROSKA_VIDEO_STEREOMODE_TYPE_BOTH_EYES_BLOCK_RL = 14,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_NB,
 } MatroskaVideoStereoModeType;
 
 /*
@@ -246,25 +269,34 @@ typedef enum {
  */
 
 typedef struct CodecTags{
-    char str[20];
-    enum CodecID id;
+    char str[22];
+    enum AVCodecID id;
 }CodecTags;
-
-typedef struct CodecMime{
-    char str[32];
-    enum CodecID id;
-}CodecMime;
 
 /* max. depth in the EBML tree structure */
 #define EBML_MAX_DEPTH 16
 
-#define MATROSKA_VIDEO_STEREO_MODE_COUNT  15
 #define MATROSKA_VIDEO_STEREO_PLANE_COUNT  3
 
 extern const CodecTags ff_mkv_codec_tags[];
 extern const CodecMime ff_mkv_mime_tags[];
+extern const CodecMime ff_mkv_image_mime_tags[];
 extern const AVMetadataConv ff_mkv_metadata_conv[];
-extern const char * const matroska_video_stereo_mode[MATROSKA_VIDEO_STEREO_MODE_COUNT];
-extern const char * const matroska_video_stereo_plane[MATROSKA_VIDEO_STEREO_PLANE_COUNT];
+extern const char * const ff_matroska_video_stereo_mode[MATROSKA_VIDEO_STEREOMODE_TYPE_NB];
+extern const char * const ff_matroska_video_stereo_plane[MATROSKA_VIDEO_STEREO_PLANE_COUNT];
+
+/* AVStream Metadata tag keys for WebM Dash Manifest */
+#define INITIALIZATION_RANGE "webm_dash_manifest_initialization_range"
+#define CUES_START "webm_dash_manifest_cues_start"
+#define CUES_END "webm_dash_manifest_cues_end"
+#define FILENAME "webm_dash_manifest_file_name"
+#define BANDWIDTH "webm_dash_manifest_bandwidth"
+#define DURATION "webm_dash_manifest_duration"
+#define CLUSTER_KEYFRAME "webm_dash_manifest_cluster_keyframe"
+#define CUE_TIMESTAMPS "webm_dash_manifest_cue_timestamps"
+#define TRACK_NUMBER "webm_dash_manifest_track_number"
+#define CODEC_PRIVATE_SIZE "webm_dash_manifest_codec_priv_size"
+
+int ff_mkv_stereo3d_conv(AVStream *st, MatroskaVideoStereoModeType stereo_mode);
 
 #endif /* AVFORMAT_MATROSKA_H */

@@ -28,8 +28,6 @@ class CDummyVideoPlayer : public IPlayer, public CThread
 public:
   CDummyVideoPlayer(IPlayerCallback& callback);
   virtual ~CDummyVideoPlayer();
-  virtual void RegisterAudioCallback(IAudioCallback* pCallback) {}
-  virtual void UnRegisterAudioCallback()                        {}
   virtual bool OpenFile(const CFileItem& file, const CPlayerOptions &options);
   virtual bool CloseFile();
   virtual bool IsPlaying() const;
@@ -41,7 +39,7 @@ public:
   virtual void SwitchToNextLanguage();
   virtual void ToggleSubtitles();
   virtual bool CanSeek();
-  virtual void Seek(bool bPlus, bool bLargeStep);
+  virtual void Seek(bool bPlus, bool bLargeStep, bool bChapterOverride);
   virtual void SeekPercentage(float iPercent);
   virtual float GetPercentage();
   virtual void SetVolume(float volume) {}
@@ -53,7 +51,6 @@ public:
   virtual void GetAudioInfo(CStdString& strAudioInfo);
   virtual void GetVideoInfo(CStdString& strVideoInfo);
   virtual void GetGeneralInfo( CStdString& strVideoInfo);
-  virtual void Update(bool bPauseDrawing)                       {}
   virtual void SwitchToNextAudioLanguage();
   virtual bool CanRecord() { return false; }
   virtual bool IsRecording() { return false; }
@@ -73,7 +70,7 @@ public:
   virtual void DoAudioWork()                                    {}
   
   virtual CStdString GetPlayerState();
-  virtual bool SetPlayerState(CStdString state);
+  virtual bool SetPlayerState(const CStdString& state);
   
 private:
   virtual void Process();

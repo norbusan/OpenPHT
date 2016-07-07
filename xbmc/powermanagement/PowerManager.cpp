@@ -18,20 +18,24 @@
  *
  */
 
-#include "system.h"
 #include "PowerManager.h"
+
+#include <list>
+#include <memory>
+
 #include "Application.h"
 #include "cores/AudioEngine/AEFactory.h"
-#include "input/KeyboardStat.h"
+#include "dialogs/GUIDialogBusy.h"
+#include "dialogs/GUIDialogKaiToast.h"
+#include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
+#include "interfaces/AnnouncementManager.h"
+#include "interfaces/Builtins.h"
 #include "settings/GUISettings.h"
-#include "windowing/WindowingFactory.h"
+#include "system.h"
 #include "utils/log.h"
 #include "utils/Weather.h"
-#include "interfaces/Builtins.h"
-#include "interfaces/AnnouncementManager.h"
-#include "guilib/LocalizeStrings.h"
-#include "guilib/GraphicContext.h"
-#include "dialogs/GUIDialogKaiToast.h"
+#include "windowing/WindowingFactory.h"
 
 #ifdef HAS_LCD
 #include "utils/LCDFactory.h"
@@ -39,11 +43,6 @@
 
 #if defined(TARGET_DARWIN)
 #include "osx/CocoaPowerSyscall.h"
-
-/* PLEX */
-#include "Helper/PlexHTHelper.h"
-/* END PLEX */
-
 #elif defined(TARGET_ANDROID)
 #include "android/AndroidPowerSyscall.h"
 #elif defined(TARGET_POSIX)
@@ -53,9 +52,6 @@
 #include "linux/ConsoleDeviceKitPowerSyscall.h"
 #include "linux/LogindUPowerSyscall.h"
 #include "linux/UPowerSyscall.h"
-#if defined(HAS_HAL)
-#include "linux/HALPowerSyscall.h"
-#endif // HAS_HAL
 #endif // HAS_DBUS
 #elif defined(TARGET_WINDOWS)
 #include "powermanagement/windows/Win32PowerSyscall.h"
@@ -78,24 +74,48 @@ CPowerManager::~CPowerManager()
 
 void CPowerManager::Initialize()
 {
+  SAFE_DELETE(m_instance);
+
 #if defined(TARGET_DARWIN)
   m_instance = new CCocoaPowerSyscall();
 #elif defined(TARGET_ANDROID)
   m_instance = new CAndroidPowerSyscall();
 #elif defined(TARGET_POSIX)
 #if defined(HAS_DBUS)
-  if (CConsoleUPowerSyscall::HasConsoleKitAndUPower())
-    m_instance = new CConsoleUPowerSyscall();
-  else if (CConsoleDeviceKitPowerSyscall::HasDeviceConsoleKit())
-    m_instance = new CConsoleDeviceKitPowerSyscall();
-  else if (CLogindUPowerSyscall::HasLogind())
-    m_instance = new CLogindUPowerSyscall();
-  else if (CUPowerSyscall::HasUPower())
-    m_instance = new CUPowerSyscall();
-#if defined(HAS_HAL)
-  else if(1)
-    m_instance = new CHALPowerSyscall();
-#endif // HAS_HAL
+  std::unique_ptr<IPowerSyscall> bestPowerManager;
+  std::unique_ptr<IPowerSyscall> currPowerManager;
+  int bestCount = -1;
+  int currCount = -1;
+  
+  std::list< std::pair< std::function<bool()>,
+                        std::function<IPowerSyscall*()> > > powerManagers =
+  {
+    std::make_pair(CConsoleUPowerSyscall::HasConsoleKitAndUPower,
+                   [] { return new CConsoleUPowerSyscall(); }),
+    std::make_pair(CConsoleDeviceKitPowerSyscall::HasDeviceConsoleKit,
+                   [] { return new CConsoleDeviceKitPowerSyscall(); }),
+    std::make_pair(CLogindUPowerSyscall::HasLogind,
+                   [] { return new CLogindUPowerSyscall(); }),
+    std::make_pair(CUPowerSyscall::HasUPower,
+                   [] { return new CUPowerSyscall(); })
+  };
+  for(const auto& powerManager : powerManagers)
+  {
+    if (powerManager.first())
+    {
+      currPowerManager.reset(powerManager.second());
+      currCount = currPowerManager->CountPowerFeatures();
+      if (currCount > bestCount)
+      {
+        bestCount = currCount;
+        bestPowerManager = std::move(currPowerManager);
+      }
+      if (bestCount == IPowerSyscall::MAX_COUNT_POWER_FEATURES)
+        break;
+    }
+  }
+  if (bestPowerManager)
+    m_instance = bestPowerManager.release();
   else
 #endif // HAS_DBUS
     m_instance = new CFallbackPowerSyscall();
@@ -153,24 +173,40 @@ void CPowerManager::SetDefaults()
 
 bool CPowerManager::Powerdown()
 {
-  return CanPowerdown() ? m_instance->Powerdown() : false;
+  if (CanPowerdown() && m_instance->Powerdown())
+  {
+    CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+    if (dialog)
+      dialog->Show();
+
+    return true;
+  }
+
+  return false;
 }
 
 bool CPowerManager::Suspend()
 {
-  return CanSuspend() ? m_instance->Suspend() : false;
+  return (CanSuspend() && m_instance->Suspend());
 }
 
 bool CPowerManager::Hibernate()
 {
-  return CanHibernate() ? m_instance->Hibernate() : false;
+  return (CanHibernate() && m_instance->Hibernate());
 }
+
 bool CPowerManager::Reboot()
 {
   bool success = CanReboot() ? m_instance->Reboot() : false;
 
   if (success)
+  {
     CAnnouncementManager::Announce(System, "xbmc", "OnRestart");
+
+    CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+    if (dialog)
+      dialog->Show();
+  }
 
   return success;
 }
@@ -197,12 +233,22 @@ int CPowerManager::BatteryLevel()
 }
 void CPowerManager::ProcessEvents()
 {
-  m_instance->PumpPowerEvents(this);
+  static int nesting = 0;
+
+  if (++nesting == 1)
+    m_instance->PumpPowerEvents(this);
+
+  nesting--;
 }
 
 void CPowerManager::OnSleep()
 {
   CAnnouncementManager::Announce(System, "xbmc", "OnSleep");
+
+  CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+  if (dialog)
+    dialog->Show();
+
   CLog::Log(LOGNOTICE, "%s: Running sleep jobs", __FUNCTION__);
 
 #ifdef HAS_LCD
@@ -231,17 +277,16 @@ void CPowerManager::OnWake()
   // reset out timers
   g_application.ResetShutdownTimers();
 
+  CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+  if (dialog)
+    dialog->Close();
+
 #if defined(HAS_SDL) || defined(TARGET_WINDOWS)
   if (g_Windowing.IsFullScreen())
   {
-#if defined(_WIN32)
+#if defined(TARGET_WINDOWS)
     ShowWindow(g_hWnd,SW_RESTORE);
     SetForegroundWindow(g_hWnd);
-#elif !defined(TARGET_DARWIN_OSX)
-    // Hack to reclaim focus, thus rehiding system mouse pointer.
-    // Surely there's a better way?
-    g_graphicsContext.ToggleFullScreenRoot();
-    g_graphicsContext.ToggleFullScreenRoot();
 #endif
   }
   g_application.ResetScreenSaver();

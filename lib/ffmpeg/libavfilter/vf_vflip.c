@@ -23,84 +23,89 @@
  * video vertical flip filter
  */
 
+#include "libavutil/internal.h"
 #include "libavutil/pixdesc.h"
 #include "avfilter.h"
+#include "internal.h"
+#include "video.h"
 
-typedef struct {
+typedef struct FlipContext {
     int vsub;   ///< vertical chroma subsampling
 } FlipContext;
 
 static int config_input(AVFilterLink *link)
 {
     FlipContext *flip = link->dst->priv;
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(link->format);
 
-    flip->vsub = av_pix_fmt_descriptors[link->format].log2_chroma_h;
+    flip->vsub = desc->log2_chroma_h;
 
     return 0;
 }
 
-static AVFilterBufferRef *get_video_buffer(AVFilterLink *link, int perms,
-                                        int w, int h)
+static AVFrame *get_video_buffer(AVFilterLink *link, int w, int h)
 {
     FlipContext *flip = link->dst->priv;
-    AVFilterBufferRef *picref;
+    AVFrame *frame;
     int i;
 
-    if (!(perms & AV_PERM_NEG_LINESIZES))
-        return avfilter_default_get_video_buffer(link, perms, w, h);
-
-    picref = avfilter_get_video_buffer(link->dst->outputs[0], perms, w, h);
-    for (i = 0; i < 4; i ++) {
-        int vsub = i == 1 || i == 2 ? flip->vsub : 0;
-
-        if (picref->data[i]) {
-            picref->data[i] += ((h >> vsub)-1) * picref->linesize[i];
-            picref->linesize[i] = -picref->linesize[i];
-        }
-    }
-
-    return picref;
-}
-
-static void start_frame(AVFilterLink *link, AVFilterBufferRef *inpicref)
-{
-    FlipContext *flip = link->dst->priv;
-    AVFilterBufferRef *outpicref = avfilter_ref_buffer(inpicref, ~0);
-    int i;
+    frame = ff_get_video_buffer(link->dst->outputs[0], w, h);
+    if (!frame)
+        return NULL;
 
     for (i = 0; i < 4; i ++) {
         int vsub = i == 1 || i == 2 ? flip->vsub : 0;
+        int height = FF_CEIL_RSHIFT(h, vsub);
 
-        if (outpicref->data[i]) {
-            outpicref->data[i] += ((link->h >> vsub)-1) * outpicref->linesize[i];
-            outpicref->linesize[i] = -outpicref->linesize[i];
+        if (frame->data[i]) {
+            frame->data[i] += (height - 1) * frame->linesize[i];
+            frame->linesize[i] = -frame->linesize[i];
         }
     }
 
-    avfilter_start_frame(link->dst->outputs[0], outpicref);
+    return frame;
 }
 
-static void draw_slice(AVFilterLink *link, int y, int h, int slice_dir)
+static int filter_frame(AVFilterLink *link, AVFrame *frame)
 {
-    AVFilterContext *ctx = link->dst;
+    FlipContext *flip = link->dst->priv;
+    int i;
 
-    avfilter_draw_slice(ctx->outputs[0], link->h - (y+h), h, -1 * slice_dir);
+    for (i = 0; i < 4; i ++) {
+        int vsub = i == 1 || i == 2 ? flip->vsub : 0;
+        int height = FF_CEIL_RSHIFT(link->h, vsub);
+
+        if (frame->data[i]) {
+            frame->data[i] += (height - 1) * frame->linesize[i];
+            frame->linesize[i] = -frame->linesize[i];
+        }
+    }
+
+    return ff_filter_frame(link->dst->outputs[0], frame);
 }
+static const AVFilterPad avfilter_vf_vflip_inputs[] = {
+    {
+        .name             = "default",
+        .type             = AVMEDIA_TYPE_VIDEO,
+        .get_video_buffer = get_video_buffer,
+        .filter_frame     = filter_frame,
+        .config_props     = config_input,
+    },
+    { NULL }
+};
 
-AVFilter avfilter_vf_vflip = {
-    .name      = "vflip",
+static const AVFilterPad avfilter_vf_vflip_outputs[] = {
+    {
+        .name = "default",
+        .type = AVMEDIA_TYPE_VIDEO,
+    },
+    { NULL }
+};
+
+AVFilter ff_vf_vflip = {
+    .name        = "vflip",
     .description = NULL_IF_CONFIG_SMALL("Flip the input video vertically."),
-
-    .priv_size = sizeof(FlipContext),
-
-    .inputs    = (const AVFilterPad[]) {{ .name       = "default",
-                                    .type             = AVMEDIA_TYPE_VIDEO,
-                                    .get_video_buffer = get_video_buffer,
-                                    .start_frame      = start_frame,
-                                    .draw_slice       = draw_slice,
-                                    .config_props     = config_input, },
-                                  { .name = NULL}},
-    .outputs   = (const AVFilterPad[]) {{ .name       = "default",
-                                    .type             = AVMEDIA_TYPE_VIDEO, },
-                                  { .name = NULL}},
+    .priv_size   = sizeof(FlipContext),
+    .inputs      = avfilter_vf_vflip_inputs,
+    .outputs     = avfilter_vf_vflip_outputs,
 };

@@ -20,7 +20,7 @@
  *
  */
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
 #endif
 
@@ -36,7 +36,7 @@
 class CDVDCodecOption
 {
 public:
-  CDVDCodecOption(std::string name, std::string value) { m_name = name; m_value = value; }
+  CDVDCodecOption(const std::string& name, const std::string& value) : m_name(name), m_value(value) {}
   std::string m_name;
   std::string m_value;
 };
@@ -46,4 +46,5 @@ class CDVDCodecOptions
 public:
   std::vector<CDVDCodecOption> m_keys;
   std::vector<ERenderFormat>   m_formats;
+  const void *m_opaque_pointer;
 };

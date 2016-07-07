@@ -25,6 +25,7 @@
  */
 
 #include "avcodec.h"
+#include "internal.h"
 #include "bytestream.h"
 #include "libavutil/lfg.h"
 #include "elbg.h"
@@ -34,7 +35,6 @@
  */
 typedef struct Msvideo1EncContext {
     AVCodecContext *avctx;
-    AVFrame pic;
     AVLFG rnd;
     uint8_t *prev;
 
@@ -57,25 +57,29 @@ enum MSV1Mode{
 };
 
 #define SKIP_PREFIX 0x8400
-#define SKIPS_MAX 0x0FFF
-#define MKRGB555(in, off) ((in[off] << 10) | (in[off + 1] << 5) | (in[off + 2]))
+#define SKIPS_MAX 0x03FF
+#define MKRGB555(in, off) (((in)[off] << 10) | ((in)[(off) + 1] << 5) | ((in)[(off) + 2]))
 
 static const int remap[16] = { 0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15 };
 
-static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void *data)
+static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
+                               const AVFrame *pict, int *got_packet)
 {
     Msvideo1EncContext * const c = avctx->priv_data;
-    AVFrame *pict = data;
-    AVFrame * const p = &c->pic;
+    const AVFrame *p = pict;
     uint16_t *src;
     uint8_t *prevptr;
-    uint8_t *dst = buf;
-    int keyframe = 1;
+    uint8_t *dst, *buf;
+    int keyframe = 0;
     int no_skips = 1;
-    int i, j, k, x, y;
+    int i, j, k, x, y, ret;
     int skips = 0;
+    int quality = 24;
 
-    *p = *pict;
+    if ((ret = ff_alloc_packet2(avctx, pkt, avctx->width*avctx->height*9 + AV_INPUT_BUFFER_MIN_SIZE, 0)) < 0)
+        return ret;
+    dst= buf= pkt->data;
+
     if(!c->prev)
         c->prev = av_malloc(avctx->width * 3 * (avctx->height + 3));
     prevptr = c->prev + avctx->width * 3 * (FFALIGN(avctx->height, 4) - 1);
@@ -83,7 +87,6 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
     if(c->keyint >= avctx->keyint_min)
         keyframe = 1;
 
-    p->quality = 24;
 
     for(y = 0; y < avctx->height; y += 4){
         for(x = 0; x < avctx->width; x += 4){
@@ -105,16 +108,16 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                 bestscore = 0;
                 for(j = 0; j < 4; j++){
                     for(i = 0; i < 4*3; i++){
-                        int t = prevptr[x*3 + i + j*p->linesize[0]] - c->block[i + j*4*3];
+                        int t = prevptr[x*3 + i - j*3*avctx->width] - c->block[i + j*4*3];
                         bestscore += t*t;
                     }
                 }
-                bestscore /= p->quality;
+                bestscore /= quality;
             }
             // try to find optimal value to fill whole 4x4 block
             score = 0;
-            ff_init_elbg(c->block, 3, 16, c->avg, 1, 1, c->output, &c->rnd);
-            ff_do_elbg  (c->block, 3, 16, c->avg, 1, 1, c->output, &c->rnd);
+            avpriv_init_elbg(c->block, 3, 16, c->avg, 1, 1, c->output, &c->rnd);
+            avpriv_do_elbg  (c->block, 3, 16, c->avg, 1, 1, c->output, &c->rnd);
             if(c->avg[0] == 1) // red component = 1 will be written as skip code
                 c->avg[0] = 0;
             for(j = 0; j < 4; j++){
@@ -125,7 +128,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                     }
                 }
             }
-            score /= p->quality;
+            score /= quality;
             score += 2;
             if(score < bestscore){
                 bestscore = score;
@@ -133,8 +136,8 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
             }
             // search for optimal filling of 2-color block
             score = 0;
-            ff_init_elbg(c->block, 3, 16, c->codebook, 2, 1, c->output, &c->rnd);
-            ff_do_elbg  (c->block, 3, 16, c->codebook, 2, 1, c->output, &c->rnd);
+            avpriv_init_elbg(c->block, 3, 16, c->codebook, 2, 1, c->output, &c->rnd);
+            avpriv_do_elbg  (c->block, 3, 16, c->codebook, 2, 1, c->output, &c->rnd);
             // last output value should be always 1, swap codebooks if needed
             if(!c->output[15]){
                 for(i = 0; i < 3; i++)
@@ -150,7 +153,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                     }
                 }
             }
-            score /= p->quality;
+            score /= quality;
             score += 6;
             if(score < bestscore){
                 bestscore = score;
@@ -159,8 +162,8 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
             // search for optimal filling of 2-color 2x2 subblocks
             score = 0;
             for(i = 0; i < 4; i++){
-                ff_init_elbg(c->block2 + i*4*3, 3, 4, c->codebook2 + i*2*3, 2, 1, c->output2 + i*4, &c->rnd);
-                ff_do_elbg  (c->block2 + i*4*3, 3, 4, c->codebook2 + i*2*3, 2, 1, c->output2 + i*4, &c->rnd);
+                avpriv_init_elbg(c->block2 + i*4*3, 3, 4, c->codebook2 + i*2*3, 2, 1, c->output2 + i*4, &c->rnd);
+                avpriv_do_elbg  (c->block2 + i*4*3, 3, 4, c->codebook2 + i*2*3, 2, 1, c->output2 + i*4, &c->rnd);
             }
             // last value should be always 1, swap codebooks if needed
             if(!c->output2[15]){
@@ -177,7 +180,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                     }
                 }
             }
-            score /= p->quality;
+            score /= quality;
             score += 18;
             if(score < bestscore){
                 bestscore = score;
@@ -199,14 +202,14 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                 for(j = 0; j < 4; j++)
                     for(i = 0; i < 4; i++)
                         for(k = 0; k < 3; k++)
-                            prevptr[i*3 + k - j*3*avctx->width] = c->avg[k];
+                            prevptr[x*3 + i*3 + k - j*3*avctx->width] = c->avg[k];
                 break;
             case MODE_2COL:
                 for(j = 0; j < 4; j++){
                     for(i = 0; i < 4; i++){
                         flags |= (c->output[i + j*4]^1) << (i + j*4);
                         for(k = 0; k < 3; k++)
-                            prevptr[i*3 + k - j*3*avctx->width] = c->codebook[c->output[i + j*4]*3 + k];
+                            prevptr[x*3 + i*3 + k - j*3*avctx->width] = c->codebook[c->output[i + j*4]*3 + k];
                     }
                 }
                 bytestream_put_le16(&dst, flags);
@@ -218,7 +221,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                     for(i = 0; i < 4; i++){
                         flags |= (c->output2[remap[i + j*4]]^1) << (i + j*4);
                         for(k = 0; k < 3; k++)
-                            prevptr[i*3 + k - j*3*avctx->width] = c->codebook2[(c->output2[remap[i+j*4]] + (i&2) + (j&2)*2)*3 + k];
+                            prevptr[x*3 + i*3 + k - j*3*avctx->width] = c->codebook2[(c->output2[remap[i+j*4]] + (i&2) + (j&2)*2)*3 + k];
                     }
                 }
                 bytestream_put_le16(&dst, flags);
@@ -243,10 +246,11 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
         c->keyint = 0;
     else
         c->keyint++;
-    p->pict_type= keyframe ? AV_PICTURE_TYPE_I : AV_PICTURE_TYPE_P;
-    p->key_frame= keyframe;
+    if (keyframe) pkt->flags |= AV_PKT_FLAG_KEY;
+    pkt->size = dst - buf;
+    *got_packet = 1;
 
-    return dst - buf;
+    return 0;
 }
 
 
@@ -262,12 +266,11 @@ static av_cold int encode_init(AVCodecContext *avctx)
         return -1;
     }
     if((avctx->width&3) || (avctx->height&3)){
-        av_log(avctx, AV_LOG_ERROR, "width and height must be multiplies of 4\n");
+        av_log(avctx, AV_LOG_ERROR, "width and height must be multiples of 4\n");
         return -1;
     }
 
-    avcodec_get_frame_defaults(&c->pic);
-    avctx->coded_frame = (AVFrame*)&c->pic;
+    avctx->bits_per_coded_sample = 16;
 
     c->keyint = avctx->keyint_min;
     av_lfg_init(&c->rnd, 1);
@@ -291,12 +294,12 @@ static av_cold int encode_end(AVCodecContext *avctx)
 
 AVCodec ff_msvideo1_encoder = {
     .name           = "msvideo1",
+    .long_name = NULL_IF_CONFIG_SMALL("Microsoft Video-1"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_MSVIDEO1,
+    .id             = AV_CODEC_ID_MSVIDEO1,
     .priv_data_size = sizeof(Msvideo1EncContext),
     .init           = encode_init,
-    .encode         = encode_frame,
+    .encode2        = encode_frame,
     .close          = encode_end,
-    .pix_fmts = (const enum PixelFormat[]){PIX_FMT_RGB555, PIX_FMT_NONE},
-    .long_name = NULL_IF_CONFIG_SMALL("Microsoft Video-1"),
+    .pix_fmts = (const enum AVPixelFormat[]){AV_PIX_FMT_RGB555, AV_PIX_FMT_NONE},
 };

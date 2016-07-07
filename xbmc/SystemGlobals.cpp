@@ -20,6 +20,7 @@
 #include "system.h"
 #include "SectionLoader.h"
 #include "cores/VideoRenderers/RenderManager.h"
+#include "cores/DataCacheCore.h"
 #include "input/MouseStat.h"
 #include "Application.h"
 #include "GUILargeTextureManager.h"
@@ -102,4 +103,6 @@
   CRarManager g_RarManager;
 #endif
   CZipManager g_ZipManager;
+
+  CDataCacheCore g_dataCacheCore;
 

@@ -21,13 +21,13 @@
 
 #include "DVDDemux.h"
 
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 #define __attribute__(dummy_val)
 #else
 #include <config.h>
 #endif
 
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 #pragma pack(push)
 #pragma pack(1)
 #endif
@@ -42,7 +42,7 @@ typedef struct
   uint64_t durationMs;
 } __attribute__((__packed__)) Demux_BXA_FmtHeader;
 
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 #pragma pack(pop)
 #endif
 
@@ -71,16 +71,12 @@ public:
   CDemuxStream* GetStream(int iStreamId);
   int GetNrOfStreams();
   std::string GetFileName();
-  virtual void GetStreamCodecName(int iStreamId, CStdString &strName);
-
-  /* PLEX */
-  virtual int GetStreamBitrate() { return 0; }
-  /* END PLEX */
+  virtual void GetStreamCodecName(int iStreamId, std::string &strName);
 
 protected:
   friend class CDemuxStreamAudioBXA;
   CDVDInputStream* m_pInput;
-  double m_pts;
+  int64_t m_bytes;
 
   CDemuxStreamAudioBXA *m_stream;
 

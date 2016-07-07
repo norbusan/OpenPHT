@@ -46,7 +46,7 @@ CPlexRemoteResponse CPlexRemotePlaybackHandler::handle(const CStdString &url, co
 ////////////////////////////////////////////////////////////////////////////////////////
 CPlexRemoteResponse CPlexRemotePlaybackHandler::stepFunction(const CStdString &url, const ArgMap &arguments)
 {
-  if (!g_application.IsPlaying())
+  if (!g_application.m_pPlayer->IsPlaying())
     return CPlexRemoteResponse();
 
   if (url.Equals("/player/playback/bigStepForward"))
@@ -140,7 +140,7 @@ CPlexRemoteResponse CPlexRemotePlaybackHandler::seekTo(const ArgMap &arguments)
   else
     return CPlexRemoteResponse(500, "missing offset argument!");
 
-  if (g_application.IsPlaying() && g_application.m_pPlayer)
+  if (g_application.m_pPlayer->IsPlaying())
     g_application.m_pPlayer->SeekTime(seekTo);
 
   return CPlexRemoteResponse();
@@ -292,7 +292,7 @@ CPlexRemoteResponse CPlexRemotePlaybackHandler::setVolume(const ArgMap &argument
 ////////////////////////////////////////////////////////////////////////////////////////
 CPlexRemoteResponse CPlexRemotePlaybackHandler::setStreams(const ArgMap &arguments)
 {
-  if (!g_application.IsPlayingVideo())
+  if (!g_application.m_pPlayer->IsPlayingVideo())
     return CPlexRemoteResponse();
 
   if (arguments.find("type") != arguments.end())

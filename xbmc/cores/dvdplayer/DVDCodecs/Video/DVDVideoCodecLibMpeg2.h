@@ -30,7 +30,7 @@ public:
   virtual ~CDVDVideoCodecLibMpeg2();
   virtual bool Open(CDVDStreamInfo &hints, CDVDCodecOptions &options);
   virtual void Dispose();
-  virtual int Decode(BYTE* pData, int iSize, double dts, double pts);
+  virtual int Decode(uint8_t* pData, int iSize, double dts, double pts);
   virtual void Reset();
   virtual bool GetPicture(DVDVideoPicture* pDvdVideoPicture);
   virtual bool GetUserData(DVDVideoUserData* pDvdVideoUserData);
@@ -43,7 +43,7 @@ protected:
   inline void ReleaseBuffer(DVDVideoPicture* pPic);
   inline void DeleteBuffer(DVDVideoPicture* pPic);
 
-  int GuessAspect(const mpeg2_sequence_t *sequence, unsigned int *pixel_width, unsigned int *pixel_height);
+  static int GuessAspect(const mpeg2_sequence_t *sequence, unsigned int *pixel_width, unsigned int *pixel_height);
 
   mpeg2dec_t* m_pHandle;
   const mpeg2_info_t* m_pInfo;

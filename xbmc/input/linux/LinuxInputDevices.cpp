@@ -292,12 +292,12 @@ typedef enum
 
 static char remoteStatus = 0xFF; // paired, battery OK
 
-CLinuxInputDevice::CLinuxInputDevice(const std::string fileName, int index)
+CLinuxInputDevice::CLinuxInputDevice(const std::string& fileName, int index):
+  m_fileName(fileName)
 {
   m_fd = -1;
   m_vt_fd = -1;
   m_hasLeds = false;
-  m_fileName = fileName;
   m_ledState[0] = false;
   m_ledState[1] = false;
   m_ledState[2] = false;
@@ -956,6 +956,30 @@ bool CLinuxInputDevice::IsUnplugged()
   return m_bUnplugged;
 }
 
+CLinuxInputDevicesCheckHotplugged::CLinuxInputDevicesCheckHotplugged(CLinuxInputDevices &parent) :
+    CThread("CLinuxInputDevicesCheckHotplugged"), m_parent(parent)
+{
+  Create();
+  SetPriority(THREAD_PRIORITY_BELOW_NORMAL);
+}
+
+CLinuxInputDevicesCheckHotplugged::~CLinuxInputDevicesCheckHotplugged()
+{
+  m_bStop = true;
+  m_quitEvent.Set();
+  StopThread(true);
+}
+
+void CLinuxInputDevicesCheckHotplugged::Process()
+{
+  while (!m_bStop)
+  {
+    m_parent.CheckHotplugged();
+    // every ten seconds
+    m_quitEvent.WaitMSec(10000);
+  }
+}
+
 bool CLinuxInputDevices::CheckDevice(const char *device)
 {
   int fd;
@@ -1022,10 +1046,6 @@ void CLinuxInputDevices::InitAvailable()
  */
 void CLinuxInputDevices::CheckHotplugged()
 {
-  CSingleLock lock(m_devicesListLock);
-
-  int deviceId = m_devices.size();
-
   /* No devices specified. Try to guess some. */
   for (int i = 0; i < MAX_LINUX_INPUT_DEVICES; i++)
   {
@@ -1033,18 +1053,22 @@ void CLinuxInputDevices::CheckHotplugged()
     bool ispresent = false;
 
     snprintf(buf, 32, "/dev/input/event%d", i);
-
-    for (size_t j = 0; j < m_devices.size(); j++)
     {
-      if (m_devices[j]->GetFileName().compare(buf) == 0)
+      CSingleLock lock(m_devicesListLock);
+      for (size_t j = 0; j < m_devices.size(); j++)
       {
-        ispresent = true;
-        break;
+        if (m_devices[j]->GetFileName().compare(buf) == 0)
+        {
+          ispresent = true;
+          break;
+        }
       }
     }
 
     if (!ispresent && CheckDevice(buf))
     {
+      CSingleLock lock(m_devicesListLock);
+      int deviceId = m_devices.size();
       CLog::Log(LOGINFO, "Found input device %s", buf);
       m_devices.push_back(new CLinuxInputDevice(buf, deviceId));
       ++deviceId;
@@ -1235,18 +1259,6 @@ XBMC_Event CLinuxInputDevices::ReadEvent()
     InitAvailable();
     m_bReInitialize = false;
   }
-  else
-  {
-    time_t now;
-    time(&now);
-
-    if ((now - m_lastHotplugCheck) >= 10)
-    {
-      CheckHotplugged();
-      m_lastHotplugCheck = now;
-    }
-  }
-
   CSingleLock lock(m_devicesListLock);
 
   XBMC_Event event;

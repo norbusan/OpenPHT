@@ -70,7 +70,7 @@ void CGUIWindowPlexPlayQueue::GetContextButtons(int itemNumber, CContextButtons&
 
   g_plexApplication.defaultActionHandler->GetContextButtons(WINDOW_PLEX_PLAY_QUEUE, item, m_vecItems, buttons);
 
-  if (!g_application.IsPlaying())
+  if (!g_application.m_pPlayer->IsPlaying())
     buttons.Add(CONTEXT_BUTTON_EDIT, 52608);
 }
 
@@ -162,7 +162,7 @@ bool CGUIWindowPlexPlayQueue::OnContextButton(int itemNumber, CONTEXT_BUTTON but
     case CONTEXT_BUTTON_EDIT:
     {
       // toggle edit mode
-       if (!g_application.IsPlaying())
+       if (!g_application.m_pPlayer->IsPlaying())
         m_vecItems->SetProperty("PlexEditMode",
                                 m_vecItems->GetProperty("PlexEditMode").asString() == "1" ? "" : "1");
       break;

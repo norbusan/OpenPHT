@@ -75,7 +75,7 @@ void CGUIFontTTFDX::Begin()
       pD3DDevice->SetTextureStageState( unit, D3DTSS_COLOROP  , D3DTOP_ADD );
       pD3DDevice->SetTextureStageState( unit, D3DTSS_COLORARG1, D3DTA_CURRENT) ;
       pD3DDevice->SetRenderState( D3DRS_TEXTUREFACTOR, D3DCOLOR_RGBA(16,16,16,0) );
-     pD3DDevice->SetTextureStageState( unit, D3DTSS_COLORARG2, D3DTA_TFACTOR );
+      pD3DDevice->SetTextureStageState( unit, D3DTSS_COLORARG2, D3DTA_TFACTOR );
       unit++;
     }
 
@@ -200,7 +200,6 @@ CBaseTexture* CGUIFontTTFDX::ReallocTexture(unsigned int& newHeight)
   }
 
   LPDIRECT3DSURFACE9 pSource, pTarget;
-  HRESULT hr;
   // There might be data to copy from the previous texture
   if ((newSpeedupTexture && m_speedupTexture) || (newTexture && m_texture))
   {
@@ -262,7 +261,7 @@ CBaseTexture* CGUIFontTTFDX::ReallocTexture(unsigned int& newHeight)
     const RECT rect = { 0, 0, m_textureWidth, m_textureHeight };
     const POINT point = { 0, 0 };
 
-    hr = g_Windowing.Get3DDevice()->UpdateSurface(pSource, &rect, pTarget, &point);
+    HRESULT hr = g_Windowing.Get3DDevice()->UpdateSurface(pSource, &rect, pTarget, &point);
     SAFE_RELEASE(pSource);
     SAFE_RELEASE(pTarget);
 

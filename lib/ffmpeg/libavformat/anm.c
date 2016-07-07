@@ -28,13 +28,13 @@
 #include "avformat.h"
 #include "internal.h"
 
-typedef struct {
+typedef struct Page {
     int base_record;
     unsigned int nb_records;
     int size;
 } Page;
 
-typedef struct {
+typedef struct AnmDemuxContext {
     unsigned int nb_pages;    /**< total pages in file */
     unsigned int nb_records;  /**< total records in file */
     int page_table_offset;
@@ -76,8 +76,7 @@ static int find_record(const AnmDemuxContext *anm, int record)
     return AVERROR_INVALIDDATA;
 }
 
-static int read_header(AVFormatContext *s,
-                       AVFormatParameters *ap)
+static int read_header(AVFormatContext *s)
 {
     AnmDemuxContext *anm = s->priv_data;
     AVIOContext *pb = s->pb;
@@ -86,8 +85,8 @@ static int read_header(AVFormatContext *s,
 
     avio_skip(pb, 4); /* magic number */
     if (avio_rl16(pb) != MAX_PAGES) {
-        av_log_ask_for_sample(s, "max_pages != " AV_STRINGIFY(MAX_PAGES) "\n");
-        return AVERROR_INVALIDDATA;
+        avpriv_request_sample(s, "max_pages != " AV_STRINGIFY(MAX_PAGES));
+        return AVERROR_PATCHWELCOME;
     }
 
     anm->nb_pages   = avio_rl16(pb);
@@ -102,7 +101,7 @@ static int read_header(AVFormatContext *s,
     if (!st)
         return AVERROR(ENOMEM);
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id   = CODEC_ID_ANM;
+    st->codec->codec_id   = AV_CODEC_ID_ANM;
     st->codec->codec_tag  = 0; /* no fourcc */
     st->codec->width      = avio_rl16(pb);
     st->codec->height     = avio_rl16(pb);
@@ -134,10 +133,10 @@ static int read_header(AVFormatContext *s,
 
     /* color cycling and palette data */
     st->codec->extradata_size = 16*8 + 4*256;
-    st->codec->extradata      = av_mallocz(st->codec->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
-    if (!st->codec->extradata)
+    st->codec->extradata      = av_mallocz(st->codec->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!st->codec->extradata) {
         return AVERROR(ENOMEM);
-
+    }
     ret = avio_read(pb, st->codec->extradata, st->codec->extradata_size);
     if (ret < 0)
         return ret;
@@ -156,15 +155,16 @@ static int read_header(AVFormatContext *s,
 
     /* find page of first frame */
     anm->page = find_record(anm, 0);
-    if (anm->page < 0)
+    if (anm->page < 0) {
         return anm->page;
+    }
 
     anm->record = -1;
     return 0;
 
 invalid:
-    av_log_ask_for_sample(s, NULL);
-    return AVERROR_INVALIDDATA;
+    avpriv_request_sample(s, "Invalid header element");
+    return AVERROR_PATCHWELCOME;
 }
 
 static int read_packet(AVFormatContext *s,
@@ -175,7 +175,7 @@ static int read_packet(AVFormatContext *s,
     Page *p;
     int tmp, record_size;
 
-    if (url_feof(s->pb))
+    if (avio_feof(s->pb))
         return AVERROR(EIO);
 
     if (anm->page < 0)

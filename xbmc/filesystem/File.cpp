@@ -269,7 +269,7 @@ bool CFile::Open(const CStdString& strFileName, unsigned int flags, size_t cache
       SAFE_DELETE(m_pFile);
       if (pRedirectEx && pRedirectEx->m_pNewFileImp)
       {
-        auto_ptr<CURL> pNewUrl(pRedirectEx->m_pNewUrl);
+        unique_ptr<CURL> pNewUrl(pRedirectEx->m_pNewUrl);
         m_pFile = pRedirectEx->m_pNewFileImp;
         delete pRedirectEx;
         
@@ -364,7 +364,7 @@ bool CFile::Exists(const CStdString& strFileName, bool bUseCache /* = true */)
     }
 
     url = URIUtils::SubstitutePath(strFileName);
-    auto_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
+    unique_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
     if (!pFile.get())
       return false;
 
@@ -378,8 +378,8 @@ bool CFile::Exists(const CStdString& strFileName, bool bUseCache /* = true */)
     CLog::Log(LOGDEBUG,"File::Exists - redirecting implementation for %s", strFileName.c_str());
     if (pRedirectEx && pRedirectEx->m_pNewFileImp)
     {
-      auto_ptr<IFile> pImp(pRedirectEx->m_pNewFileImp);
-      auto_ptr<CURL> pNewUrl(pRedirectEx->m_pNewUrl);
+      unique_ptr<IFile> pImp(pRedirectEx->m_pNewFileImp);
+      unique_ptr<CURL> pNewUrl(pRedirectEx->m_pNewUrl);
       delete pRedirectEx;
         
       if (pNewUrl.get())
@@ -426,7 +426,7 @@ int CFile::Stat(const CStdString& strFileName, struct __stat64* buffer)
   {
     url = URIUtils::SubstitutePath(strFileName);
     
-    auto_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
+    unique_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
     if (!pFile.get())
       return -1;
     return pFile->Stat(url, buffer);
@@ -439,8 +439,8 @@ int CFile::Stat(const CStdString& strFileName, struct __stat64* buffer)
     CLog::Log(LOGDEBUG,"File::Stat - redirecting implementation for %s", strFileName.c_str());
     if (pRedirectEx && pRedirectEx->m_pNewFileImp)
     {
-      auto_ptr<IFile> pImp(pRedirectEx->m_pNewFileImp);
-      auto_ptr<CURL> pNewUrl(pRedirectEx->m_pNewUrl);
+      unique_ptr<IFile> pImp(pRedirectEx->m_pNewFileImp);
+      unique_ptr<CURL> pNewUrl(pRedirectEx->m_pNewUrl);
       delete pRedirectEx;
         
       if (pNewUrl.get())
@@ -722,7 +722,7 @@ bool CFile::Delete(const CStdString& strFileName)
   {
     CURL url(URIUtils::SubstitutePath(strFileName));
 
-    auto_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
+    unique_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
     if (!pFile.get())
       return false;
 
@@ -749,7 +749,7 @@ bool CFile::Rename(const CStdString& strFileName, const CStdString& strNewFileNa
     CURL url(URIUtils::SubstitutePath(strFileName));
     CURL urlnew(URIUtils::SubstitutePath(strNewFileName));
 
-    auto_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
+    unique_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
     if (!pFile.get())
       return false;
 
@@ -775,7 +775,7 @@ bool CFile::SetHidden(const CStdString& fileName, bool hidden)
   {
     CURL url(URIUtils::SubstitutePath(fileName));
 
-    auto_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
+    unique_ptr<IFile> pFile(CFileFactory::CreateLoader(url));
     if (!pFile.get())
       return false;
 

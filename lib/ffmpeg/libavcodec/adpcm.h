@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2003 The ffmpeg Project
+ * Copyright (c) 2001-2003 The FFmpeg Project
  *
  * This file is part of FFmpeg.
  *
@@ -26,18 +26,20 @@
 #ifndef AVCODEC_ADPCM_H
 #define AVCODEC_ADPCM_H
 
+#include <stdint.h>
+
 #define BLKSIZE 1024
 
 typedef struct ADPCMChannelStatus {
     int predictor;
-    short int step_index;
+    int16_t step_index;
     int step;
     /* for encoding */
     int prev_sample;
 
     /* MS version */
-    short sample1;
-    short sample2;
+    int sample1;
+    int sample2;
     int coeff1;
     int coeff2;
     int idelta;

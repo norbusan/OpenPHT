@@ -36,17 +36,12 @@
 #include "windowing/WindowingFactory.h"
 #include "guilib/LocalizeStrings.h"
 #include "utils/log.h"
+#include "powermanagement\PowerManager.h"
+#include "utils/SystemInfo.h"
 #include "utils/StringUtils.h"
 #include "DllPaths_win32.h"
 #include "FileSystem/File.h"
 #include "utils/URIUtils.h"
-#include "powermanagement\PowerManager.h"
-
-// default Broadcom registy bits (setup when installing a CrystalHD card)
-#define BC_REG_PATH       "Software\\Broadcom\\MediaPC"
-#define BC_REG_PRODUCT    "CrystalHD" // 70012/70015
-#define BC_BCM_DLL        "bcmDIL.dll"
-#define BC_REG_INST_PATH  "InstallPath"
 
 #define DLL_ENV_PATH "special://xbmc/system/;" \
                      "special://xbmc/system/players/dvdplayer/;" \
@@ -245,24 +240,28 @@ bool CWIN32Util::PowerManagement(PowerState State)
 {
 // SetSuspendState not available in vs2003
 #if _MSC_VER > 1400
-  HANDLE hToken;
-  TOKEN_PRIVILEGES tkp;
-  // Get a token for this process.
-  if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+  static bool gotShutdownPrivileges = false;
+  if (!gotShutdownPrivileges)
   {
-    return false;
-  }
-  // Get the LUID for the shutdown privilege.
-  LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &tkp.Privileges[0].Luid);
-  tkp.PrivilegeCount = 1;  // one privilege to set
-  tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-  // Get the shutdown privilege for this process.
-  AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
-  CloseHandle(hToken);
+    HANDLE hToken;
+    // Get a token for this process.
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+    {
+      // Get the LUID for the shutdown privilege.
+      TOKEN_PRIVILEGES tkp = {};
+      if (LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &tkp.Privileges[0].Luid))
+      {
+        tkp.PrivilegeCount = 1;  // one privilege to set
+        tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+        // Get the shutdown privilege for this process.
+        if (AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES)NULL, 0))
+          gotShutdownPrivileges = true;
+      }
+      CloseHandle(hToken);
+    }
 
-  if (GetLastError() != ERROR_SUCCESS)
-  {
-    return false;
+    if (!gotShutdownPrivileges)
+      return false;
   }
 
   // process OnSleep() events. This is called in main thread.
@@ -272,19 +271,27 @@ bool CWIN32Util::PowerManagement(PowerState State)
   {
   case POWERSTATE_HIBERNATE:
     CLog::Log(LOGINFO, "Asking Windows to hibernate...");
-    return SetSuspendState(true,true,false) == TRUE;
+    return SetSuspendState(true, true, false) == TRUE;
     break;
   case POWERSTATE_SUSPEND:
     CLog::Log(LOGINFO, "Asking Windows to suspend...");
-    return SetSuspendState(false,true,false) == TRUE;
+    return SetSuspendState(false, true, false) == TRUE;
     break;
   case POWERSTATE_SHUTDOWN:
     CLog::Log(LOGINFO, "Shutdown Windows...");
-    return ExitWindowsEx(EWX_SHUTDOWN | EWX_FORCE, SHTDN_REASON_MAJOR_OPERATINGSYSTEM | SHTDN_REASON_MINOR_UPGRADE | SHTDN_REASON_FLAG_PLANNED) == TRUE;
+    if (g_sysinfo.IsWindowsVersionAtLeast(CSysInfo::WindowsVersionWin8))
+      return InitiateShutdownW(NULL, NULL, 0, SHUTDOWN_HYBRID | SHUTDOWN_INSTALL_UPDATES | SHUTDOWN_POWEROFF,
+                               SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED) == ERROR_SUCCESS;
+    return InitiateShutdownW(NULL, NULL, 0, SHUTDOWN_INSTALL_UPDATES | SHUTDOWN_POWEROFF,
+                             SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED) == ERROR_SUCCESS;
     break;
   case POWERSTATE_REBOOT:
     CLog::Log(LOGINFO, "Rebooting Windows...");
-    return ExitWindowsEx(EWX_REBOOT | EWX_FORCE, SHTDN_REASON_MAJOR_OPERATINGSYSTEM | SHTDN_REASON_MINOR_UPGRADE | SHTDN_REASON_FLAG_PLANNED) == TRUE;
+    if (g_sysinfo.IsWindowsVersionAtLeast(CSysInfo::WindowsVersionWin8))
+      return InitiateShutdownW(NULL, NULL, 0, SHUTDOWN_INSTALL_UPDATES | SHUTDOWN_RESTART,
+                               SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED) == ERROR_SUCCESS;
+    return InitiateShutdownW(NULL, NULL, 0, SHUTDOWN_INSTALL_UPDATES | SHUTDOWN_RESTART,
+                             SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED) == ERROR_SUCCESS;
     break;
   default:
     CLog::Log(LOGERROR, "Unknown PowerState called.");
@@ -436,7 +443,7 @@ CStdString CWIN32Util::GetSpecialFolder(int csidl)
   CStdString strProfilePath;
   WCHAR szPath[MAX_PATH];
 
-  if(SUCCEEDED(SHGetFolderPathW(NULL,csidl,NULL,0,szPath)))
+  if(SUCCEEDED(SHGetFolderPathW(NULL,csidl,NULL,SHGFP_TYPE_CURRENT,szPath)))
   {
     g_charsetConverter.wToUTF8(szPath, strProfilePath);
     strProfilePath = UncToSmb(strProfilePath);
@@ -1397,41 +1404,6 @@ bool CWIN32Util::UtilRegOpenKeyEx( const HKEY hKeyParent, const char *const pcKe
   return bRet;
 }
 
-bool CWIN32Util::GetCrystalHDLibraryPath(CStdString &strPath)
-{
-  // support finding library by windows registry
-  HKEY hKey;
-  CStdString strRegKey;
-
-  CLog::Log(LOGDEBUG, "CrystalHD: detecting CrystalHD installation path");
-  strRegKey.Format("%s\\%s", BC_REG_PATH, BC_REG_PRODUCT );
-
-  if( CWIN32Util::UtilRegOpenKeyEx( HKEY_LOCAL_MACHINE, strRegKey.c_str(), KEY_READ, &hKey ))
-  {
-    DWORD dwType;
-    char *pcPath= NULL;
-    if( CWIN32Util::UtilRegGetValue( hKey, BC_REG_INST_PATH, &dwType, &pcPath, NULL, sizeof( pcPath ) ) == ERROR_SUCCESS )
-    {
-      strPath = URIUtils::AddFileToFolder(pcPath, BC_BCM_DLL);
-      CLog::Log(LOGDEBUG, "CrystalHD: got CrystalHD installation path (%s)", strPath.c_str());
-      return true;
-    }
-    else
-    {
-      CLog::Log(LOGDEBUG, "CrystalHD: getting CrystalHD installation path failed");
-    }
-  }
-  else
-  {
-    CLog::Log(LOGDEBUG, "CrystalHD: CrystalHD software seems to be not installed.");
-  }
-  // check for dll in system dir
-  if(XFILE::CFile::Exists(DLL_PATH_LIBCRYSTALHD))
-    return true;
-  else
-    return false;
-}
-
 bool CWIN32Util::GetInstallerDependenciesVersion(const CStdString &strGuid, CStdString &strVersion)
 {
   HKEY hKey;
@@ -1555,7 +1527,8 @@ void CWIN32Util::CropSource(CRect& src, CRect& dst, CRect target)
 
 void CWinIdleTimer::StartZero()
 {
-  SetThreadExecutionState(ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED);
+  if (!g_application.IsDPMSActive())
+    SetThreadExecutionState(ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED);
   CStopWatch::StartZero();
 }
 

@@ -208,8 +208,8 @@ void CGUISpinControl::OnRight()
 
 void CGUISpinControl::Clear()
 {
-  m_vecLabels.erase(m_vecLabels.begin(), m_vecLabels.end());
-  m_vecValues.erase(m_vecValues.begin(), m_vecValues.end());
+  m_vecLabels.clear();
+  m_vecValues.clear();
   SetValue(0);
 }
 
@@ -410,12 +410,12 @@ void CGUISpinControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyr
 
   changed |= m_label.SetText(text);
 
-  const float space = 5;
   float textWidth = m_label.GetTextWidth() + 2 * m_label.GetLabelInfo().offsetX;
   // Position the arrows
   bool arrowsOnRight(0 != (m_label.GetLabelInfo().align & (XBFONT_RIGHT | XBFONT_CENTER_X)));
   if (!arrowsOnRight)
   {
+    const float space = 5;
     changed |= m_imgspinDownFocus.SetPosition(m_posX + textWidth + space, m_posY);
     changed |= m_imgspinDown.SetPosition(m_posX + textWidth + space, m_posY);
     changed |= m_imgspinUpFocus.SetPosition(m_posX + textWidth + space + m_imgspinDown.GetWidth(), m_posY);
@@ -426,6 +426,7 @@ void CGUISpinControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyr
   changed |= m_imgspinDown.Process(currentTime);
   changed |= m_imgspinUp.Process(currentTime);
   changed |= m_imgspinUpFocus.Process(currentTime);
+  changed |= m_label.Process(currentTime);
 
   if (changed)
     MarkDirtyRegion();

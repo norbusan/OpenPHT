@@ -1,7 +1,7 @@
 #pragma once
 /*
- *      Copyright (C) 2010-2012 Team XBMC
- *      http://www.xbmc.org
+ *      Copyright (C) 2010-2013 Team XBMC
+ *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,12 +19,17 @@
  *
  */
 
-#include "Interfaces/AESink.h"
-#include "Utils/AEDeviceInfo.h"
+#include "cores/AudioEngine/Interfaces/AESink.h"
+#include "cores/AudioEngine/Utils/AEDeviceInfo.h"
+#include "threads/CriticalSection.h"
 
 class AERingBuffer;
+namespace jni
+{
+class CJNIAudioTrack;
+};
 
-class CAESinkAUDIOTRACK : public CThread, public IAESink
+class CAESinkAUDIOTRACK : public IAESink
 {
 public:
   virtual const char *GetName() { return "AUDIOTRACK"; }
@@ -34,34 +39,28 @@ public:
 
   virtual bool Initialize(AEAudioFormat &format, std::string &device);
   virtual void Deinitialize();
-  virtual bool IsCompatible(const AEAudioFormat format, const std::string device);
 
-  virtual double       GetDelay        ();
-  virtual double       GetCacheTime    ();
+  virtual void         GetDelay        (AEDelayStatus& status);
+  virtual double       GetLatency      ();
   virtual double       GetCacheTotal   ();
-  virtual unsigned int AddPackets      (uint8_t *data, unsigned int frames, bool hasAudio);
+  virtual unsigned int AddPackets      (uint8_t **data, unsigned int frames, unsigned int offset);
   virtual void         Drain           ();
-  virtual bool         HasVolume       ();
-  virtual void         SetVolume       (float scale);
   static void          EnumerateDevicesEx(AEDeviceInfoList &list, bool force = false);
 
+protected:
+  static bool IsSupported(int sampleRateInHz, int channelConfig, int audioFormat);
+
 private:
-  virtual void Process();
+  jni::CJNIAudioTrack  *m_at_jni;
+  // m_frames_written must wrap at UINT32_MAX
+  uint32_t              m_frames_written;
 
   static CAEDeviceInfo m_info;
   AEAudioFormat      m_format;
   double             m_volume;
-  bool               m_volume_changed;
   volatile int       m_min_frames;
-  int16_t           *m_alignedS16LE;
-  AERingBuffer      *m_sinkbuffer;
+  int16_t           *m_alignedS16;
   unsigned int       m_sink_frameSize;
-  double             m_sinkbuffer_sec;
-  double             m_sinkbuffer_sec_per_byte;
-
-  CEvent             m_wake;
-  CEvent             m_inited;
-  volatile bool      m_draining;
+  bool               m_passthrough;
   double             m_audiotrackbuffer_sec;
-  double             m_audiotrack_empty_sec;
 };

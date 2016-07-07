@@ -34,7 +34,7 @@ static int aac_sync(uint64_t state, AACAC3ParseContext *hdr_info,
     int size;
     union {
         uint64_t u64;
-        uint8_t  u8[8 + FF_INPUT_BUFFER_PADDING_SIZE];
+        uint8_t  u8[8 + AV_INPUT_BUFFER_PADDING_SIZE];
     } tmp;
 
     tmp.u64 = av_be2ne64(state);
@@ -61,7 +61,7 @@ static av_cold int aac_parse_init(AVCodecParserContext *s1)
 
 
 AVCodecParser ff_aac_parser = {
-    .codec_ids      = { CODEC_ID_AAC },
+    .codec_ids      = { AV_CODEC_ID_AAC },
     .priv_data_size = sizeof(AACAC3ParseContext),
     .parser_init    = aac_parse_init,
     .parser_parse   = ff_aac_ac3_parse,

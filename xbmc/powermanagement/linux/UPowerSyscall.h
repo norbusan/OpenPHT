@@ -24,9 +24,9 @@
 #ifdef HAS_DBUS
 #include "powermanagement/IPowerSyscall.h"
 #include "DBusUtil.h"
-#include "utils/StdString.h"
 
 #include <list>
+#include <string>
 
 class CUPowerSource
 {
@@ -39,12 +39,12 @@ public:
   double  BatteryLevel();
 
 private:
-  CStdString m_powerSource;
+  std::string m_powerSource;
   bool m_isRechargeable;
   double m_batteryLevel;
 };
 
-class CUPowerSyscall : public IPowerSyscall
+class CUPowerSyscall : public CAbstractPowerSyscall
 {
 public:
   CUPowerSyscall();

@@ -17,6 +17,7 @@
  *  <http://www.gnu.org/licenses/>.
  *
  */
+
 #pragma once
 
 #include <stdlib.h>
@@ -63,5 +64,6 @@ namespace OVERLAY {
                        , int& min_x, int& max_x
                        , int& min_y, int& max_y);
   bool      convert_quad(ASS_Image* images, SQuads& quads);
+  int       GetStereoscopicDepth();
 
 }

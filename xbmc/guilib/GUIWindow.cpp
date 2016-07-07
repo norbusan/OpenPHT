@@ -220,6 +220,8 @@ bool CGUIWindow::Load(TiXmlElement* pRootElement)
     {
       XMLUtils::GetFloat(pChild, "posx", m_posX);
       XMLUtils::GetFloat(pChild, "posy", m_posY);
+      XMLUtils::GetFloat(pChild, "left", m_posX);
+      XMLUtils::GetFloat(pChild, "top", m_posY);
 
       TiXmlElement *originElement = pChild->FirstChildElement("origin");
       while (originElement)
@@ -327,10 +329,9 @@ void CGUIWindow::CenterWindow()
 void CGUIWindow::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
   g_graphicsContext.SetRenderingResolution(m_coordsRes, m_needsScaling);
-  unsigned int size = g_graphicsContext.AddGUITransform();
+  g_graphicsContext.AddGUITransform();
   CGUIControlGroup::DoProcess(currentTime, dirtyregions);
-  if (size != g_graphicsContext.RemoveTransform())
-    CLog::Log(LOGERROR, "Unbalanced UI transforms (was %d)", size);
+  g_graphicsContext.RemoveTransform();
 
   // check if currently focused control can have it
   // and fallback to default control if not
@@ -349,10 +350,9 @@ void CGUIWindow::DoRender()
 
   g_graphicsContext.SetRenderingResolution(m_coordsRes, m_needsScaling);
 
-  unsigned int size = g_graphicsContext.AddGUITransform();
+  g_graphicsContext.AddGUITransform();
   CGUIControlGroup::DoRender();
-  if (size != g_graphicsContext.RemoveTransform())
-    CLog::Log(LOGERROR, "Unbalanced UI transforms (was %d)", size);
+  g_graphicsContext.RemoveTransform();
 
   if (CGUIControlProfiler::IsRunning()) CGUIControlProfiler::Instance().EndFrame();
 }
@@ -391,7 +391,7 @@ void CGUIWindow::Close_Internal(bool forceClose /*= false*/, int nextWindowID /*
   }
 
   m_closing = false;
-  CGUIMessage msg(GUI_MSG_WINDOW_DEINIT, 0, 0);
+  CGUIMessage msg(GUI_MSG_WINDOW_DEINIT, 0, 0, nextWindowID);
   OnMessage(msg);
 }
 
@@ -494,7 +494,7 @@ void CGUIWindow::OnInitWindow()
     g_audioManager.PlayWindowSound(GetID(), SOUND_INIT);
 
   // set our rendered state
-  m_hasRendered = false;
+  m_hasProcessed = false;
   m_closing = false;
   m_active = true;
   ResetAnimations();  // we need to reset our animations as those windows that don't dynamically allocate
@@ -587,7 +587,6 @@ bool CGUIWindow::OnMessage(CGUIMessage& message)
         CLog::Log(LOGDEBUG, "Unfocus WindowID: %i, ControlID: %i",GetID(), control->GetID());
       }
       return true;
-    break;
     }
 
   case GUI_MSG_SELCHANGED:
@@ -751,7 +750,7 @@ void CGUIWindow::AllocResources(bool forceLoad /*= FALSE */)
   else
   {
     CLog::Log(LOGDEBUG,"Window %s was already loaded", GetProperty("xmlfile").c_str());
-    CLog::Log(LOGDEBUG,"Alloc resources: %.2fm", 1000.f * (end - start) / freq);
+    CLog::Log(LOGDEBUG,"Alloc resources: %.2fms", 1000.f * (end - start) / freq);
   }
 #endif
   m_bAllocated = true;
@@ -768,6 +767,7 @@ void CGUIWindow::FreeResources(bool forceUnload /*= FALSE */)
   {
     delete m_windowXMLRootElement;
     m_windowXMLRootElement = NULL;
+    m_xmlIncludeConditions.clear();
   }
 }
 
@@ -783,6 +783,7 @@ void CGUIWindow::ClearAll()
   CGUIControlGroup::ClearAll();
   m_windowLoaded = false;
   m_dynamicResourceAlloc = true;
+  m_visibleCondition = 0;
 }
 
 bool CGUIWindow::Initialize()
@@ -820,7 +821,7 @@ bool CGUIWindow::CheckAnimation(ANIMATION_TYPE animType)
   // special cases first
   if (animType == ANIM_TYPE_WINDOW_CLOSE)
   {
-    if (!m_bAllocated || !m_hasRendered) // can't render an animation if we aren't allocated or haven't rendered
+    if (!m_bAllocated || !HasProcessed()) // can't process an animation if we aren't allocated or haven't processed
       return false;
     // make sure we update our visibility prior to queuing the window close anim
     for (unsigned int i = 0; i < m_children.size(); i++)

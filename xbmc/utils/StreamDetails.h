@@ -59,6 +59,7 @@ public:
   float m_fAspect;
   int m_iDuration;
   CStdString m_strCodec;
+  CStdString m_strStereoMode;
 };
 
 class CStreamDetailAudio : public CStreamDetail
@@ -78,6 +79,7 @@ class CStreamDetailSubtitle : public CStreamDetail
 {
 public:
   CStreamDetailSubtitle();
+  CStreamDetailSubtitle& operator=(const CStreamDetailSubtitle &that);
   virtual void Archive(CArchive& ar);
   virtual void Serialize(CVariant& value) const;
   virtual bool IsWorseThan(CStreamDetail *that);
@@ -110,6 +112,8 @@ public:
   int GetVideoWidth(int idx = 0) const;
   int GetVideoHeight(int idx = 0) const;
   int GetVideoDuration(int idx = 0) const;
+  void SetVideoDuration(int idx, const int duration);
+  CStdString GetStereoMode(int idx = 0) const;
 
   CStdString GetAudioCodec(int idx = 0) const;
   CStdString GetAudioLanguage(int idx = 0) const;

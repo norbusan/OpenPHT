@@ -83,14 +83,12 @@ VecOverlaysIter CDVDOverlayContainer::Remove(VecOverlaysIter itOverlay)
 
 void CDVDOverlayContainer::CleanUp(double pts)
 {
-  CDVDOverlay* pOverlay = NULL;
-
   CSingleLock lock(*this);
 
   VecOverlaysIter it = m_overlays.begin();
   while (it != m_overlays.end())
   {
-    pOverlay = *it;
+    CDVDOverlay* pOverlay = *it;
 
     // never delete forced overlays, they are used in menu's
     // clear takes care of removing them
@@ -107,11 +105,10 @@ void CDVDOverlayContainer::CleanUp(double pts)
     {
       //Check for newer replacements
       VecOverlaysIter it2 = it;
-      CDVDOverlay* pOverlay2;
       bool bNewer = false;
       while (!bNewer && ++it2 != m_overlays.end())
       {
-        pOverlay2 = *it2;
+        CDVDOverlay* pOverlay2 = *it2;
         if (pOverlay2->bForced && pOverlay2->iPTSStartTime <= pts) bNewer = true;
       }
 
@@ -121,14 +118,14 @@ void CDVDOverlayContainer::CleanUp(double pts)
         continue;
       }
     }
-    it++;
+    ++it;
   }
 
 }
 
 void CDVDOverlayContainer::Remove()
 {
-  if (m_overlays.size() > 0)
+  if (!m_overlays.empty())
   {
     CDVDOverlay* pOverlay;
 
@@ -144,7 +141,7 @@ void CDVDOverlayContainer::Remove()
 
 void CDVDOverlayContainer::Clear()
 {
-  while (m_overlays.size() > 0) Remove();
+  while (!m_overlays.empty()) Remove();
 }
 
 int CDVDOverlayContainer::GetSize()
@@ -162,7 +159,7 @@ bool CDVDOverlayContainer::ContainsOverlayType(DVDOverlayType type)
   while (!result && it != m_overlays.end())
   {
     if (((CDVDOverlay*)*it)->IsOverlayType(type)) result = true;
-    it++;
+    ++it;
   }
 
   return result;
@@ -176,7 +173,7 @@ void CDVDOverlayContainer::UpdateOverlayInfo(CDVDInputStreamNavigator* pStream, 
   CSingleLock lock(*this);
 
   //Update any forced overlays.
-  for(VecOverlays::iterator it = m_overlays.begin(); it != m_overlays.end(); it++ )
+  for(VecOverlays::iterator it = m_overlays.begin(); it != m_overlays.end(); ++it )
   {
     if ((*it)->IsOverlayType(DVDOVERLAY_TYPE_SPU))
     {
@@ -184,7 +181,7 @@ void CDVDOverlayContainer::UpdateOverlayInfo(CDVDInputStreamNavigator* pStream, 
 
       // make sure its a forced (menu) overlay
       // set menu spu color and alpha data if there is a valid menu overlay
-      if (pOverlaySpu->bForced && pStream->GetCurrentGroupId() == pOverlaySpu->iGroupId)
+      if (pOverlaySpu->bForced)
       {
         if(pOverlaySpu->Acquire()->Release() > 1)
         {

@@ -59,7 +59,7 @@ set(PYTHON_EXEC "${PYTHON_EXEC_}" CACHE FILEPATH "Path to Python interpreter")
 string(REGEX REPLACE "/bin/python.*" "" PYTHON_PREFIX "${PYTHON_EXEC_}")
 string(REGEX REPLACE "/bin/python.*" "" PYTHON_PREFIX2 "${PYTHON_EXEC}")
 
-if (TARGET_RPI)
+if (TARGET_RPI OR TARGET_AML)
     string(REGEX REPLACE ".*/bin/python" "" PYTHON_VERSION "${PYTHON_EXEC}") # grab version from executable name
 else()
     execute_process(COMMAND "${PYTHON_EXEC}" "-c"
@@ -84,7 +84,7 @@ find_path(PYTHON_INCLUDE_DIRS "Python.h"
     PATH_SUFFIXES python${PYTHON_VERSION} python${PYTHON_VERSION}m
     DOC "Python include directories" NO_DEFAULT_PATH)
 
-if (TARGET_RPI)
+if (TARGET_RPI OR TARGET_AML)
     set(PYTHON_SITE_MODULES "${PYTHON_PREFIX}/lib/site-packages" CACHE FILEPATH "Path to Python site modules")
 else()
     execute_process(COMMAND "${PYTHON_EXEC}" "-c"
@@ -108,7 +108,7 @@ function(find_python_module module)
     if(NOT PY_${module_upper})
         # A module's location is usually a directory, but for binary modules
         # it's a .so file.
-        if (NOT TARGET_RPI)
+        if (NOT TARGET_RPI AND NOT TARGET_AML)
             execute_process(COMMAND "${PYTHON_EXEC}" "-c"
                 "import re, ${module}; print(re.compile('/__init__.py.*').sub('',${module}.__file__))"
                 RESULT_VARIABLE _${module}_status

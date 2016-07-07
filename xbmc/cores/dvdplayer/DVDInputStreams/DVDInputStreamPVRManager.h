@@ -26,6 +26,7 @@
 
 #include "DVDInputStream.h"
 #include "FileItem.h"
+#include "threads/SystemClock.h"
 
 namespace XFILE {
 class IFile;
@@ -46,7 +47,7 @@ public:
   virtual ~CDVDInputStreamPVRManager();
   virtual bool Open(const char* strFile, const std::string &content);
   virtual void Close();
-  virtual int Read(BYTE* buf, int buf_size);
+  virtual int Read(uint8_t* buf, int buf_size);
   virtual int64_t Seek(int64_t offset, int whence);
   virtual bool Pause(double dTime) { return false; }
   virtual bool IsEOF();
@@ -54,11 +55,11 @@ public:
 
   virtual ENextStream NextStream();
 
-  bool            SelectChannelByNumber(unsigned int iChannel);
-  bool            SelectChannel(const PVR::CPVRChannel &channel);
-  bool            NextChannel(bool preview = false);
-  bool            PrevChannel(bool preview = false);
-  bool            GetSelectedChannel(PVR::CPVRChannelPtr& channel) const;
+  bool                SelectChannelByNumber(unsigned int iChannel);
+  bool                SelectChannel(const PVR::CPVRChannelPtr &channel);
+  bool                NextChannel(bool preview = false);
+  bool                PrevChannel(bool preview = false);
+  PVR::CPVRChannelPtr GetSelectedChannel();
 
   int             GetTotalTime();
   int             GetTime();
@@ -89,7 +90,7 @@ public:
   void ResetScanTimeout(unsigned int iTimeoutMs);
 protected:
   bool CloseAndOpen(const char* strFile);
-  bool SupportsChannelSwitch(void) const;
+  static bool SupportsChannelSwitch(void);
 
   IDVDPlayer*               m_pPlayer;
   CDVDInputStream*          m_pOtherStream;
@@ -98,7 +99,7 @@ protected:
   XFILE::IRecordable*       m_pRecordable;
   bool                      m_eof;
   std::string               m_strContent;
-  unsigned int              m_iScanTimeout;
+  XbmcThreads::EndTime      m_ScanTimeout;
 };
 
 

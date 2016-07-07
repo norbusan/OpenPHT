@@ -22,6 +22,7 @@
 #define WINDOW_SYSTEM_WIN32_H
 
 #include "windowing/WinSystem.h"
+#include <string>
 
 struct MONITOR_DETAILS
 {
@@ -33,9 +34,9 @@ struct MONITOR_DETAILS
   bool      Interlaced;
 
   HMONITOR  hMonitor;
-  char      MonitorName[128];
-  char      CardName[128];
-  char      DeviceName[128];
+  std::wstring MonitorNameW;
+  std::wstring CardNameW;
+  std::wstring DeviceNameW;
   int       ScreenNumber; // XBMC POV, not Windows. Windows primary is XBMC #0, then each secondary is +1.
 };
 
@@ -115,6 +116,9 @@ typedef struct tagGESTURENOTIFYSTRUCT {
     DWORD dwInstanceID;             // internally used
 } GESTURENOTIFYSTRUCT, *PGESTURENOTIFYSTRUCT;
 
+#define GID_ROTATE_ANGLE_TO_ARGUMENT(_arg_)     ((USHORT)((((_arg_) + 2.0 * 3.14159265) / (4.0 * 3.14159265)) * 65535.0))
+#define GID_ROTATE_ANGLE_FROM_ARGUMENT(_arg_)   ((((double)(_arg_) / 65535.0) * 4.0 * 3.14159265) - 2.0 * 3.14159265)
+
 DECLARE_HANDLE(HGESTUREINFO);
 
 #endif
@@ -131,6 +135,7 @@ public:
   virtual bool CreateNewWindow(const CStdString& name, bool fullScreen, RESOLUTION_INFO& res, PHANDLE_EVENT_FUNC userFunction);
   virtual bool ResizeWindow(int newWidth, int newHeight, int newLeft, int newTop);
   virtual bool SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays);
+  virtual bool SetFullScreenEx(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays, bool forceResChange);
   virtual void UpdateResolutions();
   virtual bool CenterWindow();
   virtual void NotifyAppFocusChange(bool bGaining);
@@ -162,12 +167,12 @@ public:
   /* END PLEX */
 
 protected:
-  bool ChangeResolution(RESOLUTION_INFO res);
+  bool ChangeResolution(RESOLUTION_INFO res, bool forceChange = false);
   virtual bool ResizeInternal(bool forceRefresh = false);
   virtual bool UpdateResolutionsInternal();
   virtual bool CreateBlankWindows();
   virtual bool BlankNonActiveMonitors(bool bBlank);
-  const MONITOR_DETAILS &GetMonitor(int screen) const;
+  const MONITOR_DETAILS* GetMonitor(int screen) const;
   void RestoreDesktopResolution(int screen);
   RECT ScreenRect(int screen);
   /*!

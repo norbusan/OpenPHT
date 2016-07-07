@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2010-2012 Team XBMC
+ *      Copyright (C) 2010-2013 Team XBMC
  *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,13 +19,14 @@
  *
  */
 
-#include <list>
 #include <map>
+#include <list>
+#include <vector>
+#include <utility>
 
 #include "system.h"
-#include "threads/CriticalSection.h"
 
-#include "../AEAudioFormat.h"
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
 
 typedef std::pair<std::string, std::string> AEDevice;
 typedef std::vector<AEDevice> AEDeviceList;
@@ -34,11 +35,33 @@ typedef std::vector<AEDevice> AEDeviceList;
 class IAEStream;
 class IAESound;
 class IAEPacketizer;
+class IAudioCallback;
 
 /* sound options */
 #define AE_SOUND_OFF    0 /* disable sounds */
 #define AE_SOUND_IDLE   1 /* only play sounds while no streams are running */
 #define AE_SOUND_ALWAYS 2 /* always play sounds */
+
+/* config options */
+#define AE_CONFIG_FIXED 1
+#define AE_CONFIG_AUTO  2
+#define AE_CONFIG_MATCH 3
+
+enum AEQuality
+{
+  AE_QUALITY_UNKNOWN    = -1, /* Unset, unknown or incorrect quality level */
+  AE_QUALITY_DEFAULT    =  0, /* Engine's default quality level */
+
+  /* Basic quality levels */
+  AE_QUALITY_LOW        = 20, /* Low quality level */
+  AE_QUALITY_MID        = 30, /* Standard quality level */
+  AE_QUALITY_HIGH       = 50, /* Best sound processing quality */
+
+  /* Optional quality levels */
+  AE_QUALITY_REALLYHIGH = 100, /* Uncompromised optional quality level,
+                               usually with unmeasurable and unnoticeable improvement */ 
+  AE_QUALITY_GPU        = 101, /* GPU acceleration */
+};
 
 /**
  * IAE Interface
@@ -135,7 +158,7 @@ public:
    * @param options A bit field of stream options (see: enum AEStreamOptions)
    * @return a new IAEStream that will accept data in the requested format
    */
-  virtual IAEStream *MakeStream(enum AEDataFormat dataFormat, unsigned int sampleRate, unsigned int encodedSampleRate, CAEChannelInfo channelLayout, unsigned int options = 0) = 0;
+  virtual IAEStream *MakeStream(enum AEDataFormat dataFormat, unsigned int sampleRate, unsigned int encodedSampleRate, CAEChannelInfo& channelLayout, unsigned int options = 0) = 0;
 
   /**
    * This method will remove the specifyed stream from the engine.
@@ -182,6 +205,59 @@ public:
    * @see CAEPackIEC61937::CAEPackIEC61937()
    * @returns true if the AudioEngine is capable of RAW output
    */
-  virtual bool SupportsRaw() { return false; }
+  virtual bool SupportsRaw(AEDataFormat format, int samplerate) { return false; }
+
+   /**
+   * Returns true if the AudioEngine supports drain mode which is not streaming silence when idle
+   * @returns true if the AudioEngine is capable of drain mode
+   */
+  virtual bool SupportsSilenceTimeout() { return false; }
+
+  /**
+   * Returns true if the AudioEngine is currently configured for stereo audio
+   * @returns true if the AudioEngine is currently configured for stereo audio
+   */
+  virtual bool HasStereoAudioChannelCount() { return false; }
+
+  /**
+   * Returns true if the AudioEngine is currently configured for HD audio (more than 5.1)
+   * @returns true if the AudioEngine is currently configured for HD audio (more than 5.1)
+   */
+  virtual bool HasHDAudioChannelCount() { return true; }
+
+  virtual void RegisterAudioCallback(IAudioCallback* pCallback) {}
+
+  virtual void UnregisterAudioCallback() {}
+
+  /**
+   * Returns true if AudioEngine supports specified quality level
+   * @return true if specified quality level is supported, otherwise false
+   */
+  virtual bool SupportsQualityLevel(enum AEQuality level) { return false; }
+
+  /**
+   * AE decides whether this settings should be displayed
+   * @return true if AudioEngine wants to display this setting
+   */
+  virtual bool IsSettingVisible(const std::string &settingId) {return false; }
+
+  /**
+   * Instruct AE to keep configuration for a specified time
+   * @param millis time for which old configuration should be kept
+   */
+  virtual void KeepConfiguration(unsigned int millis) {return; }
+
+  /**
+   * Instruct AE to re-initialize, e.g. after ELD change event
+   */
+  virtual void DeviceChange() {return; }
+
+  /**
+   * Get the current sink data format
+   *
+   * @param Current sink data format. For more details see AEAudioFormat.
+   * @return Returns true on success, else false.
+   */
+  virtual bool GetCurrentSinkFormat(AEAudioFormat &SinkFormat) { return false; }
 };
 

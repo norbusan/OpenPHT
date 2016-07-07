@@ -39,7 +39,10 @@ extern const ff_asf_guid ff_dir_entry_guid;
 extern const ff_asf_guid ff_wtv_guid;
 extern const ff_asf_guid ff_timestamp_guid;
 extern const ff_asf_guid ff_data_guid;
-extern const ff_asf_guid ff_stream_guid;
+extern const ff_asf_guid ff_SBE2_STREAM_DESC_EVENT;
+extern const ff_asf_guid ff_stream1_guid;
+extern const ff_asf_guid ff_sync_guid;
+extern const ff_asf_guid ff_index_guid;
 extern const ff_asf_guid ff_mediatype_audio;
 extern const ff_asf_guid ff_mediatype_video;
 extern const ff_asf_guid ff_format_none;
@@ -52,4 +55,6 @@ extern const ff_asf_guid ff_mediasubtype_cpfilters_processed;
 extern const ff_asf_guid ff_format_cpfilters_processed;
 extern const ff_asf_guid ff_format_waveformatex;
 extern const ff_asf_guid ff_format_mpeg2_video;
+extern const ff_asf_guid ff_format_videoinfo2;
+
 #endif /* AVFORMAT_WTV_H */

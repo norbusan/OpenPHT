@@ -34,9 +34,8 @@ CGUIBorderedImage::CGUIBorderedImage(int parentID, int controlID, float posX, fl
 }
 
 CGUIBorderedImage::CGUIBorderedImage(const CGUIBorderedImage &right)
-: CGUIImage(right), m_borderImage(right.m_borderImage)
+: CGUIImage(right), m_borderImage(right.m_borderImage), m_borderSize(right.m_borderSize)
 {
-  m_borderSize = right.m_borderSize;
   ControlType = GUICONTROL_BORDEREDIMAGE;
 }
 
@@ -46,6 +45,7 @@ CGUIBorderedImage::~CGUIBorderedImage(void)
 
 void CGUIBorderedImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
+  CGUIImage::Process(currentTime, dirtyregions);
   if (!m_borderImage.GetFileName().IsEmpty() && m_texture.ReadyToRender())
   {
     CRect rect = CRect(m_texture.GetXPosition(), m_texture.GetYPosition(), m_texture.GetXPosition() + m_texture.GetWidth(), m_texture.GetYPosition() + m_texture.GetHeight());
@@ -57,7 +57,6 @@ void CGUIBorderedImage::Process(unsigned int currentTime, CDirtyRegionList &dirt
     if (m_borderImage.Process(currentTime))
       MarkDirtyRegion();
   }
-  CGUIImage::Process(currentTime, dirtyregions);
 }
 
 void CGUIBorderedImage::Render()

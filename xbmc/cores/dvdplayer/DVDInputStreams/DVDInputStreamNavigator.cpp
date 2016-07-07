@@ -51,7 +51,6 @@ CDVDInputStreamNavigator::CDVDInputStreamNavigator(IDVDPlayer* player) : CDVDInp
   m_iPart = m_iPartCount = 0;
   m_iTime = m_iTotalTime = 0;
   m_bEOF = false;
-  m_icurrentGroupId = 0;
   m_lastevent = DVDNAV_NOP;
 
   memset(m_lastblock, 0, sizeof(m_lastblock));
@@ -64,7 +63,6 @@ CDVDInputStreamNavigator::~CDVDInputStreamNavigator()
 
 bool CDVDInputStreamNavigator::Open(const char* strFile, const std::string& content)
 {
-  m_icurrentGroupId = 0;
   if (!CDVDInputStream::Open(strFile, "video/x-dvd-mpeg"))
     return false;
 
@@ -187,8 +185,14 @@ bool CDVDInputStreamNavigator::Open(const char* strFile, const std::string& cont
     m_dll.dvdnav_get_next_cache_block(m_dvdnav,&buf_ptr,&event,&len);
     m_dll.dvdnav_sector_search(m_dvdnav, 0, SEEK_SET);
 
+    // first try title menu
     if(m_dll.dvdnav_menu_call(m_dvdnav, DVD_MENU_Title) != DVDNAV_STATUS_OK)
+    {
       CLog::Log(LOGERROR,"Error on dvdnav_menu_call(Title): %s\n", m_dll.dvdnav_err_to_string(m_dvdnav));
+      // next try root menu
+      if(m_dll.dvdnav_menu_call(m_dvdnav, DVD_MENU_Root) != DVDNAV_STATUS_OK )
+        CLog::Log(LOGERROR,"Error on dvdnav_menu_call(Root): %s\n", m_dll.dvdnav_err_to_string(m_dvdnav));
+    }
   }
 
   m_bEOF = false;
@@ -222,7 +226,7 @@ void CDVDInputStreamNavigator::Close()
   m_bEOF = true;
 }
 
-int CDVDInputStreamNavigator::Read(BYTE* buf, int buf_size)
+int CDVDInputStreamNavigator::Read(uint8_t* buf, int buf_size)
 {
   if (!m_dvdnav || m_bEOF) return 0;
   if (buf_size < DVD_VIDEO_BLOCKSIZE)
@@ -231,14 +235,25 @@ int CDVDInputStreamNavigator::Read(BYTE* buf, int buf_size)
     return -1;
   }
 
-  int navresult;
   int iBytesRead;
 
+  int NOPcount = 0;
   while(true) {
-    navresult = ProcessBlock(buf, &iBytesRead);
+    int navresult = ProcessBlock(buf, &iBytesRead);
     if (navresult == NAVRESULT_HOLD)       return 0; // return 0 bytes read;
     else if (navresult == NAVRESULT_ERROR) return -1;
     else if (navresult == NAVRESULT_DATA)  return iBytesRead;
+    else if (navresult == NAVRESULT_NOP)
+    {
+      NOPcount++;
+      if (NOPcount == 1000) 
+      {
+        m_bEOF = true;
+        CLog::Log(LOGERROR,"CDVDInputStreamNavigator: Stopping playback due to infinite loop, caused by badly authored DVD navigation structure. Try enabling 'Attempt to skip introduction before DVD menu'.");
+        m_pDVDPlayer->OnDVDNavResult(NULL, DVDNAV_STOP);
+        return -1; // fail and stop playback.
+      }
+    }
   }
 
   return iBytesRead;
@@ -253,17 +268,16 @@ int64_t CDVDInputStreamNavigator::Seek(int64_t offset, int whence)
     return -1;
 }
 
-int CDVDInputStreamNavigator::ProcessBlock(BYTE* dest_buffer, int* read)
+int CDVDInputStreamNavigator::ProcessBlock(uint8_t* dest_buffer, int* read)
 {
   if (!m_dvdnav) return -1;
 
   int result;
   int len = 2048;
-  int iNavresult = NAVRESULT_NOP;
 
   // m_tempbuffer will be used for anything that isn't a normal data block
   uint8_t* buf = m_lastblock;
-  iNavresult = -1;
+  int iNavresult = -1;
 
   if(m_holdmode == HOLDMODE_HELD)
     return NAVRESULT_HOLD;
@@ -355,6 +369,14 @@ int CDVDInputStreamNavigator::ProcessBlock(BYTE* dest_buffer, int* read)
 
         //libdvdnav never sets logical, why.. don't know..
         event->logical = GetActiveSubtitleStream();
+
+        /* correct stream ids for disabled subs if needed */
+        if(!IsSubtitleStreamEnabled())
+        {
+          event->physical_letterbox |= 0x80;
+          event->physical_pan_scan |= 0x80;
+          event->physical_wide |= 0x80;
+        }
 
         if(event->logical<0 && GetSubTitleStreamCount()>0)
         {
@@ -455,7 +477,6 @@ int CDVDInputStreamNavigator::ProcessBlock(BYTE* dest_buffer, int* read)
         m_iCellStart = cell_change_event->cell_start; // store cell time as we need that for time later
         m_iTime      = (int) (m_iCellStart / 90);
         m_iTotalTime = (int) (cell_change_event->pgc_length / 90);
-        m_icurrentGroupId = cell_change_event->pgN * 1000 + cell_change_event->cellN;
 
         iNavresult = m_pDVDPlayer->OnDVDNavResult(buf, DVDNAV_CELL_CHANGE);
       }
@@ -505,7 +526,7 @@ int CDVDInputStreamNavigator::ProcessBlock(BYTE* dest_buffer, int* read)
           }
           m_iVobUnitCorrection += gap;
 
-          CLog::Log(LOGDEBUG, "DVDNAV_NAV_PACKET - DISCONTINUITY FROM:%"PRId64" TO:%"PRId64" DIFF:%"PRId64, (m_iVobUnitStop * 1000)/90, ((int64_t)pci->pci_gi.vobu_s_ptm*1000)/90, (gap*1000)/90);
+          CLog::Log(LOGDEBUG, "DVDNAV_NAV_PACKET - DISCONTINUITY FROM:%" PRId64" TO:%" PRId64" DIFF:%" PRId64, (m_iVobUnitStop * 1000)/90, ((int64_t)pci->pci_gi.vobu_s_ptm*1000)/90, (gap*1000)/90);
         }
 
         m_iVobUnitStart = pci->pci_gi.vobu_s_ptm;
@@ -1184,7 +1205,7 @@ bool CDVDInputStreamNavigator::SetState(const std::string &xmlstate)
     CLog::Log(LOGWARNING, "CDVDInputStreamNavigator::SetNavigatorState - Failed to set state (%s), retrying after read", m_dll.dvdnav_err_to_string(m_dvdnav));
 
     /* vm won't be started until after first read, this should really be handled internally */
-    BYTE buffer[DVD_VIDEO_BLOCKSIZE];
+    uint8_t buffer[DVD_VIDEO_BLOCKSIZE];
     Read(buffer,DVD_VIDEO_BLOCKSIZE);
 
     if( DVDNAV_STATUS_ERR == m_dll.dvdnav_set_state(m_dvdnav, &save_state) )
@@ -1336,4 +1357,8 @@ int CDVDInputStreamNavigator::ConvertSubtitleStreamId_ExternalToXBMC(int id)
     // non VTS_DOMAIN, only one stream is available
     return 0;
   }
+}
+int64_t CDVDInputStreamNavigator::GetChapterPos(int ch)
+{
+  return 0;
 }

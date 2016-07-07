@@ -20,7 +20,11 @@
 
 #pragma once
 
+#include <stdint.h>
 #include "utils/StdString.h"
+#include <vector>
+
+#include "pictures/PictureScalingAlgorithm.h"
 #include "utils/Job.h"
 
 class CBaseTexture;
@@ -105,10 +109,11 @@ protected:
    \param url wrapped URL of the image
    \param width width derived from URL
    \param height height derived from URL
+   \param scalingAlgorithm scaling algorithm derived from URL
    \param additional_info additional information, such as "flipped" to flip horizontally
    \return URL of the underlying image file.
    */
-  static CStdString DecodeImageURL(const CStdString &url, unsigned int &width, unsigned int &height, std::string &additional_info);
+  static CStdString DecodeImageURL(const CStdString &url, unsigned int &width, unsigned int &height, CPictureScalingAlgorithm::Algorithm& scalingAlgorithm, std::string &additional_info);
 
   /*! \brief Load an image at a given target size and orientation.
 
@@ -121,7 +126,7 @@ protected:
    \param additional_info extra info for loading, such as whether to flip horizontally.
    \return a pointer to a CBaseTexture object, NULL if failed.
    */
-  static CBaseTexture *LoadImage(const CStdString &image, unsigned int width, unsigned int height, const std::string &additional_info);
+  static CBaseTexture *LoadImage(const CStdString &image, unsigned int width, unsigned int height, const std::string &additional_info, bool requirePixels = false);
 
   CStdString    m_cachePath;
 };

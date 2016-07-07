@@ -20,6 +20,7 @@
 
 #include "SlideShowPicture.h"
 #include "system.h"
+#include "guilib/GraphicContext.h"
 #include "guilib/Texture.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
@@ -52,6 +53,8 @@ CSlideShowPic::CSlideShowPic()
   m_bIsFinished = false;
   m_bDrawNextImage = false;
   m_bTransistionImmediately = false;
+
+  m_bCanMoveHorizontally = false;
 }
 
 CSlideShowPic::~CSlideShowPic()
@@ -93,7 +96,9 @@ void CSlideShowPic::SetTexture(int iSlideNumber, CBaseTexture* pTexture, DISPLAY
   m_transistionStart.type = transEffect;
   m_transistionStart.start = 0;
   // the +1's make sure it actually occurs
-  float fadeTime = std::min(0.2f*g_guiSettings.GetInt("slideshow.staytime"), 3.0f);
+  float fadeTime = 0.2f;
+  if (m_displayEffect != EFFECT_NO_TIMEOUT)
+    fadeTime = std::min(0.2f*g_guiSettings.GetInt("slideshow.staytime"), 3.0f);
   m_transistionStart.length = (int)(g_graphicsContext.GetFPS() * fadeTime); // transition time in frames
   m_transistionEnd.type = transEffect;
   m_transistionEnd.length = m_transistionStart.length;
@@ -132,9 +137,9 @@ void CSlideShowPic::SetTexture(int iSlideNumber, CBaseTexture* pTexture, DISPLAY
   int iFrames = max((int)(g_graphicsContext.GetFPS() * g_guiSettings.GetInt("slideshow.staytime")), 1);
   if (m_displayEffect == EFFECT_PANORAMA)
   {
-    RESOLUTION iRes = g_graphicsContext.GetVideoResolution();
-	  float fScreenWidth = (float)g_settings.m_ResInfo[iRes].Overscan.right - g_settings.m_ResInfo[iRes].Overscan.left;
-    float fScreenHeight = (float)g_settings.m_ResInfo[iRes].Overscan.bottom - g_settings.m_ResInfo[iRes].Overscan.top;
+    RESOLUTION_INFO res = g_graphicsContext.GetResInfo();
+    float fScreenWidth  = (float)res.Overscan.right  - res.Overscan.left;
+    float fScreenHeight = (float)res.Overscan.bottom - res.Overscan.top;
 
     if (m_fWidth > m_fHeight)
     {
@@ -389,15 +394,15 @@ void CSlideShowPic::Process(unsigned int currentTime, CDirtyRegionList &dirtyreg
   if (m_iCounter > m_transistionEnd.start + m_transistionEnd.length)
     m_bIsFinished = true;
 
+  RESOLUTION_INFO info = g_graphicsContext.GetResInfo();
+
   // calculate where we should render (and how large it should be)
   // calculate aspect ratio correction factor
-  RESOLUTION iRes = g_graphicsContext.GetVideoResolution();
-  float fOffsetX = (float)g_settings.m_ResInfo[iRes].Overscan.left;
-  float fOffsetY = (float)g_settings.m_ResInfo[iRes].Overscan.top;
-  float fScreenWidth = (float)g_settings.m_ResInfo[iRes].Overscan.right - g_settings.m_ResInfo[iRes].Overscan.left;
-  float fScreenHeight = (float)g_settings.m_ResInfo[iRes].Overscan.bottom - g_settings.m_ResInfo[iRes].Overscan.top;
-
-  float fPixelRatio = g_settings.m_ResInfo[iRes].fPixelRatio;
+  float fOffsetX      = (float)info.Overscan.left;
+  float fOffsetY      = (float)info.Overscan.top;
+  float fScreenWidth  = (float)info.Overscan.right  - info.Overscan.left;
+  float fScreenHeight = (float)info.Overscan.bottom - info.Overscan.top;
+  float fPixelRatio   = info.fPixelRatio;
 
   // Rotate the image as needed
   float x[4];
@@ -718,26 +723,32 @@ void CSlideShowPic::Render(float *x, float *y, CBaseTexture* pTexture, color_t c
 #ifdef HAS_DX
   struct VERTEX
   {
-    D3DXVECTOR4 p;
+    D3DXVECTOR3 p;
     D3DCOLOR col;
     FLOAT tu, tv;
   };
-  static const DWORD FVF_VERTEX = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
+  static const DWORD FVF_VERTEX = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
 
   VERTEX vertex[5];
 
   for (int i = 0; i < 4; i++)
   {
-    vertex[i].p = D3DXVECTOR4( x[i], y[i], 0, 1.0f);
+    vertex[i].p = D3DXVECTOR3( x[i], y[i], 0);
     vertex[i].tu = 0;
     vertex[i].tv = 0;
     vertex[i].col = color;
   }
 
-  vertex[1].tu = 1.0f;
-  vertex[2].tu = 1.0f;
-  vertex[2].tv = 1.0f;
-  vertex[3].tv = 1.0f;
+  if (pTexture)
+  {
+    vertex[1].tu = vertex[2].tu = (float)pTexture->GetWidth() / pTexture->GetTextureWidth();
+    vertex[2].tv = vertex[3].tv = (float)pTexture->GetHeight() / pTexture->GetTextureHeight();
+  }
+  else
+  {
+    vertex[1].tu = vertex[2].tu = 1.0f;
+    vertex[2].tv = vertex[3].tv = 1.0f;
+  }
   
   vertex[4] = vertex[0]; // Not used when pTexture != NULL
 
@@ -778,8 +789,9 @@ void CSlideShowPic::Render(float *x, float *y, CBaseTexture* pTexture, color_t c
   g_graphicsContext.BeginPaint();
   if (pTexture)
   {
+    int unit = 0;
     pTexture->LoadToGPU();
-    pTexture->BindToUnit(0);
+    pTexture->BindToUnit(unit++);
 
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);          // Turn Blending On
@@ -791,6 +803,35 @@ void CSlideShowPic::Render(float *x, float *y, CBaseTexture* pTexture, color_t c
     glTexEnvf(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
     glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE1_RGB, GL_PRIMARY_COLOR);
     glTexEnvf(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
+
+    if(g_Windowing.UseLimitedColor())
+    {
+      // compress range
+      pTexture->BindToUnit(unit++); // dummy bind
+      const GLfloat rgba1[4] = {(235.0 - 16.0f) / 255.0f, (235.0 - 16.0f) / 255.0f, (235.0 - 16.0f) / 255.0f, 1.0f};
+      glTexEnvi (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE , GL_COMBINE);
+      glTexEnvfv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_COLOR, rgba1);
+      glTexEnvi (GL_TEXTURE_ENV, GL_COMBINE_RGB , GL_MODULATE);
+      glTexEnvi (GL_TEXTURE_ENV, GL_SOURCE0_RGB , GL_PREVIOUS);
+      glTexEnvi (GL_TEXTURE_ENV, GL_SOURCE1_RGB , GL_CONSTANT);
+      glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND0_RGB , GL_SRC_COLOR);
+      glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND1_RGB , GL_SRC_COLOR);
+      glTexEnvi (GL_TEXTURE_ENV, GL_COMBINE_ALPHA , GL_REPLACE);
+      glTexEnvi (GL_TEXTURE_ENV, GL_SOURCE0_ALPHA , GL_PREVIOUS);
+
+      // transition
+      pTexture->BindToUnit(unit++); // dummy bind
+      const GLfloat rgba2[4] = {16.0f / 255.0f, 16.0f / 255.0f, 16.0f / 255.0f, 0.0f};
+      glTexEnvi (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE , GL_COMBINE);
+      glTexEnvfv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_COLOR, rgba2);
+      glTexEnvi (GL_TEXTURE_ENV, GL_COMBINE_RGB , GL_ADD);
+      glTexEnvi (GL_TEXTURE_ENV, GL_SOURCE0_RGB , GL_PREVIOUS);
+      glTexEnvi (GL_TEXTURE_ENV, GL_SOURCE1_RGB , GL_CONSTANT);
+      glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND0_RGB , GL_SRC_COLOR);
+      glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND1_RGB , GL_SRC_COLOR);
+      glTexEnvi (GL_TEXTURE_ENV, GL_COMBINE_ALPHA , GL_REPLACE);
+      glTexEnvi (GL_TEXTURE_ENV, GL_SOURCE0_ALPHA , GL_PREVIOUS);
+    }
   }
   else
     glDisable(GL_TEXTURE_2D);

@@ -21,10 +21,29 @@
 
 #include "libavutil/mathematics.h"
 #include "avformat.h"
+#include "internal.h"
 #include "pcm.h"
 
-int pcm_read_seek(AVFormatContext *s,
-                  int stream_index, int64_t timestamp, int flags)
+#define RAW_SAMPLES     1024
+
+int ff_pcm_read_packet(AVFormatContext *s, AVPacket *pkt)
+{
+    int ret, size;
+
+    size= RAW_SAMPLES*s->streams[0]->codec->block_align;
+    if (size <= 0)
+        return AVERROR(EINVAL);
+
+    ret= av_get_packet(s->pb, pkt, size);
+
+    pkt->flags &= ~AV_PKT_FLAG_CORRUPT;
+    pkt->stream_index = 0;
+
+    return ret;
+}
+
+int ff_pcm_read_seek(AVFormatContext *s,
+                     int stream_index, int64_t timestamp, int flags)
 {
     AVStream *st;
     int block_align, byte_rate;
@@ -50,7 +69,7 @@ int pcm_read_seek(AVFormatContext *s,
 
     /* recompute exact position */
     st->cur_dts = av_rescale(pos, st->time_base.den, byte_rate * (int64_t)st->time_base.num);
-    if ((ret = avio_seek(s->pb, pos + s->data_offset, SEEK_SET)) < 0)
+    if ((ret = avio_seek(s->pb, pos + s->internal->data_offset, SEEK_SET)) < 0)
         return ret;
     return 0;
 }

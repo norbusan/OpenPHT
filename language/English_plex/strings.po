@@ -460,6 +460,10 @@ msgctxt "#40007"
 msgid "Pre-release"
 msgstr "Pre-release"
 
+msgctxt "#40008"
+msgid "Beta"
+msgstr "Beta"
+
 msgctxt "#40016"
 msgid "Check for update now..."
 msgstr "Check for update now..."
@@ -580,7 +584,11 @@ msgctxt "#40214"
 msgid "Quality"
 msgstr "Quality"
 
-#empty strings from id 40215 to 40299
+msgctxt "#40215"
+msgid "Scan localhost"
+msgstr "Scan localhost"
+
+#empty strings from id 40216 to 40299
 
 msgctxt "#40300"
 msgid "Set Quit Timer"
@@ -1195,3 +1203,35 @@ msgstr "Go to Show"
 msgctxt "#52636"
 msgid "Go to Season"
 msgstr "Go to Season"
+
+msgctxt "#52639"
+msgid "Direct Play HEVC up to"
+msgstr "Direct Play HEVC up to"
+
+msgctxt "#52640"
+msgid "None"
+msgstr "None"
+
+msgctxt "#52641"
+msgid "540p"
+msgstr "540p"
+
+msgctxt "#52642"
+msgid "720p"
+msgstr "720p"
+
+msgctxt "#52643"
+msgid "1080p"
+msgstr "1080p"
+
+msgctxt "#52644"
+msgid "1440p"
+msgstr "1440p"
+
+msgctxt "#52645"
+msgid "2160p"
+msgstr "2160p"
+
+msgctxt "#52646"
+msgid "Unlimited"
+msgstr "Unlimited"

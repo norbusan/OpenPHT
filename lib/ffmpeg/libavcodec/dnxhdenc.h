@@ -29,21 +29,21 @@
 #include "mpegvideo.h"
 #include "dnxhddata.h"
 
-typedef struct {
+typedef struct RCCMPEntry {
     uint16_t mb;
     int value;
 } RCCMPEntry;
 
-typedef struct {
+typedef struct RCEntry {
     int ssd;
     int bits;
 } RCEntry;
 
 typedef struct DNXHDEncContext {
     AVClass *class;
+    BlockDSPContext bdsp;
     MpegEncContext m; ///< Used for quantization dsp functions
 
-    AVFrame frame;
     int cid;
     const CIDEntry *cid_table;
     uint8_t *msip; ///< Macroblock Scan Indexes Payload
@@ -63,8 +63,9 @@ typedef struct DNXHDEncContext {
 
     int nitris_compat;
     unsigned min_padding;
+    int intra_quant_bias;
 
-    DECLARE_ALIGNED(16, DCTELEM, blocks)[8][64];
+    DECLARE_ALIGNED(16, int16_t, blocks)[8][64];
 
     int      (*qmatrix_c)     [64];
     int      (*qmatrix_l)     [64];
@@ -90,9 +91,10 @@ typedef struct DNXHDEncContext {
     RCCMPEntry *mb_cmp;
     RCEntry   (*mb_rc)[8160];
 
-    void (*get_pixels_8x4_sym)(DCTELEM */*align 16*/, const uint8_t *, int);
+    void (*get_pixels_8x4_sym)(int16_t * /* align 16 */,
+                               const uint8_t *, ptrdiff_t);
 } DNXHDEncContext;
 
-void ff_dnxhd_init_mmx(DNXHDEncContext *ctx);
+void ff_dnxhdenc_init_x86(DNXHDEncContext *ctx);
 
 #endif /* AVCODEC_DNXHDENC_H */

@@ -47,9 +47,11 @@ bool ModplugCodec::Init(const CStdString &strFile, unsigned int filecache)
     return false;
 
   // set correct codec name
-  URIUtils::GetExtension(strFile,m_CodecName);
-  m_CodecName.erase(0,1);
-  m_CodecName.ToUpper();
+  CStdString codec;
+  URIUtils::GetExtension(strFile, codec);
+  codec.erase(0, 1);
+  codec.ToUpper();
+  m_CodecName = codec;
 
   // Read our file to memory so it can be passed to ModPlug_Load()
   CFile file;

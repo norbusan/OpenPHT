@@ -391,7 +391,7 @@ void CXBMCApp::XBMC_Pause(bool pause)
 {
   android_printf("XBMC_Pause(%s)", pause ? "true" : "false");
   // Only send the PAUSE action if we are pausing XBMC and something is currently playing
-  if (pause && g_application.IsPlaying() && !g_application.IsPaused())
+  if (pause && g_application.m_pPlayer->IsPlaying() && !g_application.IsPaused())
     CApplicationMessenger::Get().SendAction(CAction(ACTION_PAUSE), WINDOW_INVALID, true);
 
   g_application.m_AppActive = g_application.m_AppFocused = !pause;

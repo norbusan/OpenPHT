@@ -32,7 +32,7 @@ using namespace std;
 
 CGUIControl::CGUIControl()
 {
-  m_hasRendered = false;
+  m_hasProcessed = false;
   m_bHasFocus = false;
   m_controlID = 0;
   m_parentID = 0;
@@ -77,7 +77,7 @@ CGUIControl::CGUIControl(int parentID, int controlID, float posX, float posY, fl
   ControlType = GUICONTROL_UNKNOWN;
   m_bInvalidated = true;
   m_bAllocated=false;
-  m_hasRendered = false;
+  m_hasProcessed = false;
   m_parentControl = NULL;
   m_hasCamera = false;
   m_pushedUpdates = false;
@@ -93,7 +93,7 @@ CGUIControl::~CGUIControl(void)
 
 void CGUIControl::AllocResources()
 {
-  m_hasRendered = false;
+  m_hasProcessed = false;
   m_bInvalidated = true;
   m_bAllocated=true;
 }
@@ -113,7 +113,7 @@ void CGUIControl::FreeResources(bool immediately)
     }
     m_bAllocated=false;
   }
-  m_hasRendered = false;
+  m_hasProcessed = false;
 }
 
 void CGUIControl::DynamicResourceAlloc(bool bOnOff)
@@ -162,6 +162,7 @@ void CGUIControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregio
 {
   // update our render region
   m_renderRegion = g_graphicsContext.generateAABB(CalcRenderRegion());
+  m_hasProcessed = true;
 }
 
 // the main render routine.
@@ -182,11 +183,6 @@ void CGUIControl::DoRender()
   if (m_hasCamera)
     g_graphicsContext.RestoreCameraPosition();
   g_graphicsContext.RemoveTransform();
-}
-
-void CGUIControl::Render()
-{
-  m_hasRendered = true;
 }
 
 bool CGUIControl::OnAction(const CAction &action)
@@ -538,7 +534,7 @@ void CGUIControl::SetVisible(bool bVisible, bool setVisState)
   if (bVisible && setVisState)
   {  // TODO: currently we only update m_visible from GUI_MSG_VISIBLE (SET_CONTROL_VISIBLE)
      //       otherwise we just set m_forceHidden
-    GUIVISIBLE visible = m_visible;
+    GUIVISIBLE visible;
     if (m_visibleCondition)
       visible = g_infoManager.GetBoolValue(m_visibleCondition) ? VISIBLE : HIDDEN;
     else
@@ -553,6 +549,8 @@ void CGUIControl::SetVisible(bool bVisible, bool setVisState)
   {
     m_forceHidden = !bVisible;
     SetInvalid();
+    if (m_forceHidden)
+      MarkDirtyRegion();
   }
   if (m_forceHidden)
   { // reset any visible animations that are in process
@@ -590,8 +588,11 @@ bool CGUIControl::OnMouseOver(const CPoint &point)
   if (g_Mouse.GetState() != MOUSE_STATE_DRAG)
     g_Mouse.SetState(MOUSE_STATE_FOCUS);
   if (!CanFocus()) return false;
-  CGUIMessage msg(GUI_MSG_SETFOCUS, GetParentID(), GetID());
-  OnMessage(msg);
+  if (!HasFocus())
+  {
+    CGUIMessage msg(GUI_MSG_SETFOCUS, GetParentID(), GetID());
+    OnMessage(msg);
+  }
   return true;
 }
 
@@ -709,8 +710,8 @@ void CGUIControl::ResetAnimations()
 bool CGUIControl::CheckAnimation(ANIMATION_TYPE animType)
 {
   // rule out the animations we shouldn't perform
-  if (!IsVisible() || !HasRendered())
-  { // hidden or never rendered - don't allow exit or entry animations for this control
+  if (!IsVisible() || !HasProcessed())
+  { // hidden or never processed - don't allow exit or entry animations for this control
     if (animType == ANIM_TYPE_WINDOW_CLOSE)
     { // could be animating a (delayed) window open anim, so reset it
       ResetAnimation(ANIM_TYPE_WINDOW_OPEN);
@@ -849,7 +850,7 @@ bool CGUIControl::Animate(unsigned int currentTime)
   for (unsigned int i = 0; i < m_animations.size(); i++)
   {
     CAnimation &anim = m_animations[i];
-    anim.Animate(currentTime, HasRendered() || visible == DELAYED);
+    anim.Animate(currentTime, HasProcessed() || visible == DELAYED);
     // Update the control states (such as visibility)
     UpdateStates(anim.GetType(), anim.GetProcess(), anim.GetState());
     // and render the animation effect
@@ -929,10 +930,13 @@ bool CGUIControl::CanFocusFromPoint(const CPoint &point) const
 
 void CGUIControl::UnfocusFromPoint(const CPoint &point)
 {
-  CPoint controlPoint(point);
-  m_transform.InverseTransformPosition(controlPoint.x, controlPoint.y);
-  if (!HitTest(controlPoint))
-    SetFocus(false);
+  if (HasFocus())
+  {
+    CPoint controlPoint(point);
+    m_transform.InverseTransformPosition(controlPoint.x, controlPoint.y);
+    if (!HitTest(controlPoint))
+      SetFocus(false);
+  }
 }
 
 bool CGUIControl::HasID(int id) const

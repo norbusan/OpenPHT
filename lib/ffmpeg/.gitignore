@@ -32,6 +32,7 @@ libavdevice/libavdevice*
 libavfilter/libavfilter*
 libavformat/libavformat*
 libavutil/avconfig.h
+libavutil/ffversion.h
 libavutil/libavutil*
 libpostproc/libpostproc*
 libswresample/libswresample*
@@ -53,4 +54,3 @@ tools/pktdumper
 tools/probetest
 tools/qt-faststart
 tools/trasher
-version.h

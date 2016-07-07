@@ -20,38 +20,22 @@
  *
  */
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
 #endif
 #include "threads/CriticalSection.h"
 #include "PlatformDefs.h"
-#include <queue>
 
 #include "cores/AudioEngine/Utils/AEChannelInfo.h"
 class IAEStream;
 
-#include "DllAvCodec.h"
+extern "C" {
+#include "libavcodec/avcodec.h"
+}
 
 typedef struct stDVDAudioFrame DVDAudioFrame;
 
-
-class CPTSOutputQueue
-{
-private:
-  typedef struct {double pts; double timestamp; double duration;} TPTSItem;
-  TPTSItem m_current;
-  std::queue<TPTSItem> m_queue;
-  CCriticalSection m_sync;
-
-public:
-  CPTSOutputQueue();
-  void Add(double pts, double delay, double duration);
-  void Flush();
-  double Current();
-};
-
 class CSingleLock;
-class IAudioCallback;
 
 class CDVDAudio
 {
@@ -59,20 +43,17 @@ public:
   CDVDAudio(volatile bool& bStop);
   ~CDVDAudio();
 
-  void RegisterAudioCallback(IAudioCallback* pCallback);
-  void UnRegisterAudioCallback();
-
   void SetVolume(float fVolume);
   void SetDynamicRangeCompression(long drc);
   float GetCurrentAttenuation();
   void Pause();
   void Resume();
-  bool Create(const DVDAudioFrame &audioframe, CodecID codec, bool needresampler);
+  bool Create(const DVDAudioFrame &audioframe, AVCodecID codec, bool needresampler);
   bool IsValidFormat(const DVDAudioFrame &audioframe);
   void Destroy();
-  DWORD AddPackets(const DVDAudioFrame &audioframe);
+  unsigned int AddPackets(const DVDAudioFrame &audioframe);
   double GetDelay(); // returns the time it takes to play a packet if we add one at this time
-  double GetPlayingPts() { return m_time.Current(); }
+  double GetPlayingPts();
   void   SetPlayingPts(double pts);
   double GetCacheTime();  // returns total amount of data cached in audio output at this time
   double GetCacheTotal(); // returns total amount the audio device can buffer
@@ -85,11 +66,8 @@ public:
 
   IAEStream *m_pAudioStream;
 protected:
-  CPTSOutputQueue m_time;
-  DWORD AddPacketsRenderer(unsigned char* data, DWORD len, CSingleLock &lock);
-  BYTE* m_pBuffer; // should be [m_dwPacketSize]
-  DWORD m_iBufferSize;
-  DWORD m_dwPacketSize;
+  double m_playingPts;
+  double m_timeOfPts;
   CCriticalSection m_critSection;
 
   int m_iBitrate;
@@ -100,7 +78,6 @@ protected:
   bool m_bPaused;
 
   volatile bool& m_bStop;
-  IAudioCallback* m_pAudioCallback; //the viz audio callback
   //counter that will go from 0 to m_iSpeed-1 and reset, data will only be output when speedstep is 0
   //int m_iSpeedStep;
 };

@@ -20,7 +20,10 @@
  */
 
 #include <string.h>
+
+#include "libavutil/channel_layout.h"
 #include "avformat.h"
+#include "internal.h"
 
 static int apc_probe(AVProbeData *p)
 {
@@ -30,7 +33,7 @@ static int apc_probe(AVProbeData *p)
     return 0;
 }
 
-static int apc_read_header(AVFormatContext *s, AVFormatParameters *ap)
+static int apc_read_header(AVFormatContext *s)
 {
     AVIOContext *pb = s->pb;
     AVStream *st;
@@ -44,23 +47,22 @@ static int apc_read_header(AVFormatContext *s, AVFormatParameters *ap)
         return AVERROR(ENOMEM);
 
     st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
-    st->codec->codec_id = CODEC_ID_ADPCM_IMA_APC;
+    st->codec->codec_id = AV_CODEC_ID_ADPCM_IMA_APC;
 
     avio_rl32(pb); /* number of samples */
     st->codec->sample_rate = avio_rl32(pb);
 
-    st->codec->extradata_size = 2 * 4;
-    st->codec->extradata = av_malloc(st->codec->extradata_size +
-                                     FF_INPUT_BUFFER_PADDING_SIZE);
-    if (!st->codec->extradata)
+    /* initial predictor values for adpcm decoder */
+    if (ff_get_extradata(st->codec, pb, 2 * 4) < 0)
         return AVERROR(ENOMEM);
 
-    /* initial predictor values for adpcm decoder */
-    avio_read(pb, st->codec->extradata, 2 * 4);
-
-    st->codec->channels = 1;
-    if (avio_rl32(pb))
-        st->codec->channels = 2;
+    if (avio_rl32(pb)) {
+        st->codec->channels       = 2;
+        st->codec->channel_layout = AV_CH_LAYOUT_STEREO;
+    } else {
+        st->codec->channels       = 1;
+        st->codec->channel_layout = AV_CH_LAYOUT_MONO;
+    }
 
     st->codec->bits_per_coded_sample = 4;
     st->codec->bit_rate = st->codec->bits_per_coded_sample * st->codec->channels
@@ -76,13 +78,14 @@ static int apc_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     if (av_get_packet(s->pb, pkt, MAX_READ_SIZE) <= 0)
         return AVERROR(EIO);
+    pkt->flags &= ~AV_PKT_FLAG_CORRUPT;
     pkt->stream_index = 0;
     return 0;
 }
 
 AVInputFormat ff_apc_demuxer = {
     .name           = "apc",
-    .long_name      = NULL_IF_CONFIG_SMALL("CRYO APC format"),
+    .long_name      = NULL_IF_CONFIG_SMALL("CRYO APC"),
     .read_probe     = apc_probe,
     .read_header    = apc_read_header,
     .read_packet    = apc_read_packet,

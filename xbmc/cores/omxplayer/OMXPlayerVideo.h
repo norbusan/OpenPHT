@@ -24,15 +24,13 @@
 #include <deque>
 #include <sys/types.h>
 
-#include "utils/StdString.h"
-
 #include "OMXClock.h"
 #include "DVDStreamInfo.h"
 #include "OMXVideo.h"
 #include "threads/Thread.h"
+#include "IDVDPlayer.h"
 
 #include "DVDDemuxers/DVDDemux.h"
-#include "DVDStreamInfo.h"
 #include "DVDCodecs/Video/DVDVideoCodec.h"
 #include "DVDOverlayContainer.h"
 #include "DVDMessageQueue.h"
@@ -40,7 +38,7 @@
 #include "linux/DllBCM.h"
 #include "cores/VideoRenderers/RenderManager.h"
 
-class OMXPlayerVideo : public CThread
+class OMXPlayerVideo : public CThread, public IDVDStreamPlayerVideo
 {
 protected:
   CDVDMessageQueue          m_messageQueue;
@@ -68,8 +66,9 @@ protected:
 
   CRect                     m_src_rect;
   CRect                     m_dst_rect;
-  int                       m_view_mode;
-
+  RENDER_STEREO_MODE        m_video_stereo_mode;
+  RENDER_STEREO_MODE        m_display_stereo_mode;
+  bool                      m_StereoInvert;
   DllBcmHost                m_DllBcmHost;
 
   CDVDOverlayContainer  *m_pOverlayContainer;
@@ -98,7 +97,7 @@ public:
   int  GetLevel() const                             { return m_messageQueue.GetLevel(); }
   bool IsStalled() const                            { return m_stalled;  }
   bool IsEOS();
-  bool CloseStream(bool bWaitForBuffers);
+  void CloseStream(bool bWaitForBuffers);
   void Output(double pts, bool bDropPacket);
   bool StepFrame();
   void Flush();
@@ -114,6 +113,7 @@ public:
   void SetSpeed(int iSpeed);
   std::string GetPlayerInfo();
   int GetVideoBitrate();
+  std::string GetStereoMode();
   double GetOutputDelay();
   double GetSubtitleDelay()                         { return m_iSubtitleDelay; }
   void SetSubtitleDelay(double delay)               { m_iSubtitleDelay = delay; }
@@ -124,16 +124,9 @@ public:
   void SetFlags(unsigned flags)                     { m_flags = flags; };
   int GetFreeSpace();
   void  SetVideoRect(const CRect &SrcRect, const CRect &DestRect);
+  void GetVideoRect(CRect& SrcRect, CRect& DestRect, CRect& ViewRect) const { g_renderManager.GetVideoRect(SrcRect, DestRect, ViewRect); }
   static void RenderUpdateCallBack(const void *ctx, const CRect &SrcRect, const CRect &DestRect);
   void ResolutionUpdateCallBack(uint32_t width, uint32_t height, float framerate, float pixel_aspect);
   static void ResolutionUpdateCallBack(void *ctx, uint32_t width, uint32_t height, float framerate, float pixel_aspect);
-
-  inline int GetCacheLevel()
-  {
-    if (m_omxVideo.GetInputBufferSize() > 0)
-      return 100 - ((100 * m_omxVideo.GetFreeSpace()) / m_omxVideo.GetInputBufferSize());
-    else
-      return 0;
-  }
 };
 #endif

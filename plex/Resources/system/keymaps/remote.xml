@@ -37,7 +37,7 @@
 <keymap>
   <global>
     <remote>
-      <play>Play</play>
+      <play>PlayPause</play>
       <pause>Pause</pause>
       <stop>Stop</stop>
       <forward>FastForward</forward>
@@ -145,8 +145,8 @@
       <nine>Number9</nine>
       <left>StepBack</left>
       <right>StepForward</right>
-      <up>BigStepForward</up>
-      <down>BigStepBack</down>
+      <up>ChapterOrBigStepForward</up>
+      <down>ChapterOrBigStepBack</down>
       <back>PreviousMenu</back>
       <menu>OSD</menu>
       <start>OSD</start>

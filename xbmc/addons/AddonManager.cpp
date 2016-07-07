@@ -428,7 +428,11 @@ bool CAddonMgr::GetAddons(const TYPE &type, VECADDONS &addons, bool enabled /* =
       }
 
       AddonPtr addon(Factory(props));
+#ifndef __PLEX__
       if (addon)
+#else
+      if (addon && (type != ADDON_REPOSITORY || addon->ID().Equals("repository.openpht.tv")))
+#endif
         addons.push_back(addon);
     }
   }

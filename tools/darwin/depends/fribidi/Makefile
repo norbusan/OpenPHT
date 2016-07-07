@@ -1,4 +1,5 @@
 include ../Makefile.include
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=fribidi
@@ -10,23 +11,23 @@ export CFLAGS+=-D__STDC_INT64__
 CONFIGURE=./configure --prefix=$(PREFIX) --disable-docs --enable-malloc \
           --with-glib=no
 
-LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/lib/.libs/lib$(LIBNAME).dylib
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
-	make -j $(MAKE_JOBS) -C $(SOURCE)
+	make -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

@@ -21,10 +21,10 @@
 
 #include "avcodec.h"
 #include "get_bits.h"
+#include "internal.h"
 
-
-typedef struct {
-    AVFrame picture;
+typedef struct AvsContext {
+    AVFrame *frame;
 } AvsContext;
 
 typedef enum {
@@ -44,31 +44,28 @@ typedef enum {
 
 static int
 avs_decode_frame(AVCodecContext * avctx,
-                 void *data, int *data_size, AVPacket *avpkt)
+                 void *data, int *got_frame, AVPacket *avpkt)
 {
     const uint8_t *buf = avpkt->data;
     const uint8_t *buf_end = avpkt->data + avpkt->size;
     int buf_size = avpkt->size;
     AvsContext *const avs = avctx->priv_data;
     AVFrame *picture = data;
-    AVFrame *const p = (AVFrame *) & avs->picture;
+    AVFrame *const p =  avs->frame;
     const uint8_t *table, *vect;
     uint8_t *out;
-    int i, j, x, y, stride, vect_w = 3, vect_h = 3;
+    int i, j, x, y, stride, ret, vect_w = 3, vect_h = 3;
     AvsVideoSubType sub_type;
     AvsBlockType type;
-    GetBitContext change_map;
+    GetBitContext change_map = {0}; //init to silence warning
 
-    if (avctx->reget_buffer(avctx, p)) {
-        av_log(avctx, AV_LOG_ERROR, "reget_buffer() failed\n");
-        return -1;
-    }
-    p->reference = 3;
+    if ((ret = ff_reget_buffer(avctx, p)) < 0)
+        return ret;
     p->pict_type = AV_PICTURE_TYPE_P;
     p->key_frame = 0;
 
-    out = avs->picture.data[0];
-    stride = avs->picture.linesize[0];
+    out    = p->data[0];
+    stride = p->linesize[0];
 
     if (buf_end - buf < 4)
         return AVERROR_INVALIDDATA;
@@ -78,7 +75,7 @@ avs_decode_frame(AVCodecContext * avctx,
 
     if (type == AVS_PALETTE) {
         int first, last;
-        uint32_t *pal = (uint32_t *) avs->picture.data[1];
+        uint32_t *pal = (uint32_t *) p->data[1];
 
         first = AV_RL16(buf);
         last = first + AV_RL16(buf + 2);
@@ -87,7 +84,7 @@ avs_decode_frame(AVCodecContext * avctx,
         buf += 4;
         for (i=first; i<last; i++, buf+=3) {
             pal[i] = (buf[0] << 18) | (buf[1] << 10) | (buf[2] << 2);
-            pal[i] |= 0xFF << 24 | (pal[i] >> 6) & 0x30303;
+            pal[i] |= 0xFFU << 24 | (pal[i] >> 6) & 0x30303;
         }
 
         sub_type = buf[0];
@@ -96,7 +93,7 @@ avs_decode_frame(AVCodecContext * avctx,
     }
 
     if (type != AVS_VIDEO)
-        return -1;
+        return AVERROR_INVALIDDATA;
 
     switch (sub_type) {
     case AVS_I_FRAME:
@@ -118,7 +115,7 @@ avs_decode_frame(AVCodecContext * avctx,
         break;
 
     default:
-      return -1;
+      return AVERROR_INVALIDDATA;
     }
 
     if (buf_end - buf < 256 * vect_w * vect_h)
@@ -151,38 +148,42 @@ avs_decode_frame(AVCodecContext * avctx,
             align_get_bits(&change_map);
     }
 
-    *picture = *(AVFrame *) & avs->picture;
-    *data_size = sizeof(AVPicture);
+    if ((ret = av_frame_ref(picture, p)) < 0)
+        return ret;
+    *got_frame = 1;
 
     return buf_size;
 }
 
 static av_cold int avs_decode_init(AVCodecContext * avctx)
 {
-    AvsContext *const avs = avctx->priv_data;
-    avctx->pix_fmt = PIX_FMT_PAL8;
-    avcodec_get_frame_defaults(&avs->picture);
-    avcodec_set_dimensions(avctx, 318, 198);
-    return 0;
+    AvsContext *s = avctx->priv_data;
+
+    s->frame = av_frame_alloc();
+    if (!s->frame)
+        return AVERROR(ENOMEM);
+
+    avctx->pix_fmt = AV_PIX_FMT_PAL8;
+
+    return ff_set_dimensions(avctx, 318, 198);
 }
 
 static av_cold int avs_decode_end(AVCodecContext *avctx)
 {
     AvsContext *s = avctx->priv_data;
-    if (s->picture.data[0])
-        avctx->release_buffer(avctx, &s->picture);
+    av_frame_free(&s->frame);
     return 0;
 }
 
 
 AVCodec ff_avs_decoder = {
     .name           = "avs",
+    .long_name      = NULL_IF_CONFIG_SMALL("AVS (Audio Video Standard) video"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_AVS,
+    .id             = AV_CODEC_ID_AVS,
     .priv_data_size = sizeof(AvsContext),
     .init           = avs_decode_init,
     .decode         = avs_decode_frame,
     .close          = avs_decode_end,
-    .capabilities   = CODEC_CAP_DR1,
-    .long_name = NULL_IF_CONFIG_SMALL("AVS (Audio Video Standard) video"),
+    .capabilities   = AV_CODEC_CAP_DR1,
 };

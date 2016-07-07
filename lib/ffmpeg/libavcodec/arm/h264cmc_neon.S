@@ -1,30 +1,30 @@
 /*
  * Copyright (c) 2008 Mans Rullgard <mans@mansr.com>
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "asm.S"
+#include "libavutil/arm/asm.S"
 
 /* chroma_mc8(uint8_t *dst, uint8_t *src, int stride, int h, int x, int y) */
 .macro  h264_chroma_mc8 type, codec=h264
 function ff_\type\()_\codec\()_chroma_mc8_neon, export=1
         push            {r4-r7, lr}
-        ldrd            r4,  [sp, #20]
+        ldrd            r4,  r5,  [sp, #20]
   .ifc \type,avg
         mov             lr,  r0
   .endif
@@ -38,6 +38,9 @@ function ff_\type\()_\codec\()_chroma_mc8_neon, export=1
         lsr             r7,  r4,  #1
         add             r6,  r6,  r7,  lsl #1
         vld1.16         {d22[],d23[]}, [r6,:16]
+  .endif
+  .ifc \codec,vc1
+        vmov.u16        q11, #28
   .endif
 
 A       muls            r7,  r4,  r5
@@ -93,9 +96,10 @@ T       cmp             r7,  #0
 
         pop             {r4-r7, pc}
 
-2:      tst             r6,  r6
-        add             r12, r12, r6
+2:      adds            r12, r12, r6
         vdup.8          d0,  r4
+        beq             5f
+        tst             r6,  r6
         vdup.8          d1,  r12
 
         beq             4f
@@ -161,6 +165,33 @@ T       cmp             r7,  #0
         bgt             4b
 
         pop             {r4-r7, pc}
+
+5:      vld1.8          {d4}, [r1], r2
+        vld1.8          {d5}, [r1], r2
+        pld             [r1]
+        subs            r3,  r3,  #2
+        vmull.u8        q8,  d4,  d0
+        vmull.u8        q9,  d5,  d0
+        pld             [r1, r2]
+  .ifc \codec,h264
+        vrshrn.u16      d16, q8,  #6
+        vrshrn.u16      d17, q9,  #6
+  .else
+        vadd.u16        q8,  q8,  q11
+        vadd.u16        q9,  q9,  q11
+        vshrn.u16       d16, q8,  #6
+        vshrn.u16       d17, q9,  #6
+  .endif
+  .ifc \type,avg
+        vld1.8          {d20}, [lr,:64], r2
+        vld1.8          {d21}, [lr,:64], r2
+        vrhadd.u8       q8,  q8,  q10
+  .endif
+        vst1.8          {d16}, [r0,:64], r2
+        vst1.8          {d17}, [r0,:64], r2
+        bgt             5b
+
+        pop             {r4-r7, pc}
 endfunc
 .endm
 
@@ -168,7 +199,7 @@ endfunc
 .macro  h264_chroma_mc4 type, codec=h264
 function ff_\type\()_\codec\()_chroma_mc4_neon, export=1
         push            {r4-r7, lr}
-        ldrd            r4,  [sp, #20]
+        ldrd            r4,  r5,  [sp, #20]
   .ifc \type,avg
         mov             lr,  r0
   .endif
@@ -182,6 +213,9 @@ function ff_\type\()_\codec\()_chroma_mc4_neon, export=1
         lsr             r7,  r4,  #1
         add             r6,  r6,  r7,  lsl #1
         vld1.16         {d22[],d23[]}, [r6,:16]
+  .endif
+  .ifc \codec,vc1
+        vmov.u16        q11, #28
   .endif
 
 A       muls            r7,  r4,  r5
@@ -239,9 +273,10 @@ T       cmp             r7,  #0
 
         pop             {r4-r7, pc}
 
-2:      tst             r6,  r6
-        add             r12, r12, r6
+2:      adds            r12, r12, r6
         vdup.8          d0,  r4
+        beq             5f
+        tst             r6,  r6
         vdup.8          d1,  r12
         vtrn.32         d0,  d1
 
@@ -303,6 +338,29 @@ T       cmp             r7,  #0
         vst1.32         {d16[0]}, [r0,:32], r2
         vst1.32         {d16[1]}, [r0,:32], r2
         bgt             4b
+
+        pop             {r4-r7, pc}
+
+5:      vld1.32         {d4[0]},  [r1], r2
+        vld1.32         {d4[1]},  [r1], r2
+        vmull.u8        q8,  d4,  d0
+        subs            r3,  r3,  #2
+        pld             [r1]
+  .ifc \codec,h264
+        vrshrn.u16      d16, q8,  #6
+  .else
+        vadd.u16        q8,  q8,  q11
+        vshrn.u16       d16, q8,  #6
+  .endif
+  .ifc \type,avg
+        vld1.32         {d20[0]}, [lr,:32], r2
+        vld1.32         {d20[1]}, [lr,:32], r2
+        vrhadd.u8       d16, d16, d20
+  .endif
+        pld             [r1]
+        vst1.32         {d16[0]}, [r0,:32], r2
+        vst1.32         {d16[1]}, [r0,:32], r2
+        bgt             5b
 
         pop             {r4-r7, pc}
 endfunc
@@ -376,14 +434,12 @@ function ff_\type\()_h264_chroma_mc2_neon, export=1
 endfunc
 .endm
 
-#if CONFIG_H264_DECODER
         h264_chroma_mc8 put
         h264_chroma_mc8 avg
         h264_chroma_mc4 put
         h264_chroma_mc4 avg
         h264_chroma_mc2 put
         h264_chroma_mc2 avg
-#endif
 
 #if CONFIG_RV40_DECODER
 const   rv40bias
@@ -397,4 +453,11 @@ endconst
         h264_chroma_mc8 avg, rv40
         h264_chroma_mc4 put, rv40
         h264_chroma_mc4 avg, rv40
+#endif
+
+#if CONFIG_VC1_DECODER
+        h264_chroma_mc8 put, vc1
+        h264_chroma_mc8 avg, vc1
+        h264_chroma_mc4 put, vc1
+        h264_chroma_mc4 avg, vc1
 #endif

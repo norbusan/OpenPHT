@@ -43,7 +43,10 @@ static int vqf_probe(AVProbeData *probe_packet)
     if (!memcmp(probe_packet->buf + 4, "00052200", 8))
         return AVPROBE_SCORE_MAX;
 
-    return AVPROBE_SCORE_MAX/2;
+    if (AV_RL32(probe_packet->buf + 12) > (1<<27))
+        return AVPROBE_SCORE_EXTENSION/2;
+
+    return AVPROBE_SCORE_EXTENSION;
 }
 
 static void add_metadata(AVFormatContext *s, uint32_t tag,
@@ -86,7 +89,7 @@ static const AVMetadataConv vqf_metadata_conv[] = {
     { 0 },
 };
 
-static int vqf_read_header(AVFormatContext *s, AVFormatParameters *ap)
+static int vqf_read_header(AVFormatContext *s)
 {
     VqfContext *c = s->priv_data;
     AVStream *st  = avformat_new_stream(s, NULL);
@@ -105,7 +108,7 @@ static int vqf_read_header(AVFormatContext *s, AVFormatParameters *ap)
     header_size = avio_rb32(s->pb);
 
     st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
-    st->codec->codec_id   = CODEC_ID_TWINVQ;
+    st->codec->codec_id   = AV_CODEC_ID_TWINVQ;
     st->start_time = 0;
 
     do {
@@ -132,15 +135,16 @@ static int vqf_read_header(AVFormatContext *s, AVFormatParameters *ap)
             rate_flag           = AV_RB32(comm_chunk + 8);
             avio_skip(s->pb, len-12);
 
+            if (st->codec->channels <= 0) {
+                av_log(s, AV_LOG_ERROR, "Invalid number of channels\n");
+                return AVERROR_INVALIDDATA;
+            }
+
             st->codec->bit_rate              = read_bitrate*1000;
             break;
         case MKTAG('D','S','I','Z'): // size of compressed data
         {
-            char buf[8] = {0};
-            int size = avio_rb32(s->pb);
-
-            snprintf(buf, sizeof(buf), "%d", size);
-            av_dict_set(&s->metadata, "size", buf, 0);
+            av_dict_set_int(&s->metadata, "size", avio_rb32(s->pb), 0);
         }
             break;
         case MKTAG('Y','E','A','R'): // recording date
@@ -158,7 +162,7 @@ static int vqf_read_header(AVFormatContext *s, AVFormatParameters *ap)
 
         header_size -= len;
 
-    } while (header_size >= 0);
+    } while (header_size >= 0 && !avio_feof(s->pb));
 
     switch (rate_flag) {
     case -1:
@@ -212,12 +216,11 @@ static int vqf_read_header(AVFormatContext *s, AVFormatParameters *ap)
         return -1;
     }
     c->frame_bit_len = st->codec->bit_rate*size/st->codec->sample_rate;
-    avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
+    avpriv_set_pts_info(st, 64, size, st->codec->sample_rate);
 
     /* put first 12 bytes of COMM chunk in extradata */
-    if (!(st->codec->extradata = av_malloc(12 + FF_INPUT_BUFFER_PADDING_SIZE)))
+    if (ff_alloc_extradata(st->codec, 12))
         return AVERROR(ENOMEM);
-    st->codec->extradata_size = 12;
     memcpy(st->codec->extradata, comm_chunk, 12);
 
     ff_metadata_conv_ctx(s, NULL, vqf_metadata_conv);
@@ -231,17 +234,18 @@ static int vqf_read_packet(AVFormatContext *s, AVPacket *pkt)
     int ret;
     int size = (c->frame_bit_len - c->remaining_bits + 7)>>3;
 
-    pkt->pos          = avio_tell(s->pb);
-    pkt->stream_index = 0;
-
     if (av_new_packet(pkt, size+2) < 0)
         return AVERROR(EIO);
+
+    pkt->pos          = avio_tell(s->pb);
+    pkt->stream_index = 0;
+    pkt->duration     = 1;
 
     pkt->data[0] = 8 - c->remaining_bits; // Number of bits to skip
     pkt->data[1] = c->last_frame_bits;
     ret = avio_read(s->pb, pkt->data+2, size);
 
-    if (ret<=0) {
+    if (ret != size) {
         av_free_packet(pkt);
         return AVERROR(EIO);
     }
@@ -257,7 +261,7 @@ static int vqf_read_seek(AVFormatContext *s,
 {
     VqfContext *c = s->priv_data;
     AVStream *st;
-    int ret;
+    int64_t ret;
     int64_t pos;
 
     st = s->streams[stream_index];
@@ -271,7 +275,7 @@ static int vqf_read_seek(AVFormatContext *s,
     st->cur_dts = av_rescale(pos, st->time_base.den,
                              st->codec->bit_rate * (int64_t)st->time_base.num);
 
-    if ((ret = avio_seek(s->pb, ((pos-7) >> 3) + s->data_offset, SEEK_SET)) < 0)
+    if ((ret = avio_seek(s->pb, ((pos-7) >> 3) + s->internal->data_offset, SEEK_SET)) < 0)
         return ret;
 
     c->remaining_bits = -7 - ((pos-7)&7);

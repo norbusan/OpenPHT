@@ -33,8 +33,11 @@
 #ifndef AVCODEC_MJPEGENC_H
 #define AVCODEC_MJPEGENC_H
 
-#include "dsputil.h"
+#include <stdint.h>
+
+#include "mjpeg.h"
 #include "mpegvideo.h"
+#include "put_bits.h"
 
 typedef struct MJpegContext {
     uint8_t huff_size_dc_luminance[12]; //FIXME use array [3] instead of lumi / chrom, for easier addressing
@@ -48,13 +51,14 @@ typedef struct MJpegContext {
     uint16_t huff_code_ac_chrominance[256];
 } MJpegContext;
 
+static inline void put_marker(PutBitContext *p, enum JpegMarker code)
+{
+    put_bits(p, 8, 0xff);
+    put_bits(p, 8, code);
+}
+
 int  ff_mjpeg_encode_init(MpegEncContext *s);
 void ff_mjpeg_encode_close(MpegEncContext *s);
-void ff_mjpeg_encode_picture_header(MpegEncContext *s);
-void ff_mjpeg_encode_picture_trailer(MpegEncContext *s);
-void ff_mjpeg_encode_stuffing(PutBitContext *pbc);
-void ff_mjpeg_encode_dc(MpegEncContext *s, int val,
-                        uint8_t *huff_size, uint16_t *huff_code);
-void ff_mjpeg_encode_mb(MpegEncContext *s, DCTELEM block[6][64]);
+void ff_mjpeg_encode_mb(MpegEncContext *s, int16_t block[12][64]);
 
 #endif /* AVCODEC_MJPEGENC_H */

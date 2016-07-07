@@ -68,7 +68,7 @@ endif()
 
 if (APPLE)
 	# Build the updater so that it works on OS X 10.5 and above.
-	set(MIN_OSX_VERSION 10.6)
+	set(MIN_OSX_VERSION 10.7)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmacosx-version-min=${MIN_OSX_VERSION}")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmacosx-version-min=${MIN_OSX_VERSION}")
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "gnu++98")

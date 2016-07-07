@@ -18,9 +18,9 @@
  *
  */
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
-#elif defined(_WIN32)
+#elif defined(TARGET_WINDOWS)
 #include "system.h"
 #endif
 
@@ -39,6 +39,7 @@
 #include "utils/URIUtils.h"
 #include "windowing/WindowingFactory.h"
 #include "Application.h"
+#include <cassert>
 
 #ifdef _DEBUG
 #define CheckError() m_result = eglGetError(); if (m_result != EGL_SUCCESS) CLog::Log(LOGERROR, "EGL error in %s: %x",__FUNCTION__, m_result);
@@ -55,12 +56,17 @@ static XbmcThreads::ConditionVariable g_count_cond;
 static CCriticalSection               g_count_lock;
 static int g_count_val;
 
-static void limit_calls_enter()
+static bool limit_calls_enter()
 {
   CSingleLock lock(g_count_lock);
+  // on Pi2 fall back to arm decode if the queue is getting big
+  if (g_RBP.RasberryPiVersion() > 1 && g_count_val >= 2)
+    return false;
+
   while (g_count_val >= 3)
     g_count_cond.wait(lock);
   g_count_val++;
+  return true;
 }
 
 static void limit_calls_leave()
@@ -111,6 +117,9 @@ bool COMXImage::CreateThumbnailFromSurface(unsigned char* buffer, unsigned int w
       unsigned int format, unsigned int pitch, const CStdString& destFile)
 {
   COMXImageEnc omxImageEnc;
+  if (!omxImageEnc.Gpu())
+    return false;
+
   bool ret = omxImageEnc.CreateThumbnailFromSurface(buffer, width, height, format, pitch, destFile);
   if (!ret)
     CLog::Log(LOGNOTICE, "%s: unable to create thumbnail %s %dx%d", __func__, destFile.c_str(), width, height);
@@ -204,6 +213,8 @@ bool COMXImage::CreateThumb(const CStdString& srcFile, unsigned int maxHeight, u
   bool okay = false;
   COMXImageFile file;
   COMXImageReEnc reenc;
+  if (!reenc.Gpu())
+    return false;
   void *pDestBuffer;
   unsigned int nDestSize;
   int orientation = additional_info == "flipped" ? 1:0;
@@ -309,6 +320,9 @@ bool COMXImage::DecodeJpegToTexture(COMXImageFile *file, unsigned int width, uns
   bool ret = false;
   COMXTexture omx_image;
 
+  if (!omx_image.Gpu())
+    return false;
+
   struct textureinfo *tex = new struct textureinfo;
   if (!tex)
     return NULL;
@@ -326,6 +340,7 @@ bool COMXImage::DecodeJpegToTexture(COMXImageFile *file, unsigned int width, uns
   {
     ret = true;
     *userdata = tex;
+    CLog::Log(LOGDEBUG, "%s: decoded %s %dx%d", __func__, file->GetFilename(), width, height);
   }
   else
   {
@@ -922,7 +937,7 @@ bool COMXImageFile::ReadFile(const CStdString& inputFile, int orientation)
 
 COMXImageDec::COMXImageDec()
 {
-  limit_calls_enter();
+  m_gpu = limit_calls_enter();
   m_decoded_buffer = NULL;
   OMX_INIT_STRUCTURE(m_decoded_format);
   m_success = false;
@@ -934,7 +949,8 @@ COMXImageDec::~COMXImageDec()
 
   OMX_INIT_STRUCTURE(m_decoded_format);
   m_decoded_buffer = NULL;
-  limit_calls_leave();
+  if (m_gpu)
+    limit_calls_leave();
 }
 
 void COMXImageDec::Close()
@@ -1084,6 +1100,9 @@ bool COMXImageDec::HandlePortSettingChange(unsigned int resize_width, unsigned i
 
 bool COMXImageDec::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes, unsigned width, unsigned height, unsigned stride, void *pixels)
 {
+  if (!m_gpu)
+    return false;
+
   CSingleLock lock(m_OMXSection);
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
   OMX_BUFFERHEADERTYPE *omx_buffer = NULL;
@@ -1221,7 +1240,7 @@ bool COMXImageDec::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes
 
 COMXImageEnc::COMXImageEnc()
 {
-  limit_calls_enter();
+  m_gpu = limit_calls_enter();
   CSingleLock lock(m_OMXSection);
   OMX_INIT_STRUCTURE(m_encoded_format);
   m_encoded_buffer = NULL;
@@ -1245,11 +1264,15 @@ COMXImageEnc::~COMXImageEnc()
       m_omx_encoder.Deinitialize();
     }
   }
-  limit_calls_leave();
+  if (m_gpu)
+    limit_calls_leave();
 }
 
 bool COMXImageEnc::Encode(unsigned char *buffer, int size, unsigned width, unsigned height, unsigned int pitch)
 {
+  if (!m_gpu)
+    return false;
+
   CSingleLock lock(m_OMXSection);
 
   unsigned int demuxer_bytes = 0;
@@ -1430,6 +1453,9 @@ bool COMXImageEnc::Encode(unsigned char *buffer, int size, unsigned width, unsig
 bool COMXImageEnc::CreateThumbnailFromSurface(unsigned char* buffer, unsigned int width, unsigned int height,
     unsigned int format, unsigned int pitch, const CStdString& destFile)
 {
+  if (!m_gpu)
+    return false;
+
   if(format != XB_FMT_A8R8G8B8 || !buffer)
   {
     CLog::Log(LOGDEBUG, "%s::%s : %s failed format=0x%x\n", CLASSNAME, __func__, destFile.c_str(), format);
@@ -1463,7 +1489,7 @@ bool COMXImageEnc::CreateThumbnailFromSurface(unsigned char* buffer, unsigned in
 
 COMXImageReEnc::COMXImageReEnc()
 {
-  limit_calls_enter();
+  m_gpu = limit_calls_enter();
   m_encoded_buffer = NULL;
   m_pDestBuffer = NULL;
   m_nDestAllocSize = 0;
@@ -1477,7 +1503,8 @@ COMXImageReEnc::~COMXImageReEnc()
     free (m_pDestBuffer);
   m_pDestBuffer = NULL;
   m_nDestAllocSize = 0;
-  limit_calls_leave();
+  if (m_gpu)
+    limit_calls_leave();
 }
 
 void COMXImageReEnc::Close()
@@ -1769,6 +1796,9 @@ bool COMXImageReEnc::HandlePortSettingChange(unsigned int resize_width, unsigned
 
 bool COMXImageReEnc::ReEncode(COMXImageFile &srcFile, unsigned int maxWidth, unsigned int maxHeight, void * &pDestBuffer, unsigned int &nDestSize)
 {
+  if (!m_gpu)
+    return false;
+
   CSingleLock lock(m_OMXSection);
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
@@ -1941,14 +1971,15 @@ bool COMXImageReEnc::ReEncode(COMXImageFile &srcFile, unsigned int maxWidth, uns
 
 COMXTexture::COMXTexture()
 {
-  limit_calls_enter();
+  m_gpu = limit_calls_enter();
   m_success = false;
 }
 
 COMXTexture::~COMXTexture()
 {
   Close();
-  limit_calls_leave();
+  if (m_gpu)
+    limit_calls_leave();
 }
 
 void COMXTexture::Close()
@@ -2132,6 +2163,9 @@ bool COMXTexture::HandlePortSettingChange(unsigned int resize_width, unsigned in
 
 bool COMXTexture::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes, unsigned int width, unsigned int height, void *egl_image)
 {
+  if (!m_gpu)
+    return false;
+
   CSingleLock lock(m_OMXSection);
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 

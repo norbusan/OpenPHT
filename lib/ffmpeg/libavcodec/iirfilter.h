@@ -47,6 +47,29 @@ enum IIRFilterMode{
     FF_FILTER_MODE_BANDSTOP,
 };
 
+typedef struct FFIIRFilterContext {
+    /**
+    * Perform IIR filtering on floating-point input samples.
+    *
+    * @param coeffs pointer to filter coefficients
+    * @param state  pointer to filter state
+    * @param size   input length
+    * @param src    source samples
+    * @param sstep  source stride
+    * @param dst    filtered samples (destination may be the same as input)
+    * @param dstep  destination stride
+    */
+    void (*filter_flt)(const struct FFIIRFilterCoeffs *coeffs,
+                        struct FFIIRFilterState *state, int size,
+                        const float *src, int sstep, float *dst, int dstep);
+} FFIIRFilterContext;
+
+/**
+ * Initialize FFIIRFilterContext
+ */
+void ff_iir_filter_init(FFIIRFilterContext *f);
+void ff_iir_filter_init_mips(FFIIRFilterContext *f);
+
 /**
  * Initialize filter coefficients.
  *
@@ -81,14 +104,14 @@ struct FFIIRFilterState* ff_iir_filter_init_state(int order);
  *
  * @param coeffs pointer allocated with ff_iir_filter_init_coeffs()
  */
-void ff_iir_filter_free_coeffs(struct FFIIRFilterCoeffs *coeffs);
+void ff_iir_filter_free_coeffsp(struct FFIIRFilterCoeffs **coeffs);
 
 /**
- * Free filter state.
+ * Free and zero filter state.
  *
- * @param state pointer allocated with ff_iir_filter_init_state()
+ * @param state pointer to pointer allocated with ff_iir_filter_init_state()
  */
-void ff_iir_filter_free_state(struct FFIIRFilterState *state);
+void ff_iir_filter_free_statep(struct FFIIRFilterState **state);
 
 /**
  * Perform IIR filtering on signed 16-bit input samples.

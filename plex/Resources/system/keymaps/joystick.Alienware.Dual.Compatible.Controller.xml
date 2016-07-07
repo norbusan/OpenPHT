@@ -51,7 +51,7 @@
       <button id="8"></button>  <!-- r2 -->
       <button id="12">XBMC.ActivateWindow(ShutdownMenu)</button> <!-- R3 - right analog -->      
       <button id="9"></button>  <!-- select -->      
-      <button id="10">XBMC.ActivateWindow(PlayerControls)</button>  <!-- start --> 
+      <!--<button id="10">XBMC.ActivateWindow(PlayerControls)</button>--> <!-- start --> 
       <!-- Left Analog Left and Right-->
       <axis limit="-1" id="0">AnalogSeekBack</axis>        
       <axis limit="+1" id="0">AnalogSeekForward</axis>

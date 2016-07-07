@@ -107,9 +107,16 @@ DVDVideoPicture* CDVDVideoCodecLibMpeg2::GetBuffer(unsigned int width, unsigned 
         m_pVideoBuffer[i].iWidth = width;
         m_pVideoBuffer[i].iHeight = height;
 
-        m_pVideoBuffer[i].data[0] = (BYTE*)_aligned_malloc(iPixels, 16);    //Y
-        m_pVideoBuffer[i].data[1] = (BYTE*)_aligned_malloc(iChromaPixels, 16);  //U
-        m_pVideoBuffer[i].data[2] = (BYTE*)_aligned_malloc(iChromaPixels, 16);  //V
+        m_pVideoBuffer[i].data[0] = (uint8_t*)_aligned_malloc(iPixels, 16);    //Y
+        m_pVideoBuffer[i].data[1] = (uint8_t*)_aligned_malloc(iChromaPixels, 16);  //U
+        m_pVideoBuffer[i].data[2] = (uint8_t*)_aligned_malloc(iChromaPixels, 16);  //V
+        if (!m_pVideoBuffer[i].data[0] || !m_pVideoBuffer[i].data[1] || !m_pVideoBuffer[i].data[2])
+        {
+          _aligned_free(m_pVideoBuffer[i].data[0]);
+          _aligned_free(m_pVideoBuffer[i].data[1]);
+          _aligned_free(m_pVideoBuffer[i].data[2]);
+          return NULL;
+        }
 
         //Set all data to 0 for less artifacts.. hmm.. what is black in YUV??
         memset( m_pVideoBuffer[i].data[0], 0, iPixels );
@@ -204,7 +211,7 @@ void CDVDVideoCodecLibMpeg2::SetDropState(bool bDrop)
   m_hurry = bDrop ? 1 : 0;
 }
 
-int CDVDVideoCodecLibMpeg2::Decode(BYTE* pData, int iSize, double dts, double pts)
+int CDVDVideoCodecLibMpeg2::Decode(uint8_t* pData, int iSize, double dts, double pts)
 {
   int iState = 0;
   if (!m_pHandle) return VC_ERROR;
@@ -500,7 +507,7 @@ bool CDVDVideoCodecLibMpeg2::GetUserData(DVDVideoUserData* pDvdVideoUserData)
 {
   if (pDvdVideoUserData && m_pInfo && m_pInfo->user_data && m_pInfo->user_data_len > 0)
   {
-    pDvdVideoUserData->data = (BYTE*)m_pInfo->user_data;
+    pDvdVideoUserData->data = (uint8_t*)m_pInfo->user_data;
     pDvdVideoUserData->size = m_pInfo->user_data_len;
     return true;
   }

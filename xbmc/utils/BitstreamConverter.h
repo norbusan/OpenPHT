@@ -1,6 +1,6 @@
 /*
- *      Copyright (C) 2010-2012 Team XBMC
- *      http://www.xbmc.org
+ *      Copyright (C) 2010-2013 Team XBMC
+ *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,10 +22,21 @@
 #define _BITSTREAMCONVERTER_H_
 
 #include <stdint.h>
-#include "DllAvUtil.h"
-#include "DllAvFormat.h"
-#include "DllAvFilter.h"
-#include "DllAvCodec.h"
+
+extern "C" {
+#include "libavutil/avutil.h"
+#include "libavformat/avformat.h"
+#include "libavfilter/avfilter.h"
+#include "libavcodec/avcodec.h"
+}
+
+typedef struct {
+  int       writer_le;
+  uint32_t  bit_buf;
+  int       bit_left;
+  uint8_t   *buf, *buf_ptr, *buf_end;
+  int       size_in_bits;
+} bits_writer_t;
 
 typedef struct {
   uint8_t *buffer, *start;
@@ -61,6 +72,12 @@ typedef struct {
   ((uint8_t*)(p))[1] = (d) >> 16; \
   ((uint8_t*)(p))[0] = (d) >> 24; }
 
+#define BS_WL32(p, d) { \
+  ((uint8_t*)(p))[0] = (d); \
+  ((uint8_t*)(p))[1] = (d) >> 8; \
+  ((uint8_t*)(p))[2] = (d) >> 16; \
+  ((uint8_t*)(p))[3] = (d) >> 24; }
+
 typedef struct
 {
   const uint8_t *data;
@@ -68,6 +85,16 @@ typedef struct
   int head;
   uint64_t cache;
 } nal_bitstream;
+
+typedef struct mpeg2_sequence
+{
+  uint32_t  width;
+  uint32_t  height;
+  float     rate;
+  uint32_t  rate_info;
+  float     ratio;
+  uint32_t  ratio_info;
+} mpeg2_sequence;
 
 typedef struct
 {
@@ -103,53 +130,72 @@ typedef struct
   int frame_crop_bottom_offset;
 } sps_info_struct;
 
+class CBitstreamParser
+{
+public:
+  CBitstreamParser();
+  ~CBitstreamParser();
+
+  static bool Open();
+  static void Close();
+  static bool FindIdrSlice(const uint8_t *buf, int buf_size);
+
+protected:
+  static const uint8_t* find_start_code(const uint8_t *p, const uint8_t *end, uint32_t *state);
+};
+
 class CBitstreamConverter
 {
 public:
   CBitstreamConverter();
   ~CBitstreamConverter();
-  // Required overrides
-  static void     bits_reader_set( bits_reader_t *br, uint8_t *buf, int len );
-  static uint32_t read_bits( bits_reader_t *br, int nbits );
-  static void     skip_bits( bits_reader_t *br, int nbits );
-  static uint32_t get_bits( bits_reader_t *br, int nbits );
 
-  bool Open(enum CodecID codec, uint8_t *in_extradata, int in_extrasize, bool to_annexb);
-  void Close(void);
-  bool NeedConvert(void) { return m_convert_bitstream; };
-  bool Convert(uint8_t *pData, int iSize);
-  uint8_t *GetConvertBuffer(void);
-  int GetConvertSize();
-  uint8_t *GetExtraData(void);
-  int GetExtraSize();
-  void parseh264_sps(const uint8_t *sps, const uint32_t sps_size, bool *interlaced, int32_t *max_ref_frames);
+  bool              Open(enum AVCodecID codec, uint8_t *in_extradata, int in_extrasize, bool to_annexb);
+  void              Close(void);
+  bool              NeedConvert(void) const { return m_convert_bitstream; };
+  bool              Convert(uint8_t *pData, int iSize);
+  uint8_t*          GetConvertBuffer(void) const;
+  int               GetConvertSize() const;
+  uint8_t*          GetExtraData(void) const;
+  int               GetExtraSize() const;
+
+  static void       bits_reader_set( bits_reader_t *br, uint8_t *buf, int len );
+  static uint32_t   read_bits( bits_reader_t *br, int nbits );
+  static void       skip_bits( bits_reader_t *br, int nbits );
+  static uint32_t   get_bits( bits_reader_t *br, int nbits );
+
+  static void       init_bits_writer(bits_writer_t *s, uint8_t *buffer, int buffer_size, int writer_le);
+  static void       write_bits(bits_writer_t *s, int n, unsigned int value);
+  static void       skip_bits( bits_writer_t *s, int n);
+  static void       flush_bits(bits_writer_t *s);
+
+  static void       parseh264_sps(const uint8_t *sps, const uint32_t sps_size, bool *interlaced, int32_t *max_ref_frames);
+  static bool       mpeg2_sequence_header(const uint8_t *data, const uint32_t size, mpeg2_sequence *sequence);
+
 protected:
-  // bytestream (Annex B) to bistream conversion support.
-  void nal_bs_init(nal_bitstream *bs, const uint8_t *data, size_t size);
-  uint32_t nal_bs_read(nal_bitstream *bs, int n);
-  bool nal_bs_eos(nal_bitstream *bs);
-  int nal_bs_read_ue(nal_bitstream *bs);
-  const uint8_t *avc_find_startcode_internal(const uint8_t *p, const uint8_t *end);
-  const uint8_t *avc_find_startcode(const uint8_t *p, const uint8_t *end);
-  const int avc_parse_nal_units(AVIOContext *pb, const uint8_t *buf_in, int size);
-  const int avc_parse_nal_units_buf(const uint8_t *buf_in, uint8_t **buf, int *size);
-  const int isom_write_avcc(AVIOContext *pb, const uint8_t *data, int len);
+  static const int  avc_parse_nal_units(AVIOContext *pb, const uint8_t *buf_in, int size);
+  static const int  avc_parse_nal_units_buf(const uint8_t *buf_in, uint8_t **buf, int *size);
+  const int         isom_write_avcc(AVIOContext *pb, const uint8_t *data, int len);
   // bitstream to bytestream (Annex B) conversion support.
-  bool BitstreamConvertInit(void *in_extradata, int in_extrasize);
-  bool BitstreamConvert(uint8_t* pData, int iSize, uint8_t **poutbuf, int *poutbuf_size);
-  void BitstreamAllocAndCopy( uint8_t **poutbuf, int *poutbuf_size,
-    const uint8_t *sps_pps, uint32_t sps_pps_size, const uint8_t *in, uint32_t in_size);
+  bool              IsIDR(uint8_t unit_type);
+  bool              IsSlice(uint8_t unit_type);
+  bool              BitstreamConvertInitAVC(void *in_extradata, int in_extrasize);
+  bool              BitstreamConvertInitHEVC(void *in_extradata, int in_extrasize);
+  bool              BitstreamConvert(uint8_t* pData, int iSize, uint8_t **poutbuf, int *poutbuf_size);
+  static void       BitstreamAllocAndCopy(uint8_t **poutbuf, int *poutbuf_size,
+                      const uint8_t *sps_pps, uint32_t sps_pps_size, const uint8_t *in, uint32_t in_size);
 
   typedef struct omx_bitstream_ctx {
       uint8_t  length_size;
       uint8_t  first_idr;
+      uint8_t  idr_sps_pps_seen;
       uint8_t *sps_pps_data;
       uint32_t size;
   } omx_bitstream_ctx;
 
-  uint8_t           *m_convertBuffer;
+  uint8_t          *m_convertBuffer;
   int               m_convertSize;
-  uint8_t           *m_inputBuffer;
+  uint8_t          *m_inputBuffer;
   int               m_inputSize;
 
   uint32_t          m_sps_pps_size;
@@ -157,13 +203,11 @@ protected:
   bool              m_convert_bitstream;
   bool              m_to_annexb;
 
-  uint8_t           *m_extradata;
+  uint8_t          *m_extradata;
   int               m_extrasize;
   bool              m_convert_3byteTo4byteNALSize;
   bool              m_convert_bytestream;
-  DllAvUtil         *m_dllAvUtil;
-  DllAvFormat       *m_dllAvFormat;
-  CodecID           m_codec;
+  AVCodecID         m_codec;
 };
 
 #endif

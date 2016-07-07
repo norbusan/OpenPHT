@@ -3,24 +3,23 @@
 ;* Copyright (c) 2011 Loren Merritt <lorenm@u.washington.edu>
 ;* Copyright (c) 2011 Kieran Kunhya <kieran@kunhya.com>
 ;*
-;* This file is part of Libav.
+;* This file is part of FFmpeg.
 ;*
-;* Libav is free software; you can redistribute it and/or
+;* FFmpeg is free software; you can redistribute it and/or
 ;* modify it under the terms of the GNU Lesser General Public
 ;* License as published by the Free Software Foundation; either
 ;* version 2.1 of the License, or (at your option) any later version.
 ;*
-;* Libav is distributed in the hope that it will be useful,
+;* FFmpeg is distributed in the hope that it will be useful,
 ;* but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;* Lesser General Public License for more details.
 ;*
 ;* You should have received a copy of the GNU Lesser General Public
-;* License along with Libav; if not, write to the Free Software
+;* License along with FFmpeg; if not, write to the Free Software
 ;* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ;******************************************************************************
 
-%include "libavutil/x86/x86inc.asm"
 %include "libavutil/x86/x86util.asm"
 
 SECTION_RODATA
@@ -32,10 +31,10 @@ v210_chroma_shuf: db 0,1,8,9,6,7,-1,-1,2,3,4,5,12,13,-1,-1
 
 SECTION .text
 
-%macro v210_planar_unpack 2
+%macro v210_planar_unpack 1
 
 ; v210_planar_unpack(const uint32_t *src, uint16_t *y, uint16_t *u, uint16_t *v, int width)
-cglobal v210_planar_unpack_%1_%2, 5, 5
+cglobal v210_planar_unpack_%1, 5, 5, 7
     movsxdifnidn r4, r4d
     lea    r1, [r1+2*r4]
     add    r2, r4
@@ -46,7 +45,7 @@ cglobal v210_planar_unpack_%1_%2, 5, 5
     mova   m4, [v210_mask]
     mova   m5, [v210_luma_shuf]
     mova   m6, [v210_chroma_shuf]
-.loop
+.loop:
 %ifidn %1, unaligned
     movu   m0, [r0]
 %else
@@ -74,16 +73,18 @@ cglobal v210_planar_unpack_%1_%2, 5, 5
     REP_RET
 %endmacro
 
-INIT_XMM
-v210_planar_unpack unaligned, ssse3
-%ifdef HAVE_AVX
-INIT_AVX
-v210_planar_unpack unaligned, avx
+INIT_XMM ssse3
+v210_planar_unpack unaligned
+
+%if HAVE_AVX_EXTERNAL
+INIT_XMM avx
+v210_planar_unpack unaligned
 %endif
 
-INIT_XMM
-v210_planar_unpack aligned, ssse3
-%ifdef HAVE_AVX
-INIT_AVX
-v210_planar_unpack aligned, avx
+INIT_XMM ssse3
+v210_planar_unpack aligned
+
+%if HAVE_AVX_EXTERNAL
+INIT_XMM avx
+v210_planar_unpack aligned
 %endif

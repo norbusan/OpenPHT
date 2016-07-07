@@ -610,6 +610,40 @@ void CSettings::UpdateCalibrations()
   }
 }
 
+void CSettings::AddResolutionInfo(const RESOLUTION_INFO &resolution)
+{
+  RESOLUTION_INFO res(resolution);
+
+  if ((res.dwFlags & D3DPRESENTFLAG_MODE3DTB) == 0)
+  {
+    /* add corrections for some special case modes frame packing modes */
+
+    if (res.iScreenWidth == 1920
+      && res.iScreenHeight == 2205)
+    {
+      res.iBlanking = 45;
+      res.dwFlags |= D3DPRESENTFLAG_MODE3DTB;
+    }
+
+    if (res.iScreenWidth == 1280
+      && res.iScreenHeight == 1470)
+    {
+      res.iBlanking = 30;
+      res.dwFlags |= D3DPRESENTFLAG_MODE3DTB;
+    }
+  }
+  m_ResInfo.push_back(res);
+}
+
+void CSettings::ClearCustomResolutions()
+{
+  if (m_ResInfo.size() > RES_CUSTOM)
+  {
+    std::vector<RESOLUTION_INFO>::iterator firstCustom = m_ResInfo.begin() + RES_CUSTOM;
+    m_ResInfo.erase(firstCustom, m_ResInfo.end());
+  }
+}
+
 bool CSettings::SaveCalibration(TiXmlNode* pRootNode) const
 {
   TiXmlElement xmlRootElement("resolutions");

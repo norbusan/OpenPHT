@@ -53,11 +53,11 @@ public:
    \param texturePath the path of the texture to load.
    \param idealWidth the ideal width of the texture (defaults to 0, no ideal width).
    \param idealHeight the ideal height of the texture (defaults to 0, no ideal height).
-   \param autoRotate whether the textures should be autorotated based on EXIF information (defaults to false).
+   \param strMimeType mimetype of the given texture if available (defaults to empty)
    \return a CBaseTexture pointer to the created texture - NULL if the texture failed to load.
    */
   static CBaseTexture *LoadFromFile(const CStdString& texturePath, unsigned int idealWidth = 0, unsigned int idealHeight = 0,
-                                    bool autoRotate = false);
+                                    bool requirePixels = false, const std::string& strMimeType = "");
 
   /*! \brief Load a texture from a file in memory
    Loads a texture from a file in memory, restricting in size if needed based on maxHeight and maxWidth.
@@ -102,7 +102,7 @@ public:
   void ClampToEdge();
 
   static unsigned int PadPow2(unsigned int x);
-  bool SwapBlueRed(unsigned char *pixels, unsigned int height, unsigned int pitch, unsigned int elements = 4, unsigned int offset=0);
+  static bool SwapBlueRed(unsigned char *pixels, unsigned int height, unsigned int pitch, unsigned int elements = 4, unsigned int offset=0);
 
 private:
   // no copy constructor
@@ -111,8 +111,8 @@ private:
 protected:
   bool LoadFromFileInMem(unsigned char* buffer, size_t size, const std::string& mimeType,
                          unsigned int maxWidth, unsigned int maxHeight);
-  bool LoadFromFileInternal(const CStdString& texturePath, unsigned int maxWidth, unsigned int maxHeight, bool autoRotate);
-  void LoadFromImage(ImageInfo &image, bool autoRotate = false);
+  bool LoadFromFileInternal(const CStdString& texturePath, unsigned int maxWidth, unsigned int maxHeight, bool requirePixels, const std::string& strMimeType = "");
+  void LoadFromImage(ImageInfo &image);
   // helpers for computation of texture parameters for compressed textures
   unsigned int GetPitch(unsigned int width) const;
   unsigned int GetRows(unsigned int height) const;

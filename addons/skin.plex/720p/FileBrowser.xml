@@ -6,12 +6,12 @@
 		<!-- bg's -->
 		<control type="group">
 			<posx>20</posx>
-			<posy>110</posy>
+			<posy>50</posy>
 			<control type="image">
 				<posx>-1</posx>
 				<posy>-1</posy>
 				<width>602</width>
-				<height>562</height>
+				<height>517</height>
 				<texture>transparent.png</texture>
 				<bordertexture border="10">border-black.png</bordertexture>
 				<bordersize>1</bordersize>
@@ -20,7 +20,7 @@
 			<control type="image">
 				<posy>80</posy>
 				<width>600</width>
-				<height>480</height>
+				<height>435</height>
 				<texture border="10">base-rounded-half.png</texture>
 				<colordiffuse>FF000000</colordiffuse>
 				<animation effect="fade" start="0" end="70" time="0" condition="true">Conditional</animation>
@@ -49,19 +49,19 @@
 			<control type="image">
 				<description>Dialog arrow</description>
 				<posx>600</posx>
-				<posy>155</posy>
+				<posy>255</posy>
 				<include>ArrowBlack</include>
 			</control>
 		</control>
 		<control type="group">
 			<control type="group">
-				<posy>130</posy>
+				<posy>65</posy>
 				<posx>10</posx>
 				<control type="label" id="411">
 					<description>Heading</description>
 					<include>DialogHeading</include>
 					<width>580</width>
-					<height>40</height>
+					<height>50</height>
 					<align>center</align>
 				</control>
 				<!-- browse list -->
@@ -71,8 +71,8 @@
 					<control type="list" id="450">
 						<width>560</width>
 						<height>300</height>
-						<onleft>414</onleft>
-						<onright>414</onright>
+						<onleft>413</onleft>
+						<onright>413</onright>
 						<onup>450</onup>
 						<ondown>450</ondown>
 						<pagecontrol>61</pagecontrol>
@@ -112,15 +112,15 @@
 					</control>
 					<control type="scrollbar" id="61">
 						<description>Scroll Bar</description>
-						<posy>-5</posy>
-						<posx>570</posx>
+						<posy>-8</posy>
+						<posx>566</posx>
 						<width>20</width>
-						<height>300</height>
+						<height>312</height>
 					</control>
 				</control>
 				<control type="label" id="412">
 					<description>Path</description>
-					<posy>420</posy>
+					<posy>410</posy>
 					<posx>30</posx>
 					<width>560</width>
 					<font>Bold-17</font>
@@ -170,9 +170,10 @@
 				</control>
 				<control type="group">
 					<posx>0</posx>
-					<posy>470</posy>
-					<!--><control type="button" id="413">
+					<posy>438</posy>
+					<control type="button" id="413">
 						<description>Ok Button</description>
+						<posx>70</posx>
 						<onleft>414</onleft>
 						<onright>414</onright>
 						<onup>450</onup>
@@ -180,12 +181,12 @@
 						<textoffsety>3</textoffsety>
 						<label>$LOCALIZE[186]</label>
 						<include>DialogPressButton</include>
-					</control>-->
+					</control>
 					<control type="button" id="414">
 						<description>Cancel Button</description>
-						<posx>210</posx>
-						<onleft>450</onleft>
-						<onright>450</onright>
+						<posx>330</posx>
+						<onleft>413</onleft>
+						<onright>413</onright>
 						<onup>450</onup>
 						<width>200</width>
 						<textoffsety>3</textoffsety>

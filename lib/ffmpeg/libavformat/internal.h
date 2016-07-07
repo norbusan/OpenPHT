@@ -23,19 +23,97 @@
 
 #include <stdint.h>
 #include "avformat.h"
+#include "os_support.h"
 
 #define MAX_URL_SIZE 4096
+
+/** size of probe buffer, for guessing file type from file contents */
+#define PROBE_BUF_MIN 2048
+#define PROBE_BUF_MAX (1 << 20)
+
+#define MAX_PROBE_PACKETS 2500
 
 #ifdef DEBUG
 #    define hex_dump_debug(class, buf, size) av_hex_dump_log(class, AV_LOG_DEBUG, buf, size)
 #else
-#    define hex_dump_debug(class, buf, size)
+#    define hex_dump_debug(class, buf, size) do { if (0) av_hex_dump_log(class, AV_LOG_DEBUG, buf, size); } while(0)
 #endif
 
 typedef struct AVCodecTag {
-    enum CodecID id;
+    enum AVCodecID id;
     unsigned int tag;
 } AVCodecTag;
+
+typedef struct CodecMime{
+    char str[32];
+    enum AVCodecID id;
+} CodecMime;
+
+/*************************************************/
+/* fractional numbers for exact pts handling */
+
+/**
+ * The exact value of the fractional number is: 'val + num / den'.
+ * num is assumed to be 0 <= num < den.
+ */
+typedef struct FFFrac {
+    int64_t val, num, den;
+} FFFrac;
+
+
+struct AVFormatInternal {
+    /**
+     * Number of streams relevant for interleaving.
+     * Muxing only.
+     */
+    int nb_interleaved_streams;
+
+    /**
+     * This buffer is only needed when packets were already buffered but
+     * not decoded, for example to get the codec parameters in MPEG
+     * streams.
+     */
+    struct AVPacketList *packet_buffer;
+    struct AVPacketList *packet_buffer_end;
+
+    /* av_seek_frame() support */
+    int64_t data_offset; /**< offset of the first packet */
+
+    /**
+     * Raw packets from the demuxer, prior to parsing and decoding.
+     * This buffer is used for buffering packets until the codec can
+     * be identified, as parsing cannot be done without knowing the
+     * codec.
+     */
+    struct AVPacketList *raw_packet_buffer;
+    struct AVPacketList *raw_packet_buffer_end;
+    /**
+     * Packets split by the parser get queued here.
+     */
+    struct AVPacketList *parse_queue;
+    struct AVPacketList *parse_queue_end;
+    /**
+     * Remaining size available for raw_packet_buffer, in bytes.
+     */
+#define RAW_PACKET_BUFFER_SIZE 2500000
+    int raw_packet_buffer_remaining_size;
+
+    /**
+     * Offset to remap timestamps to be non-negative.
+     * Expressed in timebase units.
+     * @see AVStream.mux_ts_offset
+     */
+    int64_t offset;
+
+    /**
+     * Timebase for the timestamp offset.
+     */
+    AVRational offset_timebase;
+
+    int inject_global_side_data;
+
+    int avoid_negative_ts_use_pts;
+};
 
 #ifdef __GNUC__
 #define dynarray_add(tab, nb_ptr, elem)\
@@ -52,7 +130,7 @@ do {\
 } while(0)
 #endif
 
-struct tm *brktimegm(time_t secs, struct tm *tm);
+struct tm *ff_brktimegm(time_t secs, struct tm *tm);
 
 char *ff_data_to_hex(char *buf, const uint8_t *src, int size, int lowercase);
 
@@ -74,7 +152,7 @@ void ff_program_add_stream_index(AVFormatContext *ac, int progid, unsigned int i
  * @return 0, or < 0 on error
  */
 int ff_interleave_add_packet(AVFormatContext *s, AVPacket *pkt,
-                              int (*compare)(AVFormatContext *, AVPacket *, AVPacket *));
+                             int (*compare)(AVFormatContext *, AVPacket *, AVPacket *));
 
 void ff_read_frame_flush(AVFormatContext *s);
 
@@ -85,31 +163,6 @@ void ff_read_frame_flush(AVFormatContext *s);
 uint64_t ff_ntp_time(void);
 
 /**
- * Assemble a URL string from components. This is the reverse operation
- * of av_url_split.
- *
- * Note, this requires networking to be initialized, so the caller must
- * ensure ff_network_init has been called.
- *
- * @see av_url_split
- *
- * @param str the buffer to fill with the url
- * @param size the size of the str buffer
- * @param proto the protocol identifier, if null, the separator
- *              after the identifier is left out, too
- * @param authorization an optional authorization string, may be null.
- *                      An empty string is treated the same as a null string.
- * @param hostname the host name string
- * @param port the port number, left out from the string if negative
- * @param fmt a generic format string for everything to add after the
- *            host/port, may be null
- * @return the number of characters written to the destination buffer
- */
-int ff_url_join(char *str, int size, const char *proto,
-                const char *authorization, const char *hostname,
-                int port, const char *fmt, ...) av_printf_format(7, 8);
-
-/**
  * Append the media-specific SDP fragment for the media stream c
  * to the buffer buff.
  *
@@ -118,7 +171,8 @@ int ff_url_join(char *str, int size, const char *proto,
  *
  * @param buff the buffer to append the SDP fragment to
  * @param size the size of the buff buffer
- * @param c the AVCodecContext of the media to describe
+ * @param st the AVStream of the media to describe
+ * @param idx the global stream index
  * @param dest_addr the destination address of the media stream, may be NULL
  * @param dest_type the destination address type, may be NULL
  * @param port the destination port of the media stream, 0 if unknown
@@ -126,7 +180,7 @@ int ff_url_join(char *str, int size, const char *proto,
  * @param fmt the AVFormatContext, which might contain options modifying
  *            the generated SDP
  */
-void ff_sdp_write_media(char *buff, int size, AVCodecContext *c,
+void ff_sdp_write_media(char *buff, int size, AVStream *st, int idx,
                         const char *dest_addr, const char *dest_type,
                         int port, int ttl, AVFormatContext *fmt);
 
@@ -139,10 +193,11 @@ void ff_sdp_write_media(char *buff, int size, AVCodecContext *c,
  * @param dst_stream the stream index within dst to write the packet to
  * @param pkt the packet to be written
  * @param src the muxer the packet originally was intended for
+ * @param interleave 0->use av_write_frame, 1->av_interleaved_write_frame
  * @return the value av_write_frame returned
  */
 int ff_write_chained(AVFormatContext *dst, int dst_stream, AVPacket *pkt,
-                     AVFormatContext *src);
+                     AVFormatContext *src, int interleave);
 
 /**
  * Get the length in bytes which is needed to store val as v.
@@ -213,6 +268,8 @@ int ff_add_index_entry(AVIndexEntry **index_entries,
                        unsigned int *index_entries_allocated_size,
                        int64_t pos, int64_t timestamp, int size, int distance, int flags);
 
+void ff_configure_buffers_for_index(AVFormatContext *s, int64_t time_tolerance);
+
 /**
  * Add a new chapter.
  *
@@ -234,18 +291,7 @@ AVChapter *avpriv_new_chapter(AVFormatContext *s, int id, AVRational time_base,
  */
 void ff_reduce_index(AVFormatContext *s, int stream_index);
 
-/*
- * Convert a relative url into an absolute url, given a base url.
- *
- * @param buf the buffer where output absolute url is written
- * @param size the size of buf
- * @param base the base url, may be equal to buf.
- * @param rel the new url, which is interpreted relative to base
- */
-void ff_make_absolute_url(char *buf, int size, const char *base,
-                          const char *rel);
-
-enum CodecID ff_guess_image2_codec(const char *filename);
+enum AVCodecID ff_guess_image2_codec(const char *filename);
 
 /**
  * Convert a date string in ISO8601 format to Unix timestamp.
@@ -272,6 +318,9 @@ int ff_seek_frame_binary(AVFormatContext *s, int stream_index,
  */
 void ff_update_cur_dts(AVFormatContext *s, AVStream *ref_st, int64_t timestamp);
 
+int ff_find_last_ts(AVFormatContext *s, int stream_index, int64_t *ts, int64_t *pos,
+                    int64_t (*read_timestamp)(struct AVFormatContext *, int , int64_t *, int64_t ));
+
 /**
  * Perform a binary search using read_timestamp().
  *
@@ -286,14 +335,16 @@ int64_t ff_gen_search(AVFormatContext *s, int stream_index,
                       int64_t (*read_timestamp)(struct AVFormatContext *, int , int64_t *, int64_t ));
 
 /**
- * Set the pts for a given stream. If the new values would be invalid
- * (<= 0), it leaves the AVStream unchanged.
+ * Set the time base and wrapping info for a given stream. This will be used
+ * to interpret the stream's timestamps. If the new time base is invalid
+ * (numerator or denominator are non-positive), it leaves the stream
+ * unchanged.
  *
  * @param s stream
  * @param pts_wrap_bits number of bits effectively used by the pts
- *        (used for wrap control, 33 is the value for MPEG)
- * @param pts_num numerator to convert to seconds (MPEG: 1)
- * @param pts_den denominator to convert to seconds (MPEG: 90000)
+ *        (used for wrap control)
+ * @param pts_num time base numerator
+ * @param pts_den time base denominator
  */
 void avpriv_set_pts_info(AVStream *s, int pts_wrap_bits,
                          unsigned int pts_num, unsigned int pts_den);
@@ -305,5 +356,159 @@ void avpriv_set_pts_info(AVStream *s, int pts_wrap_bits,
 int ff_add_param_change(AVPacket *pkt, int32_t channels,
                         uint64_t channel_layout, int32_t sample_rate,
                         int32_t width, int32_t height);
+
+/**
+ * Set the timebase for each stream from the corresponding codec timebase and
+ * print it.
+ */
+int ff_framehash_write_header(AVFormatContext *s);
+
+/**
+ * Read a transport packet from a media file.
+ *
+ * @param s media file handle
+ * @param pkt is filled
+ * @return 0 if OK, AVERROR_xxx on error
+ */
+int ff_read_packet(AVFormatContext *s, AVPacket *pkt);
+
+/**
+ * Interleave a packet per dts in an output media file.
+ *
+ * Packets with pkt->destruct == av_destruct_packet will be freed inside this
+ * function, so they cannot be used after it. Note that calling av_free_packet()
+ * on them is still safe.
+ *
+ * @param s media file handle
+ * @param out the interleaved packet will be output here
+ * @param pkt the input packet
+ * @param flush 1 if no further packets are available as input and all
+ *              remaining packets should be output
+ * @return 1 if a packet was output, 0 if no packet could be output,
+ *         < 0 if an error occurred
+ */
+int ff_interleave_packet_per_dts(AVFormatContext *s, AVPacket *out,
+                                 AVPacket *pkt, int flush);
+
+void ff_free_stream(AVFormatContext *s, AVStream *st);
+
+/**
+ * Return the frame duration in seconds. Return 0 if not available.
+ */
+void ff_compute_frame_duration(AVFormatContext *s, int *pnum, int *pden, AVStream *st,
+                               AVCodecParserContext *pc, AVPacket *pkt);
+
+unsigned int ff_codec_get_tag(const AVCodecTag *tags, enum AVCodecID id);
+
+enum AVCodecID ff_codec_get_id(const AVCodecTag *tags, unsigned int tag);
+
+/**
+ * Select a PCM codec based on the given parameters.
+ *
+ * @param bps     bits-per-sample
+ * @param flt     floating-point
+ * @param be      big-endian
+ * @param sflags  signed flags. each bit corresponds to one byte of bit depth.
+ *                e.g. the 1st bit indicates if 8-bit should be signed or
+ *                unsigned, the 2nd bit indicates if 16-bit should be signed or
+ *                unsigned, etc... This is useful for formats such as WAVE where
+ *                only 8-bit is unsigned and all other bit depths are signed.
+ * @return        a PCM codec id or AV_CODEC_ID_NONE
+ */
+enum AVCodecID ff_get_pcm_codec_id(int bps, int flt, int be, int sflags);
+
+/**
+ * Chooses a timebase for muxing the specified stream.
+ *
+ * The chosen timebase allows sample accurate timestamps based
+ * on the framerate or sample rate for audio streams. It also is
+ * at least as precise as 1/min_precision would be.
+ */
+AVRational ff_choose_timebase(AVFormatContext *s, AVStream *st, int min_precision);
+
+/**
+ * Chooses a timebase for muxing the specified stream.
+ */
+enum AVChromaLocation ff_choose_chroma_location(AVFormatContext *s, AVStream *st);
+
+/**
+ * Generate standard extradata for AVC-Intra based on width/height and field
+ * order.
+ */
+int ff_generate_avci_extradata(AVStream *st);
+
+/**
+ * Wrap errno on rename() error.
+ *
+ * @param oldpath source path
+ * @param newpath destination path
+ * @return        0 or AVERROR on failure
+ */
+static inline int ff_rename(const char *oldpath, const char *newpath, void *logctx)
+{
+    int ret = 0;
+    if (rename(oldpath, newpath) == -1) {
+        ret = AVERROR(errno);
+        if (logctx)
+            av_log(logctx, AV_LOG_ERROR, "failed to rename file %s to %s\n", oldpath, newpath);
+    }
+    return ret;
+}
+
+/**
+ * Add new side data to a stream. If a side data of this type already exists, it
+ * is replaced.
+ */
+uint8_t *ff_stream_new_side_data(AVStream *st, enum AVPacketSideDataType type,
+                                 int size);
+
+/**
+ * Allocate extradata with additional AV_INPUT_BUFFER_PADDING_SIZE at end
+ * which is always set to 0.
+ *
+ * @param size size of extradata
+ * @return 0 if OK, AVERROR_xxx on error
+ */
+int ff_alloc_extradata(AVCodecContext *avctx, int size);
+
+/**
+ * Allocate extradata with additional AV_INPUT_BUFFER_PADDING_SIZE at end
+ * which is always set to 0 and fill it from pb.
+ *
+ * @param size size of extradata
+ * @return >= 0 if OK, AVERROR_xxx on error
+ */
+int ff_get_extradata(AVCodecContext *avctx, AVIOContext *pb, int size);
+
+/**
+ * add frame for rfps calculation.
+ *
+ * @param dts timestamp of the i-th frame
+ * @return 0 if OK, AVERROR_xxx on error
+ */
+int ff_rfps_add_frame(AVFormatContext *ic, AVStream *st, int64_t dts);
+
+void ff_rfps_calculate(AVFormatContext *ic);
+
+/**
+ * Flags for AVFormatContext.write_uncoded_frame()
+ */
+enum AVWriteUncodedFrameFlags {
+
+    /**
+     * Query whether the feature is possible on this stream.
+     * The frame argument is ignored.
+     */
+    AV_WRITE_UNCODED_FRAME_QUERY           = 0x0001,
+
+};
+
+/**
+ * Copies the whilelists from one context to the other
+ */
+int ff_copy_whitelists(AVFormatContext *dst, AVFormatContext *src);
+
+int ffio_open2_wrapper(struct AVFormatContext *s, AVIOContext **pb, const char *url, int flags,
+                       const AVIOInterruptCB *int_cb, AVDictionary **options);
 
 #endif /* AVFORMAT_INTERNAL_H */

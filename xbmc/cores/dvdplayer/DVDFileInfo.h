@@ -17,13 +17,16 @@
  *  <http://www.gnu.org/licenses/>.
  *
  */
+
 #pragma once
 
 #include "utils/StdString.h"
+#include <vector>
 
 class CFileItem;
 class CDVDDemux;
 class CStreamDetails;
+class CStreamDetailSubtitle;
 class CDVDInputStream;
 class CTextureDetails;
 
@@ -31,7 +34,9 @@ class CDVDFileInfo
 {
 public:
   // Extract a thumbnail immage from the media at strPath, optionally populating a streamdetails class with the data
-  static bool ExtractThumb(const CStdString &strPath, CTextureDetails &details, CStreamDetails *pStreamDetails);
+  static bool ExtractThumb(const CStdString &strPath,
+                           CTextureDetails &details,
+                           CStreamDetails *pStreamDetails, int pos=-1);
 
   // Probe the files streams and store the info in the VideoInfoTag
   static bool GetFileStreamDetails(CFileItem *pItem);

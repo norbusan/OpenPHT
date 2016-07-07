@@ -182,10 +182,16 @@
 
 #define ACTION_VOLUME_UP            88
 #define ACTION_VOLUME_DOWN          89
+#define ACTION_VOLAMP               90
 #define ACTION_MUTE                 91
 #define ACTION_NAV_BACK             92
 #define ACTION_VOLAMP_UP            93
 #define ACTION_VOLAMP_DOWN          94
+
+#define ACTION_CHAPTER_OR_BIG_STEP_FORWARD       97 // Goto the next chapter, if not available perform a big step forward
+#define ACTION_CHAPTER_OR_BIG_STEP_BACK          98 // Goto the previous chapter, if not available perform a big step back
+
+#define ACTION_CYCLE_SUBTITLE         99 // switch to next subtitle of movie, but will not enable/disable the subtitles. Can be used in videoFullScreen.xml window id=2005
 
 #define ACTION_MOUSE_START            100
 #define ACTION_MOUSE_LEFT_CLICK       100
@@ -304,16 +310,22 @@
 
 #define ACTION_PLAYER_PLAYPAUSE       229 // Play/pause. If playing it pauses, if paused it plays.
 
-// The NOOP action can be specified to disable an input event. This is
-// useful in user keyboard.xml etc to disable actions specified in the
-// system mappings.
-#define ACTION_NOOP                   999
-
 #define ACTION_SUBTITLE_VSHIFT_UP     230 // shift up subtitles in DVDPlayer
 #define ACTION_SUBTITLE_VSHIFT_DOWN   231 // shift down subtitles in DVDPlayer
 #define ACTION_SUBTITLE_ALIGN         232 // toggle vertical alignment of subtitles
 
 #define ACTION_FILTER                 233
+
+#define ACTION_STEREOMODE_NEXT        235
+#define ACTION_STEREOMODE_PREVIOUS    236
+#define ACTION_STEREOMODE_TOGGLE      237 // turns 3d mode on/off
+#define ACTION_STEREOMODE_SELECT      238
+#define ACTION_STEREOMODE_TOMONO      239
+#define ACTION_STEREOMODE_SET         240
+
+#define ACTION_TRIGGER_OSD            243 // show autoclosing OSD. Can b used in videoFullScreen.xml window id=2005
+#define ACTION_VOLUME_SET             245
+
 
 /* PLEX */
 #define ACTION_MARK_AS_UNWATCHED      300
@@ -341,8 +353,15 @@
 #define ACTION_PLEX_RELATED_END       510
 /* END PLEX */
 
+// The NOOP action can be specified to disable an input event. This is
+// useful in user keyboard.xml etc to disable actions specified in the
+// system mappings. ERROR action is used to play an error sound
+#define ACTION_ERROR                  998
+#define ACTION_NOOP                   999
+
+
 // Window ID defines to make the code a bit more readable
-#define WINDOW_INVALID                     9999
+#define WINDOW_INVALID                     9999 // do not change. value is used to avoid include in headers.
 #define WINDOW_HOME                       10000
 #define WINDOW_PROGRAMS                   10001
 #define WINDOW_PICTURES                   10002
@@ -454,6 +473,8 @@
 // PVR_WINDOW VIEWS = 10694-10699
 
 //#define WINDOW_VIRTUAL_KEYBOARD           11000
+// WINDOW_ID's from 11100 to 11199 reserved for Skins
+
 #define WINDOW_DIALOG_SELECT              12000
 #define WINDOW_DIALOG_MUSIC_INFO          12001
 #define WINDOW_DIALOG_OK                  12002
@@ -507,6 +528,7 @@ public:
   CAction(int actionID, wchar_t unicode);
   CAction(int actionID, unsigned int state, float posX, float posY, float offsetX, float offsetY, const CStdString &name = "");
   CAction(int actionID, const CStdString &name, const CKey &key);
+  CAction(int actionID, const CStdString &name);
 
   /*! \brief Identifier of the action
    \return id of the action
@@ -599,7 +621,7 @@ public:
   CKey(const CKey& key);
 
   virtual ~CKey(void);
-  const CKey& operator=(const CKey& key);
+  CKey& operator=(const CKey& key);
   uint8_t GetLeftTrigger() const;
   uint8_t GetRightTrigger() const;
   float GetLeftThumbX() const;

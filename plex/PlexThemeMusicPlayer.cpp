@@ -69,7 +69,7 @@ CFileItemPtr CPlexThemeMusicPlayer::getThemeItem(const CStdString &url)
 
 void CPlexThemeMusicPlayer::playForItem(const CFileItem &item)
 {
-  if (g_guiSettings.GetBool("backgroundmusic.thememusicenabled") && !g_application.IsPlaying())
+  if (g_guiSettings.GetBool("backgroundmusic.thememusicenabled") && !g_application.m_pPlayer->IsPlaying())
   {
     std::string theme;
     if (item.HasProperty("theme"))

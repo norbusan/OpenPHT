@@ -29,6 +29,7 @@
 #include "xbmc/guilib/Shader.h"
 #include "settings/VideoSettings.h"
 #include "RenderFlags.h"
+#include "RenderFormats.h"
 #include "guilib/GraphicContext.h"
 #include "BaseRenderer.h"
 #include "xbmc/cores/dvdplayer/DVDCodecs/Video/DVDVideoCodec.h"
@@ -40,8 +41,6 @@ namespace Shaders { class BaseYUV2RGBShader; }
 namespace Shaders { class BaseVideoFilterShader; }
 class COpenMaxVideo;
 typedef std::vector<int>     Features;
-
-#define NUM_BUFFERS 3
 
 
 #undef ALIGN
@@ -112,9 +111,6 @@ extern YUVCOEF yuv_coef_bt709;
 extern YUVCOEF yuv_coef_ebu;
 extern YUVCOEF yuv_coef_smtp240m;
 
-class DllSwScale;
-struct SwsContext;
-
 class CEvent;
 
 class CLinuxRendererGLES : public CBaseRenderer
@@ -123,7 +119,7 @@ public:
   CLinuxRendererGLES();
   virtual ~CLinuxRendererGLES();
 
-  virtual void Update(bool bPauseDrawing);
+  virtual void Update();
   virtual void SetupScreenshot() {};
 
   bool RenderCapture(CRenderCapture* capture);
@@ -139,6 +135,9 @@ public:
   virtual void         Reset(); /* resets renderer after seek for example */
   virtual void         Flush();
   virtual void         ReorderDrawPoints();
+  virtual void         ReleaseBuffer(int idx);
+  virtual void         SetBufferSize(int numBuffers) { m_NumYV12Buffers = numBuffers; }
+  virtual bool         IsGuiLayer();
 
   virtual void RenderUpdate(bool clear, DWORD flags = 0, DWORD alpha = 255);
 
@@ -151,26 +150,19 @@ public:
 
   virtual EINTERLACEMETHOD AutoInterlaceMethod();
 
-  virtual std::vector<ERenderFormat> SupportedFormats() { return m_formats; }
+  virtual CRenderInfo GetRenderInfo();
 
 #ifdef HAVE_LIBOPENMAX
-  virtual void         AddProcessor(COpenMax* openMax, DVDVideoPicture *picture);
+  virtual void         AddProcessor(COpenMax* openMax, DVDVideoPicture *picture, int index);
 #endif
 #ifdef HAVE_VIDEOTOOLBOXDECODER
-  virtual void         AddProcessor(struct __CVBuffer *cvBufferRef);
+  virtual void         AddProcessor(struct __CVBuffer *cvBufferRef, int index);
 #endif
-
-  /* PLEX */
-  virtual void SetRGB32Image(const char *image, int nHeight, int nWidth, int nPitch);
-  /* END PLEX */
 
 protected:
   virtual void Render(DWORD flags, int index);
+  void RenderUpdateVideo(bool clear, DWORD flags = 0, DWORD alpha = 255);
 
-  /* PLEX */
-  bool ValidateRenderer();
-  /* END PLEX */
-  virtual void ManageTextures();
   int  NextYV12Texture();
   virtual bool ValidateRenderTarget();
   virtual void LoadShaders(int field=FIELD_FULL);
@@ -218,7 +210,6 @@ protected:
   bool m_bValidated;
   std::vector<ERenderFormat> m_formats;
   bool m_bImageReady;
-  ERenderFormat m_format;
   GLenum m_textureTarget;
   unsigned short m_renderMethod;
   unsigned short m_oldRenderMethod;
@@ -261,12 +252,11 @@ protected:
     unsigned  flipindex; /* used to decide if this has been uploaded */
 
 #ifdef HAVE_LIBOPENMAX
-    OpenMaxVideoBuffer *openMaxBuffer;
+    OpenMaxVideoBufferHolder *openMaxBufferHolder;
 #endif
 #ifdef HAVE_VIDEOTOOLBOXDECODER
-  struct __CVBuffer *cvBufferRef;
+    struct __CVBuffer *cvBufferRef;
 #endif
-
   };
 
   typedef YUVBUFFER          YUVBUFFERS[NUM_BUFFERS];
@@ -294,15 +284,10 @@ protected:
   float m_clearColour;
 
   // software scale libraries (fallback if required gl version is not available)
-  DllSwScale  *m_dllSwScale;
   struct SwsContext *m_sw_context;
   BYTE	      *m_rgbBuffer;  // if software scale is used, this will hold the result image
   unsigned int m_rgbBufferSize;
-
-  CEvent* m_eventTexturesDone[NUM_BUFFERS];
-  /* PLEX */
-  bool        m_bRGBImageSet;
-  /* END PLEX */
+  float        m_textureMatrix[16];
 };
 
 

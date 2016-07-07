@@ -20,8 +20,8 @@
  *
  */
 
-#include "utils/StdString.h"
 #include <map>
+#include "utils/StdString.h"
 #include "XBTFReader.h"
 
 class CBaseTexture;

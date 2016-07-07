@@ -34,6 +34,7 @@
 #include "bswap.h"
 #include "intreadwrite.h"
 #include "md5.h"
+#include "mem.h"
 
 typedef struct AVMD5{
     uint64_t len;
@@ -42,6 +43,11 @@ typedef struct AVMD5{
 } AVMD5;
 
 const int av_md5_size = sizeof(AVMD5);
+
+struct AVMD5 *av_md5_alloc(void)
+{
+    return av_mallocz(sizeof(struct AVMD5));
+}
 
 static const uint8_t S[4][4] = {
     { 7, 12, 17, 22 },  /* round 1 */
@@ -77,50 +83,56 @@ static const uint32_t T[64] = { // T[i]= fabs(sin(i+1)<<32)
         a += T[i];                                                      \
                                                                         \
         if (i < 32) {                                                   \
-            if (i < 16) a += (d ^ (b & (c ^ d))) + X[       i  & 15];   \
-            else        a += (c ^ (d & (c ^ b))) + X[(1 + 5*i) & 15];   \
+            if (i < 16) a += (d ^ (b & (c ^ d)))  + X[       i  & 15];  \
+            else        a += ((d & b) | (~d & c)) + X[(1 + 5*i) & 15];  \
         } else {                                                        \
-            if (i < 48) a += (b ^ c ^ d)         + X[(5 + 3*i) & 15];   \
-            else        a += (c ^ (b | ~d))      + X[(    7*i) & 15];   \
+            if (i < 48) a += (b ^ c ^ d)          + X[(5 + 3*i) & 15];  \
+            else        a += (c ^ (b | ~d))       + X[(    7*i) & 15];  \
         }                                                               \
         a = b + (a << t | a >> (32 - t));                               \
     } while (0)
 
-static void body(uint32_t ABCD[4], uint32_t X[16])
+static void body(uint32_t ABCD[4], uint32_t *src, int nblocks)
 {
-    int t;
     int i av_unused;
-    unsigned int a = ABCD[3];
-    unsigned int b = ABCD[2];
-    unsigned int c = ABCD[1];
-    unsigned int d = ABCD[0];
+    int n;
+    uint32_t a, b, c, d, t, *X;
+
+    for (n = 0; n < nblocks; n++) {
+        a = ABCD[3];
+        b = ABCD[2];
+        c = ABCD[1];
+        d = ABCD[0];
+
+        X = src + n * 16;
 
 #if HAVE_BIGENDIAN
-    for (i = 0; i < 16; i++)
-        X[i] = av_bswap32(X[i]);
+        for (i = 0; i < 16; i++)
+            X[i] = av_bswap32(X[i]);
 #endif
 
 #if CONFIG_SMALL
-    for (i = 0; i < 64; i++) {
-        CORE(i, a, b, c, d);
-        t = d;
-        d = c;
-        c = b;
-        b = a;
-        a = t;
-    }
+        for (i = 0; i < 64; i++) {
+            CORE(i, a, b, c, d);
+            t = d;
+            d = c;
+            c = b;
+            b = a;
+            a = t;
+        }
 #else
 #define CORE2(i)                                                        \
-    CORE( i,   a,b,c,d); CORE((i+1),d,a,b,c);                           \
-    CORE((i+2),c,d,a,b); CORE((i+3),b,c,d,a)
+        CORE( i,   a,b,c,d); CORE((i+1),d,a,b,c);                       \
+        CORE((i+2),c,d,a,b); CORE((i+3),b,c,d,a)
 #define CORE4(i) CORE2(i); CORE2((i+4)); CORE2((i+8)); CORE2((i+12))
-    CORE4(0); CORE4(16); CORE4(32); CORE4(48);
+        CORE4(0); CORE4(16); CORE4(32); CORE4(48);
 #endif
 
-    ABCD[0] += d;
-    ABCD[1] += c;
-    ABCD[2] += b;
-    ABCD[3] += a;
+        ABCD[0] += d;
+        ABCD[1] += c;
+        ABCD[2] += b;
+        ABCD[3] += a;
+    }
 }
 
 void av_md5_init(AVMD5 *ctx)
@@ -133,20 +145,39 @@ void av_md5_init(AVMD5 *ctx)
     ctx->ABCD[3] = 0x67452301;
 }
 
-void av_md5_update(AVMD5 *ctx, const uint8_t *src, const int len)
+void av_md5_update(AVMD5 *ctx, const uint8_t *src, int len)
 {
-    int i, j;
+    const uint8_t *end;
+    int j;
 
     j = ctx->len & 63;
     ctx->len += len;
 
-    for (i = 0; i < len; i++) {
-        ctx->block[j++] = src[i];
-        if (j == 64) {
-            body(ctx->ABCD, (uint32_t *) ctx->block);
-            j = 0;
-        }
+    if (j) {
+        int cnt = FFMIN(len, 64 - j);
+        memcpy(ctx->block + j, src, cnt);
+        src += cnt;
+        len -= cnt;
+        if (j + cnt < 64)
+            return;
+        body(ctx->ABCD, (uint32_t *)ctx->block, 1);
     }
+
+    end = src + (len & ~63);
+    if (HAVE_BIGENDIAN || (!HAVE_FAST_UNALIGNED && ((intptr_t)src & 3))) {
+       while (src < end) {
+           memcpy(ctx->block, src, 64);
+           body(ctx->ABCD, (uint32_t *) ctx->block, 1);
+           src += 64;
+        }
+    } else {
+        int nblocks = len / 64;
+        body(ctx->ABCD, (uint32_t *)src, nblocks);
+        src = end;
+    }
+    len &= 63;
+    if (len > 0)
+        memcpy(ctx->block, src, len);
 }
 
 void av_md5_final(AVMD5 *ctx, uint8_t *dst)
@@ -174,7 +205,6 @@ void av_md5_sum(uint8_t *dst, const uint8_t *src, const int len)
 }
 
 #ifdef TEST
-#undef printf
 #include <stdio.h>
 
 static void print_md5(uint8_t *md5)
@@ -188,7 +218,8 @@ static void print_md5(uint8_t *md5)
 int main(void){
     uint8_t md5val[16];
     int i;
-    uint8_t in[1000];
+    volatile uint8_t in[1000]; // volatile to workaround http://llvm.org/bugs/show_bug.cgi?id=20849
+    // FIXME remove volatile once it has been fixed and all fate clients are updated
 
     for (i = 0; i < 1000; i++)
         in[i] = i * i;

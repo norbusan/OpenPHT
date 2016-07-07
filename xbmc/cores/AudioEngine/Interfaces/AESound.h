@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2010-2012 Team XBMC
+ *      Copyright (C) 2010-2013 Team XBMC
  *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,8 +19,8 @@
  *
  */
 
-#include "utils/StdString.h"
-#include "AE.h"
+#include <string>
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
 
 class IAESound
 {
@@ -38,6 +38,12 @@ public:
 
   /* return true if the sound is currently playing */
   virtual bool IsPlaying() = 0;
+
+  /* set the playback channel of this sound, AE_CH_NULL for all */
+  virtual void SetChannel(AEChannel channel) = 0;
+
+  /* get the current playback channel of this sound, AE_CH_NULL for all */
+  virtual AEChannel GetChannel() = 0;
 
   /* set the playback volume of this sound */
   virtual void SetVolume(float volume) = 0;

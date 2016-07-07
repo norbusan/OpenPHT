@@ -24,7 +24,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "asm.S"
+#include "libavutil/arm/asm.S"
 
 #define M_SQRT1_2 0.70710678118654752440
 
@@ -348,7 +348,7 @@ function ff_fft_permute_neon, export=1
         pop             {r4,pc}
 endfunc
 
-const   fft_tab_neon
+const   fft_tab_neon, relocate=1
         .word fft4_neon
         .word fft8_neon
         .word fft16_neon

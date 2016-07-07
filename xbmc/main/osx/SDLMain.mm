@@ -26,6 +26,7 @@
 #undef BOOL
 
 #import "osx/HotKeyController.h"
+#import "osx/DarwinUtils.h"
 
 /* PLEX */
 #import "GUIUserMessages.h"
@@ -143,7 +144,13 @@ static void setupWindowMenu(void)
   menuItem = [[NSMenuItem alloc] initWithTitle:@"Minimize" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
   [windowMenu addItem:menuItem];
   [menuItem release];
-
+  
+  // "Title Bar" item
+  menuItem = [[NSMenuItem alloc] initWithTitle:@"Title Bar" action:@selector(titlebarToggle:) keyEquivalent:@""];
+  [windowMenu addItem:menuItem];
+  [menuItem setState: true];
+  [menuItem release];
+  
   // Put menu into the menubar
   windowMenuItem = [[NSMenuItem alloc] initWithTitle:@"Window" action:nil keyEquivalent:@""];
   [windowMenuItem setSubmenu:windowMenu];
@@ -205,6 +212,17 @@ static void setupWindowMenu(void)
     [sender setState:NSOnState];
   }
 }
+
+- (void)titlebarToggle:(id)sender
+{
+  NSWindow* window = [[[NSOpenGLContext currentContext] view] window];
+  [window setStyleMask: [window styleMask] ^ NSTitledWindowMask ];
+  BOOL isSet = [window styleMask] & NSTitledWindowMask;
+  [window setMovableByWindowBackground: !isSet];
+  [sender setState: isSet];
+  
+}
+
 
 @end
 
@@ -432,7 +450,7 @@ static void setupWindowMenu(void)
   [pool release];
 }
 
-#define VK_SLEEP            0x5F
+#define VK_SLEEP            0x143
 #define VK_VOLUME_MUTE      0xAD
 #define VK_VOLUME_DOWN      0xAE
 #define VK_VOLUME_UP        0xAF
@@ -443,7 +461,7 @@ static void setupWindowMenu(void)
 #define VK_REWIND           0x9D
 #define VK_FAST_FWD         0x9E
 
-- (void)MediaKeyPower
+- (void)powerKeyNotification
 {
   SDL_Event event;
   memset(&event, 0, sizeof(event));
@@ -558,6 +576,14 @@ int main(int argc, char *argv[])
     gFinderLaunch = NO;
   }
 
+  // fix open with document/movie - autostart
+  // on mavericks we are not called with "-psn" anymore
+  // as the whole ProcessSerialNumber approach is deprecated
+  // in that case assume finder launch - else
+  // we wouldn't handle documents/movies someone dragged on the app icon
+  if (DarwinIsMavericks())
+    gFinderLaunch = TRUE;
+
   // Ensure the application object is initialised
   [XBMCApplication sharedApplication];
 
@@ -579,7 +605,7 @@ int main(int argc, char *argv[])
 
   // Create XBMCDelegate and make it the app delegate
   xbmc_delegate = [[XBMCDelegate alloc] init];
-  [NSApp setDelegate:xbmc_delegate];
+  [[NSApplication sharedApplication] setDelegate:xbmc_delegate];
 
   // Start the main event loop
   [NSApp run];

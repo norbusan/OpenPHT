@@ -22,7 +22,6 @@
 #ifdef HAS_DX
 
 #include "threads/SystemClock.h"
-#include "settings/Settings.h"
 #include "RenderSystemDX.h"
 #include "utils/log.h"
 #include "utils/TimeUtils.h"
@@ -30,12 +29,9 @@
 #include "guilib/GUIWindowManager.h"
 #include "threads/SingleLock.h"
 #include "guilib/D3DResource.h"
-#include "settings/GUISettings.h"
 #include "settings/AdvancedSettings.h"
-#include "utils/SystemInfo.h"
 #include "Application.h"
-#include "Util.h"
-#include "win32/WIN32Util.h"
+#include "utils/StringUtils.h"
 #include "video/VideoReferenceClock.h"
 #include "cores/VideoRenderers/RenderManager.h"
 #if (D3DX_SDK_VERSION >= 42) //aug 2009 sdk and up use dxerr
@@ -102,7 +98,7 @@ bool CRenderSystemDX::InitRenderSystem()
 {
   m_bVSync = true;
 
-  m_useD3D9Ex = (g_advancedSettings.m_AllowD3D9Ex && g_sysinfo.IsVistaOrHigher() && LoadD3D9Ex());
+  m_useD3D9Ex = (g_advancedSettings.m_AllowD3D9Ex && LoadD3D9Ex());
   m_pD3D = NULL;
 
   if (m_useD3D9Ex)
@@ -331,7 +327,7 @@ void CRenderSystemDX::DeleteDevice()
   CSingleLock lock(m_resourceSection);
 
   // tell any shared resources
-  for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); i++)
+  for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
     (*i)->OnDestroyDevice();
 
   SAFE_RELEASE(m_pD3DDevice);
@@ -349,7 +345,7 @@ void CRenderSystemDX::OnDeviceLost()
   else
   {
     // just resetting the device
-    for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); i++)
+    for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
       (*i)->OnLostDevice();
   }
 }
@@ -371,7 +367,7 @@ void CRenderSystemDX::OnDeviceReset()
 
   if (m_nDeviceStatus == S_OK)
   { // we're back
-    for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); i++)
+    for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
       (*i)->OnResetDevice();
 
     g_renderManager.Flush();
@@ -380,7 +376,7 @@ void CRenderSystemDX::OnDeviceReset()
   }
   else
   {
-    for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); i++)
+    for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
       (*i)->OnLostDevice();
   }
 }
@@ -466,8 +462,8 @@ bool CRenderSystemDX::CreateDevice()
   {
     m_RenderRenderer = (const char*)m_AIdentifier.Description;
     m_RenderVendor   = (const char*)m_AIdentifier.Driver;
-    m_RenderVersion.Format("%d.%d.%d.%04d", HIWORD(m_AIdentifier.DriverVersion.HighPart), LOWORD(m_AIdentifier.DriverVersion.HighPart),
-                                            HIWORD(m_AIdentifier.DriverVersion.LowPart) , LOWORD(m_AIdentifier.DriverVersion.LowPart));
+    m_RenderVersion = StringUtils::Format("%d.%d.%d.%04d", HIWORD(m_AIdentifier.DriverVersion.HighPart), LOWORD(m_AIdentifier.DriverVersion.HighPart),
+                                                           HIWORD(m_AIdentifier.DriverVersion.LowPart) , LOWORD(m_AIdentifier.DriverVersion.LowPart));
   }
 
   CLog::Log(LOGDEBUG, __FUNCTION__" - adapter %d: %s, %s, VendorId %lu, DeviceId %lu",
@@ -562,7 +558,7 @@ bool CRenderSystemDX::CreateDevice()
   m_needNewDevice = false;
 
   // tell any shared objects about our resurrection
-  for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); i++)
+  for (vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
     (*i)->OnCreateDevice();
 
   return true;
@@ -740,19 +736,25 @@ bool CRenderSystemDX::EndRender()
 
 bool CRenderSystemDX::ClearBuffers(color_t color)
 {
-  HRESULT hr;
-
   if (!m_bRenderCreated)
     return false;
 
-  if( FAILED( hr = m_pD3DDevice->Clear(
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN
+  || m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA
+  || m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE)
+  {
+    // if stereo anaglyph, data was cleared when left view was rendererd
+    if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      return true;
+  }
+
+  return SUCCEEDED(m_pD3DDevice->Clear(
     0,
     NULL,
     D3DCLEAR_TARGET,
     color,
     1.0,
-    0 ) ) )
-    return false;
+    0 ) );
 
   return true;
 }
@@ -804,7 +806,7 @@ void CRenderSystemDX::ApplyStateBlock()
     m_stateBlock->Apply();
 }
 
-void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight)
+void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor)
 {
   if (!m_bRenderCreated)
     return;
@@ -825,7 +827,7 @@ void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, i
   // position.
   D3DXMATRIX flipY, translate, mtxView;
   D3DXMatrixScaling(&flipY, 1.0f, -1.0f, 1.0f);
-  D3DXMatrixTranslation(&translate, -(w + offset.x), -(h + offset.y), 2*h);
+  D3DXMatrixTranslation(&translate, -(w + offset.x - stereoFactor), -(h + offset.y), 2*h);
   D3DXMatrixMultiply(&mtxView, &translate, &flipY);
   m_pD3DDevice->SetTransform(D3DTS_VIEW, &mtxView);
 
@@ -953,6 +955,14 @@ void CRenderSystemDX::SetViewPort(CRect& viewPort)
   m_pD3DDevice->SetViewport(&m_viewPort);
 }
 
+void CRenderSystemDX::RestoreViewPort()
+{
+  if (!m_bRenderCreated)
+    return;
+
+  m_pD3DDevice->SetViewport(&m_viewPort);
+}
+
 void CRenderSystemDX::SetScissors(const CRect& rect)
 {
   if (!m_bRenderCreated)
@@ -995,12 +1005,50 @@ void CRenderSystemDX::Unregister(ID3DResource* resource)
     m_resources.erase(i);
 }
 
-CStdString CRenderSystemDX::GetErrorDescription(HRESULT hr)
+std::string CRenderSystemDX::GetErrorDescription(HRESULT hr)
 {
-  CStdString strError;
-  strError.Format("%X - %s (%s)", hr, DXGetErrorString(hr), DXGetErrorDescription(hr));
+  return StringUtils::Format("%X - %s (%s)", hr, DXGetErrorString(hr), DXGetErrorDescription(hr));
+}
 
-  return strError;
+void CRenderSystemDX::SetStereoMode(RENDER_STEREO_MODE mode, RENDER_STEREO_VIEW view)
+{
+  CRenderSystemBase::SetStereoMode(mode, view);
+
+  m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN);
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_RED );
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN );
+  }
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_GREEN );
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_RED );
+  }
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN);
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      m_pD3DDevice->SetRenderState( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_BLUE);
+  }
+}
+
+bool CRenderSystemDX::SupportsStereo(RENDER_STEREO_MODE mode) const
+{
+  switch(mode)
+  {
+    case RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN:
+    case RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA:
+    case RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE:
+      return true;
+    default:
+      return CRenderSystemBase::SupportsStereo(mode);
+  }
 }
 
 void CRenderSystemDX::FlushGPU()

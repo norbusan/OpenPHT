@@ -30,16 +30,25 @@
 #include <string.h>
 
 #ifdef __MINGW32__
+#undef fseeko
 #define fseeko(x, y, z) fseeko64(x, y, z)
+#undef ftello
 #define ftello(x)       ftello64(x)
+#elif defined(_WIN32)
+#undef fseeko
+#define fseeko(x, y, z) _fseeki64(x, y, z)
+#undef ftello
+#define ftello(x)       _ftelli64(x)
 #endif
+
+#define MIN(a,b) ((a) > (b) ? (b) : (a))
 
 #define BE_16(x) ((((uint8_t*)(x))[0] <<  8) | ((uint8_t*)(x))[1])
 
-#define BE_32(x) ((((uint8_t*)(x))[0] << 24) |  \
-                  (((uint8_t*)(x))[1] << 16) |  \
-                  (((uint8_t*)(x))[2] <<  8) |  \
-                   ((uint8_t*)(x))[3])
+#define BE_32(x) (((uint32_t)(((uint8_t*)(x))[0]) << 24) |  \
+                             (((uint8_t*)(x))[1]  << 16) |  \
+                             (((uint8_t*)(x))[2]  <<  8) |  \
+                              ((uint8_t*)(x))[3])
 
 #define BE_64(x) (((uint64_t)(((uint8_t*)(x))[0]) << 56) |  \
                   ((uint64_t)(((uint8_t*)(x))[1]) << 48) |  \
@@ -74,7 +83,7 @@
 #define CO64_ATOM QT_ATOM('c', 'o', '6', '4')
 
 #define ATOM_PREAMBLE_SIZE    8
-#define COPY_BUFFER_SIZE   1024
+#define COPY_BUFFER_SIZE   33554432
 
 int main(int argc, char *argv[])
 {
@@ -84,7 +93,7 @@ int main(int argc, char *argv[])
     uint32_t atom_type   = 0;
     uint64_t atom_size   = 0;
     uint64_t atom_offset = 0;
-    uint64_t last_offset;
+    int64_t last_offset;
     unsigned char *moov_atom = NULL;
     unsigned char *ftyp_atom = NULL;
     uint64_t moov_atom_size;
@@ -92,12 +101,13 @@ int main(int argc, char *argv[])
     uint64_t i, j;
     uint32_t offset_count;
     uint64_t current_offset;
-    uint64_t start_offset = 0;
-    unsigned char copy_buffer[COPY_BUFFER_SIZE];
+    int64_t start_offset = 0;
+    unsigned char *copy_buffer = NULL;
     int bytes_to_copy;
 
     if (argc != 3) {
-        printf("Usage: qt-faststart <infile.mov> <outfile.mov>\n");
+        printf("Usage: qt-faststart <infile.mov> <outfile.mov>\n"
+               "Note: alternatively you can use -movflags +faststart in ffmpeg\n");
         return 0;
     }
 
@@ -118,7 +128,7 @@ int main(int argc, char *argv[])
         if (fread(atom_bytes, ATOM_PREAMBLE_SIZE, 1, infile) != 1) {
             break;
         }
-        atom_size = (uint32_t) BE_32(&atom_bytes[0]);
+        atom_size = BE_32(&atom_bytes[0]);
         atom_type = BE_32(&atom_bytes[4]);
 
         /* keep ftyp atom */
@@ -131,22 +141,27 @@ int main(int argc, char *argv[])
                        atom_size);
                 goto error_out;
             }
-            fseeko(infile, -ATOM_PREAMBLE_SIZE, SEEK_CUR);
-            if (fread(ftyp_atom, atom_size, 1, infile) != 1) {
+            if (fseeko(infile, -ATOM_PREAMBLE_SIZE, SEEK_CUR) ||
+                fread(ftyp_atom, atom_size, 1, infile) != 1 ||
+                (start_offset = ftello(infile)) < 0) {
                 perror(argv[1]);
                 goto error_out;
             }
-            start_offset = ftello(infile);
         } else {
+            int ret;
             /* 64-bit special case */
             if (atom_size == 1) {
                 if (fread(atom_bytes, ATOM_PREAMBLE_SIZE, 1, infile) != 1) {
                     break;
                 }
                 atom_size = BE_64(&atom_bytes[0]);
-                fseeko(infile, atom_size - ATOM_PREAMBLE_SIZE * 2, SEEK_CUR);
+                ret = fseeko(infile, atom_size - ATOM_PREAMBLE_SIZE * 2, SEEK_CUR);
             } else {
-                fseeko(infile, atom_size - ATOM_PREAMBLE_SIZE, SEEK_CUR);
+                ret = fseeko(infile, atom_size - ATOM_PREAMBLE_SIZE, SEEK_CUR);
+            }
+            if (ret) {
+                perror(argv[1]);
+                goto error_out;
             }
         }
         printf("%c%c%c%c %10"PRIu64" %"PRIu64"\n",
@@ -187,8 +202,15 @@ int main(int argc, char *argv[])
 
     /* moov atom was, in fact, the last atom in the chunk; load the whole
      * moov atom */
-    fseeko(infile, -atom_size, SEEK_END);
+    if (fseeko(infile, -atom_size, SEEK_END)) {
+        perror(argv[1]);
+        goto error_out;
+    }
     last_offset    = ftello(infile);
+    if (last_offset < 0) {
+        perror(argv[1]);
+        goto error_out;
+    }
     moov_atom_size = atom_size;
     moov_atom      = malloc(moov_atom_size);
     if (!moov_atom) {
@@ -222,6 +244,10 @@ int main(int argc, char *argv[])
                 goto error_out;
             }
             offset_count = BE_32(&moov_atom[i + 8]);
+            if (i + 12 + offset_count * UINT64_C(4) > moov_atom_size) {
+                printf(" bad atom size/element count\n");
+                goto error_out;
+            }
             for (j = 0; j < offset_count; j++) {
                 current_offset  = BE_32(&moov_atom[i + 12 + j * 4]);
                 current_offset += moov_atom_size;
@@ -239,6 +265,10 @@ int main(int argc, char *argv[])
                 goto error_out;
             }
             offset_count = BE_32(&moov_atom[i + 8]);
+            if (i + 12 + offset_count * UINT64_C(8) > moov_atom_size) {
+                printf(" bad atom size/element count\n");
+                goto error_out;
+            }
             for (j = 0; j < offset_count; j++) {
                 current_offset  = BE_64(&moov_atom[i + 12 + j * 8]);
                 current_offset += moov_atom_size;
@@ -263,7 +293,11 @@ int main(int argc, char *argv[])
     }
 
     if (start_offset > 0) { /* seek after ftyp atom */
-        fseeko(infile, start_offset, SEEK_SET);
+        if (fseeko(infile, start_offset, SEEK_SET)) {
+            perror(argv[1]);
+            goto error_out;
+        }
+
         last_offset -= start_offset;
     }
 
@@ -290,12 +324,15 @@ int main(int argc, char *argv[])
     }
 
     /* copy the remainder of the infile, from offset 0 -> last_offset - 1 */
+    bytes_to_copy = MIN(COPY_BUFFER_SIZE, last_offset);
+    copy_buffer = malloc(bytes_to_copy);
+    if (!copy_buffer) {
+        printf("could not allocate %d bytes for copy_buffer\n", bytes_to_copy);
+        goto error_out;
+    }
     printf(" copying rest of file...\n");
     while (last_offset) {
-        if (last_offset > COPY_BUFFER_SIZE)
-            bytes_to_copy = COPY_BUFFER_SIZE;
-        else
-            bytes_to_copy = last_offset;
+        bytes_to_copy = MIN(bytes_to_copy, last_offset);
 
         if (fread(copy_buffer, bytes_to_copy, 1, infile) != 1) {
             perror(argv[1]);
@@ -312,6 +349,7 @@ int main(int argc, char *argv[])
     fclose(outfile);
     free(moov_atom);
     free(ftyp_atom);
+    free(copy_buffer);
 
     return 0;
 
@@ -322,5 +360,6 @@ error_out:
         fclose(outfile);
     free(moov_atom);
     free(ftyp_atom);
+    free(copy_buffer);
     return 1;
 }

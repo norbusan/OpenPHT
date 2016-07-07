@@ -82,7 +82,9 @@ Export win32_exports[] =
   { "_stat32",                    -1, (void*)dll_stat,                      NULL },
   { "_findclose",                 -1, (void*)dll_findclose,                 NULL },
   { "_findfirst",                 -1, (void*)dll_findfirst,                 NULL },
+  { "_findfirst32",               -1, (void*)dll_findfirst,                 NULL },
   { "_findnext",                  -1, (void*)dll_findnext,                  NULL },
+  { "_findnext32",                -1, (void*)dll_findnext,                  NULL },
   { "_findfirst64i32",            -1, (void*)dll_findfirst64i32,            NULL },
   { "_findnext64i32",             -1, (void*)dll_findnext64i32,             NULL },
   { "fclose",                     -1, (void*)dll_fclose,                    (void*)track_fclose},
@@ -418,10 +420,14 @@ bool Win32DllLoader::ResolveOrdinal(const char *dllName, unsigned long ordinal, 
 
 extern "C" FARPROC __stdcall dllWin32GetProcAddress(HMODULE hModule, LPCSTR function)
 {
-  // first check whether this function is one of the ones we need to wrap
-  void *fixup = NULL;
-  if (FunctionNeedsWrapping(win32_exports, function, &fixup))
-    return (FARPROC)fixup;
+  // if the high-order word is zero, then lpProcName is the function's ordinal value
+  if (reinterpret_cast<uintptr_t>(function) > std::numeric_limits<WORD>::max())
+  {
+    // first check whether this function is one of the ones we need to wrap
+    void *fixup = NULL;
+    if (FunctionNeedsWrapping(win32_exports, function, &fixup))
+      return (FARPROC)fixup;
+  }
 
   // Nope
   return GetProcAddress(hModule, function);

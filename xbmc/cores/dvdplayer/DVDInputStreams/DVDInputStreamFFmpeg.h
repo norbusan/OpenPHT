@@ -31,7 +31,7 @@ public:
   virtual ~CDVDInputStreamFFmpeg();
   virtual bool Open(const char* strFile, const std::string &content);
   virtual void Close();
-  virtual int Read(BYTE* buf, int buf_size);
+  virtual int Read(uint8_t* buf, int buf_size);
   virtual int64_t Seek(int64_t offset, int whence);
   virtual bool Pause(double dTime) { return false; };
   virtual bool IsEOF();
@@ -44,7 +44,7 @@ public:
   bool            CanPause() { return m_can_pause; }
 
 protected:
-  bool m_aborted;
   bool m_can_pause;
   bool m_can_seek;
+  bool m_aborted;
 };

@@ -1,0 +1,30 @@
+NEW:
+  - Updated branding and new splash screen
+  - Direct play of HEVC and other codecs ffmpeg 2.8 supports
+  - Transcode audio to AC3 for use with optical out
+  - Improved gapless music support
+  - Stereoscopic support
+  - Preference option to disable preplay screen
+  - Skin option to disable window and dialog fade animations
+  - Music OSD added to default skin
+  - Preference option to disable server side scaling of fanart and photos
+  - Support for downloading and installing skins in preferences
+  - Updated seek handling with support for adaptive seeking and preview images
+  - Previous menu and back button now switches to fullscreen when media is playing on home screen
+  - RasPlex: Support for MMAL decoding (usb/hifiberry + video)
+  - RasPlex: Transcode media larger then 1080p
+  - RasPlex: Direct play of HEVC up to 720p
+  - Embedded/RasPlex: Exprimental Bluetooth Audio support
+
+FIXES:
+  - Fix filtered episodes view in default skin
+  - Fix a shuffle all / create play queue issue
+  - Fix a shoutcast redirect issue
+  - Fix shoutcast stream title when ffmpeg avio is enabled
+  - Fix audio and subtitle selection for media with multiple media items or parts
+  - Avoid getting stuck in dim state when skin is reloaded
+  - Fix wrong icon highlight and window switch in preferences menu
+  - Font fixes for a common crash in windows version
+  - Reset screen saver timer in plex http handler
+  - Fix search result title in default skin
+  - Embedded/RasPlex: Fix pre-cache of bigThumb art

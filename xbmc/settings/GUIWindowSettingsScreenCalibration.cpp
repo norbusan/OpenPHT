@@ -124,7 +124,7 @@ bool CGUIWindowSettingsScreenCalibration::OnMessage(CGUIMessage& message)
       g_graphicsContext.SetVideoResolution(g_guiSettings.m_LookAndFeelResolution);
       // Inform the player so we can update the resolution
 #ifdef HAS_VIDEO_PLAYBACK
-      g_renderManager.Update(false);
+      g_renderManager.Update();
 #endif
       g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_WINDOW_RESIZE);
     }
@@ -138,14 +138,14 @@ bool CGUIWindowSettingsScreenCalibration::OnMessage(CGUIMessage& message)
 
       // Get the allowable resolutions that we can calibrate...
       m_Res.clear();
-      if (g_application.IsPlayingVideo())
+      if (g_application.m_pPlayer->IsPlayingVideo())
       { // don't allow resolution switching if we are playing a video
 
 #ifdef HAS_VIDEO_PLAYBACK
         RESOLUTION res = g_renderManager.GetResolution();
         g_graphicsContext.SetVideoResolution(res);
         // Inform the renderer so we can update the resolution
-        g_renderManager.Update(false);
+        g_renderManager.Update();
 #endif
 
         m_iCurRes = 0;

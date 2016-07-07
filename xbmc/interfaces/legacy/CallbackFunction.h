@@ -39,13 +39,13 @@ namespace XBMCAddon
   { 
   protected:
     AddonClass* addonClassObject;
-    Callback(AddonClass* _object, const char* classname) : AddonClass(classname), addonClassObject(_object) {}
+    Callback(AddonClass* _object, const char* classname) : AddonClass(classname), addonClassObject(_object) { TRACE; }
 
   public:
     virtual void executeCallback() = 0;
     virtual ~Callback();
 
-    AddonClass* getObject() { return addonClassObject; }
+    AddonClass* getObject() { TRACE; return addonClassObject; }
   };
 
   struct cb_null_type {};
@@ -71,9 +71,9 @@ namespace XBMCAddon
 
   public:
     CallbackFunction(M* object, MemberFunction method) : 
-      Callback(object, "CallbackFunction<M>"), meth(method), obj(object) {}
+      Callback(object, "CallbackFunction<M>"), meth(method), obj(object) { TRACE; }
 
-    virtual ~CallbackFunction() { deallocating(); }
+    virtual ~CallbackFunction() { TRACE; deallocating(); }
 
     virtual void executeCallback() { TRACE; ((*obj).*(meth))(); }
   };
@@ -95,9 +95,9 @@ namespace XBMCAddon
   public:
     CallbackFunction(M* object, MemberFunction method, P1 parameter) : 
       Callback(object, "CallbackFunction<M,P1>"), meth(method), obj(object),
-      param(parameter) {}
+      param(parameter) { TRACE; }
 
-    virtual ~CallbackFunction() { deallocating(); }
+    virtual ~CallbackFunction() { TRACE; deallocating(); }
 
     virtual void executeCallback() { TRACE; ((*obj).*(meth))(param); }
   };
@@ -120,9 +120,9 @@ namespace XBMCAddon
   public:
     CallbackFunction(M* object, MemberFunction method, P1* parameter) : 
       Callback(object, "CallbackFunction<M,P1>"), meth(method), obj(object),
-      param(parameter) {}
+      param(parameter) { TRACE; }
 
-    virtual ~CallbackFunction() { deallocating(); }
+    virtual ~CallbackFunction() { TRACE; deallocating(); }
 
     virtual void executeCallback() { TRACE; ((*obj).*(meth))(param); }
   };
@@ -146,9 +146,9 @@ namespace XBMCAddon
   public:
     CallbackFunction(M* object, MemberFunction method, P1 parameter, P2 parameter2) : 
       Callback(object, "CallbackFunction<M,P1,P2>"), meth(method), obj(object),
-      param1(parameter), param2(parameter2) {}
+      param1(parameter), param2(parameter2) { TRACE; }
 
-    virtual ~CallbackFunction() { deallocating(); }
+    virtual ~CallbackFunction() { TRACE; deallocating(); }
 
     virtual void executeCallback() { TRACE; ((*obj).*(meth))(param1,param2); }
   };

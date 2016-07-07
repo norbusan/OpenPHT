@@ -24,8 +24,6 @@
 #include "GUIControl.h"
 #include "GUIInfoManager.h"
 
-using namespace std;
-
 CGUIAction::CGUIAction()
 {
   m_sendThreadMessages = false;
@@ -40,30 +38,34 @@ CGUIAction::CGUIAction(int controlID)
 bool CGUIAction::ExecuteActions(int controlID, int parentID) const
 {
   if (m_actions.size() == 0) return false;
-  bool retval = false;
-  CGUIAction copy(*this);
-  for (ciActions it = copy.m_actions.begin() ; it != copy.m_actions.end() ; it++)
+  // take a copy of actions that satisfy our conditions
+  std::vector<CStdString> actions;
+  for (ciActions it = m_actions.begin() ; it != m_actions.end() ; ++it)
   {
     if (it->condition.IsEmpty() || g_infoManager.EvaluateBool(it->condition))
     {
       if (!StringUtils::IsInteger(it->action))
-      {
-        CGUIMessage msg(GUI_MSG_EXECUTE, controlID, parentID);
-        msg.SetStringParam(it->action);
-        if (m_sendThreadMessages)
-          g_windowManager.SendThreadMessage(msg);
-        else
-          g_windowManager.SendMessage(msg);
-        retval |= true;
-      }
+        actions.push_back(it->action);
     }
+  }
+  // execute them
+  bool retval = false;
+  for (std::vector<CStdString>::iterator i = actions.begin(); i != actions.end(); ++i)
+  {
+    CGUIMessage msg(GUI_MSG_EXECUTE, controlID, parentID);
+    msg.SetStringParam(*i);
+    if (m_sendThreadMessages)
+      g_windowManager.SendThreadMessage(msg);
+    else
+      g_windowManager.SendMessage(msg);
+    retval = true;
   }
   return retval;
 }
 
 int CGUIAction::GetNavigation() const
 {
-  for (ciActions it = m_actions.begin() ; it != m_actions.end() ; it++)
+  for (ciActions it = m_actions.begin() ; it != m_actions.end() ; ++it)
   {
     if (StringUtils::IsInteger(it->action))
     {
@@ -79,7 +81,7 @@ void CGUIAction::SetNavigation(int id)
   if (id == 0) return;
   CStdString strId;
   strId.Format("%i", id);
-  for (iActions it = m_actions.begin() ; it != m_actions.end() ; it++)
+  for (iActions it = m_actions.begin() ; it != m_actions.end() ; ++it)
   {
     if (StringUtils::IsInteger(it->action) && it->condition.IsEmpty())
     {
@@ -94,7 +96,7 @@ void CGUIAction::SetNavigation(int id)
 
 bool CGUIAction::HasActionsMeetingCondition() const
 {
-  for (ciActions it = m_actions.begin() ; it != m_actions.end() ; it++)
+  for (ciActions it = m_actions.begin() ; it != m_actions.end() ; ++it)
   {
     if (it->condition.IsEmpty() || g_infoManager.EvaluateBool(it->condition))
       return true;

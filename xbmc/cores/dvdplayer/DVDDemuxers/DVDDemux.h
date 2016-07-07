@@ -31,11 +31,13 @@ class CDVDInputStream;
 #pragma warning(disable:4244)
 #endif
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
 #endif
 
-#include "DllAvCodec.h"
+extern "C" {
+#include "libavcodec/avcodec.h"
+}
 
 #ifndef __GNUC__
 #pragma warning(pop)
@@ -58,7 +60,8 @@ enum StreamSource {
   STREAM_SOURCE_DEMUX         = 0x100,
   STREAM_SOURCE_NAV           = 0x200,
   STREAM_SOURCE_DEMUX_SUB     = 0x300,
-  STREAM_SOURCE_TEXT          = 0x400
+  STREAM_SOURCE_TEXT          = 0x400,
+  STREAM_SOURCE_VIDEOMUX      = 0x500
 };
 
 #define STREAM_SOURCE_MASK(a) ((a) & 0xf00)
@@ -74,7 +77,7 @@ public:
   {
     iId = 0;
     iPhysicalId = 0;
-    codec = (CodecID)0; // CODEC_ID_NONE
+    codec = (AVCodecID)0; // AV_CODEC_ID_NONE
     codec_fourcc = 0;
     profile = FF_PROFILE_UNKNOWN;
     level = FF_LEVEL_UNKNOWN;
@@ -88,14 +91,15 @@ public:
     disabled = false;
     changes = 0;
     flags = FLAG_NONE;
-
     /* PLEX */
     iBitRate = 0;
     /* END PLEX */
-
   }
 
-  virtual ~CDemuxStream() {}
+  virtual ~CDemuxStream()
+  {
+    delete [] ExtraData;
+  }
 
   virtual void GetStreamInfo(std::string& strInfo)
   {
@@ -109,7 +113,7 @@ public:
 
   int iId;         // most of the time starting from 0
   int iPhysicalId; // id
-  CodecID codec;
+  AVCodecID codec;
   unsigned int codec_fourcc; // if available
   int profile; // encoder profile of the stream reported by the decoder. used to qualify hw decoders.
   int level;   // encoder level of the stream reported by the decoder. used to qualify hw decoders.
@@ -118,7 +122,7 @@ public:
 
   int iDuration; // in mseconds
   void* pPrivate; // private pointer for the demuxer
-  void* ExtraData; // extra data for codec to use
+  uint8_t*     ExtraData; // extra data for codec to use
   unsigned int ExtraSize; // size of extra data
 
   char language[4]; // ISO 639 3-letter language code (empty string if undefined)
@@ -127,16 +131,18 @@ public:
   int  changes; // increment on change which player may need to know about
 
   enum EFlags
-  { FLAG_NONE     = 0x0000 
-  , FLAG_DEFAULT  = 0x0001
-  , FLAG_DUB      = 0x0002
-  , FLAG_ORIGINAL = 0x0004
-  , FLAG_COMMENT  = 0x0008
-  , FLAG_LYRICS   = 0x0010
-  , FLAG_KARAOKE  = 0x0020
-  , FLAG_FORCED   = 0x0040
+  { FLAG_NONE             = 0x0000 
+  , FLAG_DEFAULT          = 0x0001
+  , FLAG_DUB              = 0x0002
+  , FLAG_ORIGINAL         = 0x0004
+  , FLAG_COMMENT          = 0x0008
+  , FLAG_LYRICS           = 0x0010
+  , FLAG_KARAOKE          = 0x0020
+  , FLAG_FORCED           = 0x0040
+  , FLAG_HEARING_IMPAIRED = 0x0080
+  , FLAG_VISUAL_IMPAIRED  = 0x0100
   /* PLEX */
-  , FLAG_SELECTED = 0x0080
+  , FLAG_SELECTED         = 0x0200
   /* END PLEX */
   } flags;
 
@@ -152,6 +158,8 @@ public:
   {
     iFpsScale = 0;
     iFpsRate = 0;
+    irFpsScale = 0;
+    irFpsRate = 0;
     iHeight = 0;
     iWidth = 0;
     fAspect = 0.0;
@@ -161,11 +169,14 @@ public:
     type = STREAM_VIDEO;
     iOrientation = 0;
     iBitsPerPixel = 0;
+    workaround_bugs = 0;
   }
 
   virtual ~CDemuxStreamVideo() {}
   int iFpsScale; // scale of 1000 and a rate of 29970 will result in 29.97 fps
   int iFpsRate;
+  int irFpsScale;
+  int irFpsRate;
   int iHeight; // height of the stream reported by the demuxer
   int iWidth; // width of the stream reported by the demuxer
   float fAspect; // display aspect of stream
@@ -174,6 +185,8 @@ public:
   bool bForcedAspect; // aspect is forced from container
   int iOrientation; // orientation of the video in degress counter clockwise
   int iBitsPerPixel;
+  std::string stereo_mode; // expected stereo mode
+  int workaround_bugs; // info for decoder
 };
 
 class CDemuxStreamAudio : public CDemuxStream
@@ -209,11 +222,8 @@ class CDemuxStreamSubtitle : public CDemuxStream
 public:
   CDemuxStreamSubtitle() : CDemuxStream()
   {
-    identifier = 0;
     type = STREAM_SUBTITLE;
   }
-
-  int identifier;
 };
 
 class CDemuxStreamTeletext : public CDemuxStream
@@ -278,9 +288,17 @@ public:
   virtual int GetChapter() { return 0; }
 
   /*
-   * Get the name of the current chapter
+   * Get the name of a chapter
+   * \param strChapterName[out] Name of chapter
+   * \param chapterIdx -1 for current chapter, else a chapter index
    */
-  virtual void GetChapterName(std::string& strChapterName) {}
+  virtual void GetChapterName(std::string& strChapterName, int chapterIdx=-1) {}
+
+  /*
+   * Get the position of a chapter
+   * \param chapterIdx -1 for current chapter, else a chapter index
+   */
+  virtual int64_t GetChapterPos(int chapterIdx=-1) { return 0; }
 
   /*
    * Set the playspeed, if demuxer can handle different
@@ -350,20 +368,11 @@ public:
   /*
    * return a user-presentable codec name of the given stream
    */
-  virtual void GetStreamCodecName(int iStreamId, CStdString &strName) {};
+  virtual void GetStreamCodecName(int iStreamId, std::string &strName) {};
 
-  /* PLEX */
   /*
-   * Get the total bitrate of the entire stream.
+   * return shoutcast metadata
    */
-  virtual int GetStreamBitrate() = 0;
-  /*
-   * Error string.
-   */
-  void SetError(const std::string& error) { m_strError = error; }
-  const std::string& GetError() const { return m_strError; }
-
-private:
-  std::string m_strError;
-  /* END PLEX */
+  virtual void GetIcyMetadataHeaders(std::string &metadata) {};
+  virtual void GetIcyMetadataPacket(std::string &metadata) {};
 };

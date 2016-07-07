@@ -180,7 +180,7 @@ protected:
   CFileItemListPtr m_vecItems;
   CFileItemList* m_unfilteredItems;        ///< \brief items prior to filtering using FilterItems()
   CDirectoryHistory m_history;
-  std::auto_ptr<CGUIViewState> m_guiState;
+  std::unique_ptr<CGUIViewState> m_guiState;
 
   // save control state on window exit
   int m_iLastControl;

@@ -55,7 +55,7 @@ retry:
             goto retry;
         }
 #if 0
-        if (pc->index && pc->index * 2 + FF_INPUT_BUFFER_PADDING_SIZE < pc->buffer_size && buf_size > pc->index) {
+        if (pc->index && pc->index * 2 + AV_INPUT_BUFFER_PADDING_SIZE < pc->buffer_size && buf_size > pc->index) {
             memcpy(pc->buffer + pc->index, buf, pc->index);
             pc->index += pc->index;
             buf       += pc->index;
@@ -84,8 +84,8 @@ retry:
 }
 
 AVCodecParser ff_pnm_parser = {
-    .codec_ids      = { CODEC_ID_PGM, CODEC_ID_PGMYUV, CODEC_ID_PPM,
-                        CODEC_ID_PBM, CODEC_ID_PAM },
+    .codec_ids      = { AV_CODEC_ID_PGM, AV_CODEC_ID_PGMYUV, AV_CODEC_ID_PPM,
+                        AV_CODEC_ID_PBM, AV_CODEC_ID_PAM },
     .priv_data_size = sizeof(ParseContext),
     .parser_parse   = pnm_parse,
     .parser_close   = ff_parse_close,

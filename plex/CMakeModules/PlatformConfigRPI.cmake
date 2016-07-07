@@ -28,7 +28,6 @@ set(LINK_PKG
   Lzo2
   FriBiDi
   Fontconfig
-  Samplerate
   YAJL
   microhttpd
   Crypto
@@ -68,7 +67,6 @@ set(INSTALL_LIB
   PNG
   TIFF
   Vorbis
-  LibMad
   Mpeg2
   Ass
   RTMP
@@ -117,8 +115,6 @@ endif()
 
 plex_get_soname(CURL_SONAME ${CURL_LIBRARY})
 
-list(APPEND CONFIG_INTERNAL_LIBS lib_dllsymbols)
-
 ####
 if(DEFINED DBUS_FOUND)
   include_directories(${DBUS_INCLUDE_DIR} ${DBUS_ARCH_INCLUDE_DIR})
@@ -137,7 +133,6 @@ set(ARCH "arm")
 set(USE_OPENGLES 1)
 set(USE_OMXLIB 1)
 set(USE_OPENMAX 0)
-set(USE_CRYSTALHD 0)
 set(USE_PULSE 0)
 set(DISABLE_PROJECTM 1)
 set(USE_TEXTUREPACKER_NATIVE_ROOT 0)
@@ -176,6 +171,10 @@ plex_find_library(GLESv2 0  0 system/usr/lib 1)
 plex_find_library(bcm_host 0 0  system/usr/lib 1)
 plex_find_library(vcos 0 0  system/usr/lib 1)
 plex_find_library(vchiq_arm 0 0  system/usr/lib 1)
+plex_find_library(mmal 0 0  system/usr/lib 1)
+plex_find_library(mmal_core 0 0  system/usr/lib 1)
+plex_find_library(mmal_util 0 0  system/usr/lib 1)
+plex_find_library(vcsm 0 0  system/usr/lib 1)
 
 #needed for the commandline flag CMAKE_INCLUDE_PATH
 foreach(path ${CMAKE_INCLUDE_PATH})
@@ -204,6 +203,7 @@ add_definitions(
   -D_ARMEL
   -DTARGET_RPI
   -DHAS_GLES=2
+  -DHAS_MMAL
   -DHAVE_OMXLIB
   -DOMX_SKIP64BIT
   -DHAS_BUILTIN_SYNC_ADD_AND_FETCH

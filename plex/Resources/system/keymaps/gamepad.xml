@@ -43,7 +43,7 @@
       <Y>Queue</Y>
       <white>ContextMenu</white>
       <black/>
-      <start>XBMC.ActivateWindow(PlayerControls)</start>
+      <!--<start>XBMC.ActivateWindow(PlayerControls)</start>-->
       <back>PreviousMenu</back>
       <dpadleft>Left</dpadleft>
       <dpadright>Right</dpadright>
@@ -105,8 +105,8 @@
       <rightanalogtrigger>AnalogFastForward</rightanalogtrigger>
       <dpadleft>StepBack</dpadleft>
       <dpadright>StepForward</dpadright>
-      <dpadup>BigStepForward</dpadup>
-      <dpaddown>BigStepBack</dpaddown>
+      <dpadup>ChapterOrBigStepForward</dpadup>
+      <dpaddown>ChapterOrBigStepBack</dpaddown>
     </gamepad>
   </FullscreenVideo>
   <FullscreenLiveTV>

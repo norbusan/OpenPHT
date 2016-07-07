@@ -3,6 +3,7 @@
 
 #pragma once
 
+#if defined(HAVE_LIBGL)
 /*
  *      Copyright (C) 2005-2012 Team XBMC
  *      http://www.xbmc.org
@@ -45,11 +46,8 @@ protected:
 
   int (*m_glXGetVideoSyncSGI)(unsigned int*);
   int (*m_glXWaitVideoSyncSGI)(int, int, unsigned int*);
-  int (*m_glXSwapIntervalSGI)(int);
   int (*m_glXSwapIntervalMESA)(int);
-
-  Bool    (*m_glXGetSyncValuesOML)(Display* dpy, GLXDrawable drawable, int64_t* ust, int64_t* msc, int64_t* sbc);
-  int64_t (*m_glXSwapBuffersMscOML)(Display* dpy, GLXDrawable drawable, int64_t target_msc, int64_t divisor,int64_t remainder);
+  PFNGLXSWAPINTERVALEXTPROC m_glXSwapIntervalEXT;
 
   int m_iVSyncErrors;
 };
@@ -57,5 +55,6 @@ protected:
 XBMC_GLOBAL_REF(CWinSystemX11GL,g_Windowing);
 #define g_Windowing XBMC_GLOBAL_USE(CWinSystemX11GL)
 
+#endif // HAVE_LIBGL
 
 #endif // WINDOW_SYSTEM_H

@@ -1,4 +1,4 @@
-/**
+/*
  * VP8 compatible video decoder
  *
  * Copyright (C) 2010 David Conrad
@@ -20,12 +20,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "config.h"
 #include "libavutil/cpu.h"
+#include "libavutil/mem.h"
+#include "libavutil/ppc/cpu.h"
+#include "libavutil/ppc/types_altivec.h"
+#include "libavutil/ppc/util_altivec.h"
 #include "libavcodec/vp8dsp.h"
-#include "dsputil_altivec.h"
-#include "types_altivec.h"
-#include "util_altivec.h"
+#include "hpeldsp_altivec.h"
 
+#if HAVE_ALTIVEC
 #define REPT4(...) { __VA_ARGS__, __VA_ARGS__, __VA_ARGS__, __VA_ARGS__ }
 
 // h subpel filter uses msum to multiply+add 4 pixel taps at once
@@ -55,17 +59,30 @@ static const vec_s8 h_subpel_filters_outer[3] =
     vec_s8 filter_outerh = h_subpel_filters_outer[(i)>>1]; \
     vec_s8 filter_outerl = vec_sld(filter_outerh, filter_outerh, 2)
 
+#if HAVE_BIGENDIAN
+#define GET_PIXHL(offset)                   \
+    a = vec_ld((offset)-is6tap-1, src);     \
+    b = vec_ld((offset)-is6tap-1+15, src);  \
+    pixh  = vec_perm(a, b, permh##offset);  \
+    pixl  = vec_perm(a, b, perml##offset)
+
+#define GET_OUTER(offset) outer = vec_perm(a, b, perm_6tap##offset)
+#else
+#define GET_PIXHL(offset)                   \
+    a = vec_vsx_ld((offset)-is6tap-1, src); \
+    pixh  = vec_perm(a, a, perm_inner);     \
+    pixl  = vec_perm(a, a, vec_add(perm_inner, vec_splat_u8(4)))
+
+#define GET_OUTER(offset) outer = vec_perm(a, a, perm_outer)
+#endif
+
 #define FILTER_H(dstv, off) \
-    a = vec_ld((off)-is6tap-1,    src); \
-    b = vec_ld((off)-is6tap-1+15, src); \
-\
-    pixh  = vec_perm(a, b, permh##off); \
-    pixl  = vec_perm(a, b, perml##off); \
+    GET_PIXHL(off);                            \
     filth = vec_msum(filter_inner, pixh, c64); \
     filtl = vec_msum(filter_inner, pixl, c64); \
 \
     if (is6tap) { \
-        outer = vec_perm(a, b, perm_6tap##off); \
+        GET_OUTER(off);                                \
         filth = vec_msum(filter_outerh, outer, filth); \
         filtl = vec_msum(filter_outerl, outer, filtl); \
     } \
@@ -75,14 +92,17 @@ static const vec_s8 h_subpel_filters_outer[3] =
     dstv = vec_sra(dstv, c7)
 
 static av_always_inline
-void put_vp8_epel_h_altivec_core(uint8_t *dst, int dst_stride,
-                                 uint8_t *src, int src_stride,
+void put_vp8_epel_h_altivec_core(uint8_t *dst, ptrdiff_t dst_stride,
+                                 uint8_t *src, ptrdiff_t src_stride,
                                  int h, int mx, int w, int is6tap)
 {
     LOAD_H_SUBPEL_FILTER(mx-1);
-    vec_u8 align_vec0, align_vec8, permh0, permh8, filt;
+#if HAVE_BIGENDIAN
+    vec_u8 align_vec0, align_vec8, permh0, permh8;
     vec_u8 perm_6tap0, perm_6tap8, perml0, perml8;
-    vec_u8 a, b, pixh, pixl, outer;
+    vec_u8 b;
+#endif
+    vec_u8 filt, a, pixh, pixl, outer;
     vec_s16 f16h, f16l;
     vec_s32 filth, filtl;
 
@@ -93,6 +113,7 @@ void put_vp8_epel_h_altivec_core(uint8_t *dst, int dst_stride,
     vec_s32 c64 = vec_sl(vec_splat_s32(1), vec_splat_u32(6));
     vec_u16 c7  = vec_splat_u16(7);
 
+#if HAVE_BIGENDIAN
     align_vec0 = vec_lvsl( -is6tap-1, src);
     align_vec8 = vec_lvsl(8-is6tap-1, src);
 
@@ -103,6 +124,7 @@ void put_vp8_epel_h_altivec_core(uint8_t *dst, int dst_stride,
     perml8     = vec_perm(align_vec8, align_vec8, perm_inner);
     perm_6tap0 = vec_perm(align_vec0, align_vec0, perm_outer);
     perm_6tap8 = vec_perm(align_vec8, align_vec8, perm_outer);
+#endif
 
     while (h --> 0) {
         FILTER_H(f16h, 0);
@@ -160,9 +182,15 @@ static const vec_u8 v_subpel_filters[7] =
     dstv = vec_adds(dstv, c64); \
     dstv = vec_sra(dstv, c7)
 
+#if HAVE_BIGENDIAN
+#define LOAD_HL(off, s, perm) load_with_perm_vec(off, s, perm)
+#else
+#define LOAD_HL(off, s, perm) vec_mergeh(vec_vsx_ld(off,s), vec_vsx_ld(off+8,s))
+#endif
+
 static av_always_inline
-void put_vp8_epel_v_altivec_core(uint8_t *dst, int dst_stride,
-                                 uint8_t *src, int src_stride,
+void put_vp8_epel_v_altivec_core(uint8_t *dst, ptrdiff_t dst_stride,
+                                 uint8_t *src, ptrdiff_t src_stride,
                                  int h, int my, int w, int is6tap)
 {
     LOAD_V_SUBPEL_FILTER(my-1);
@@ -171,6 +199,7 @@ void put_vp8_epel_v_altivec_core(uint8_t *dst, int dst_stride,
     vec_s16 c64 = vec_sl(vec_splat_s16(1), vec_splat_u16(6));
     vec_u16 c7  = vec_splat_u16(7);
 
+#if HAVE_BIGENDIAN
     // we want pixels 0-7 to be in the even positions and 8-15 in the odd,
     // so combine this permute with the alignment permute vector
     align_vech = vec_lvsl(0, src);
@@ -179,22 +208,23 @@ void put_vp8_epel_v_altivec_core(uint8_t *dst, int dst_stride,
         perm_vec = vec_mergeh(align_vech, align_vecl);
     else
         perm_vec = vec_mergeh(align_vech, align_vech);
+#endif
 
     if (is6tap)
-        s0 = load_with_perm_vec(-2*src_stride, src, perm_vec);
-    s1 = load_with_perm_vec(-1*src_stride, src, perm_vec);
-    s2 = load_with_perm_vec( 0*src_stride, src, perm_vec);
-    s3 = load_with_perm_vec( 1*src_stride, src, perm_vec);
+        s0 = LOAD_HL(-2*src_stride, src, perm_vec);
+    s1 = LOAD_HL(-1*src_stride, src, perm_vec);
+    s2 = LOAD_HL( 0*src_stride, src, perm_vec);
+    s3 = LOAD_HL( 1*src_stride, src, perm_vec);
     if (is6tap)
-        s4 = load_with_perm_vec( 2*src_stride, src, perm_vec);
+        s4 = LOAD_HL( 2*src_stride, src, perm_vec);
 
     src += (2+is6tap)*src_stride;
 
     while (h --> 0) {
         if (is6tap)
-            s5 = load_with_perm_vec(0, src, perm_vec);
+            s5 = LOAD_HL(0, src, perm_vec);
         else
-            s4 = load_with_perm_vec(0, src, perm_vec);
+            s4 = LOAD_HL(0, src, perm_vec);
 
         FILTER_V(f16h, vec_mule);
 
@@ -226,27 +256,27 @@ void put_vp8_epel_v_altivec_core(uint8_t *dst, int dst_stride,
 
 #define EPEL_FUNCS(WIDTH, TAPS) \
 static av_noinline \
-void put_vp8_epel ## WIDTH ## _h ## TAPS ## _altivec(uint8_t *dst, int dst_stride, uint8_t *src, int src_stride, int h, int mx, int my) \
+void put_vp8_epel ## WIDTH ## _h ## TAPS ## _altivec(uint8_t *dst, ptrdiff_t dst_stride, uint8_t *src, ptrdiff_t src_stride, int h, int mx, int my) \
 { \
     put_vp8_epel_h_altivec_core(dst, dst_stride, src, src_stride, h, mx, WIDTH, TAPS == 6); \
 } \
 \
 static av_noinline \
-void put_vp8_epel ## WIDTH ## _v ## TAPS ## _altivec(uint8_t *dst, int dst_stride, uint8_t *src, int src_stride, int h, int mx, int my) \
+void put_vp8_epel ## WIDTH ## _v ## TAPS ## _altivec(uint8_t *dst, ptrdiff_t dst_stride, uint8_t *src, ptrdiff_t src_stride, int h, int mx, int my) \
 { \
     put_vp8_epel_v_altivec_core(dst, dst_stride, src, src_stride, h, my, WIDTH, TAPS == 6); \
 }
 
 #define EPEL_HV(WIDTH, HTAPS, VTAPS) \
-static void put_vp8_epel ## WIDTH ## _h ## HTAPS ## v ## VTAPS ## _altivec(uint8_t *dst, int stride, uint8_t *src, int s, int h, int mx, int my) \
+static void put_vp8_epel ## WIDTH ## _h ## HTAPS ## v ## VTAPS ## _altivec(uint8_t *dst, ptrdiff_t dstride, uint8_t *src, ptrdiff_t sstride, int h, int mx, int my) \
 { \
     DECLARE_ALIGNED(16, uint8_t, tmp)[(2*WIDTH+5)*16]; \
     if (VTAPS == 6) { \
-        put_vp8_epel ## WIDTH ## _h ## HTAPS ## _altivec(tmp, 16,     src-2*stride, stride, h+5, mx, my); \
-        put_vp8_epel ## WIDTH ## _v ## VTAPS ## _altivec(dst, stride, tmp+2*16,     16,     h,   mx, my); \
+        put_vp8_epel ## WIDTH ## _h ## HTAPS ## _altivec(tmp, 16,      src-2*sstride, sstride, h+5, mx, my); \
+        put_vp8_epel ## WIDTH ## _v ## VTAPS ## _altivec(dst, dstride, tmp+2*16,      16,      h,   mx, my); \
     } else { \
-        put_vp8_epel ## WIDTH ## _h ## HTAPS ## _altivec(tmp, 16,     src-stride, stride, h+4, mx, my); \
-        put_vp8_epel ## WIDTH ## _v ## VTAPS ## _altivec(dst, stride, tmp+16,     16,     h,   mx, my); \
+        put_vp8_epel ## WIDTH ## _h ## HTAPS ## _altivec(tmp, 16,      src-sstride, sstride, h+4, mx, my); \
+        put_vp8_epel ## WIDTH ## _v ## VTAPS ## _altivec(dst, dstride, tmp+16,      16,      h,   mx, my); \
     } \
 }
 
@@ -266,14 +296,39 @@ EPEL_HV(4,  4,6)
 EPEL_HV(4,  6,4)
 EPEL_HV(4,  4,4)
 
-static void put_vp8_pixels16_altivec(uint8_t *dst, int stride, uint8_t *src, int s, int h, int mx, int my)
+static void put_vp8_pixels16_altivec(uint8_t *dst, ptrdiff_t dstride, uint8_t *src, ptrdiff_t sstride, int h, int mx, int my)
 {
-    put_pixels16_altivec(dst, src, stride, h);
+    register vector unsigned char perm;
+    int i;
+    register ptrdiff_t dstride2 = dstride << 1, sstride2 = sstride << 1;
+    register ptrdiff_t dstride3 = dstride2 + dstride, sstride3 = sstride + sstride2;
+    register ptrdiff_t dstride4 = dstride << 2, sstride4 = sstride << 2;
+
+#if HAVE_BIGENDIAN
+    perm = vec_lvsl(0, src);
+#endif
+// hand-unrolling the loop by 4 gains about 15%
+// mininum execution time goes from 74 to 60 cycles
+// it's faster than -funroll-loops, but using
+// -funroll-loops w/ this is bad - 74 cycles again.
+// all this is on a 7450, tuning for the 7450
+    for (i = 0; i < h; i += 4) {
+        vec_st(load_with_perm_vec(0, src, perm), 0, dst);
+        vec_st(load_with_perm_vec(sstride, src, perm), dstride, dst);
+        vec_st(load_with_perm_vec(sstride2, src, perm), dstride2, dst);
+        vec_st(load_with_perm_vec(sstride3, src, perm), dstride3, dst);
+        src += sstride4;
+        dst += dstride4;
+    }
 }
 
-av_cold void ff_vp8dsp_init_altivec(VP8DSPContext *c)
+#endif /* HAVE_ALTIVEC */
+
+
+av_cold void ff_vp78dsp_init_ppc(VP8DSPContext *c)
 {
-    if (!(av_get_cpu_flags() & AV_CPU_FLAG_ALTIVEC))
+#if HAVE_ALTIVEC
+    if (!PPC_ALTIVEC(av_get_cpu_flags()))
         return;
 
     c->put_vp8_epel_pixels_tab[0][0][0] = put_vp8_pixels16_altivec;
@@ -300,4 +355,5 @@ av_cold void ff_vp8dsp_init_altivec(VP8DSPContext *c)
     c->put_vp8_epel_pixels_tab[2][1][1] = put_vp8_epel4_h4v4_altivec;
     c->put_vp8_epel_pixels_tab[2][1][2] = put_vp8_epel4_h6v4_altivec;
     c->put_vp8_epel_pixels_tab[2][2][1] = put_vp8_epel4_h4v6_altivec;
+#endif /* HAVE_ALTIVEC */
 }

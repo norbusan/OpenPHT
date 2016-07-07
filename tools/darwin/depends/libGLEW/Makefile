@@ -1,5 +1,6 @@
 include ../Makefile.include
 include ../config.site.mk
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=glew
@@ -14,26 +15,26 @@ export CC.ARCH=$(CC)
 export CFLAGS.ARCH=$(CFLAGS)
 export LDFLAGS.ARCH=$(LDFLAGS)
 
-LIBDYLIB=$(SOURCE)/.libs/$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/lib/libGLEW.a
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
+	echo $(SOURCE) > .gitignore
+
+$(LIBDYLIB): $(SOURCE)
 	sed -ie "s|CC = cc|CC = $(CC.ARCH)|" "$(SOURCE)/config/Makefile.darwin"
 	sed -ie "s|LD = cc|LD = $(CC.ARCH)|" "$(SOURCE)/config/Makefile.darwin"
 	sed -ie "s|CFLAGS.EXTRA =|CFLAGS.EXTRA = \$(CFLAGS.ARCH)|" "$(SOURCE)/config/Makefile.darwin"
 	sed -ie "s|LDFLAGS.EXTRA =|LDFLAGS.EXTRA = \$(LDFLAGS.ARCH)|" "$(SOURCE)/config/Makefile.darwin"
-	echo $(SOURCE) > .gitignore
+	make -C $(SOURCE)
 
-$(LIBDYLIB): $(SOURCE)
-	make -j 1 -C $(SOURCE)
-
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

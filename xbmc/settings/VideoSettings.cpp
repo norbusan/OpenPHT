@@ -23,6 +23,7 @@
 
 #include "VideoSettings.h"
 #include "Settings.h"
+#include "rendering/RenderSystem.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -30,7 +31,7 @@
 
 CVideoSettings::CVideoSettings()
 {
-  m_DeinterlaceMode = VS_DEINTERLACEMODE_OFF;
+  m_DeinterlaceMode = VS_DEINTERLACEMODE_AUTO;
   m_InterlaceMethod = VS_INTERLACEMETHOD_AUTO;
   m_ScalingMethod = VS_SCALINGMETHOD_LINEAR;
   m_ViewMode = VIEW_MODE_NORMAL;
@@ -53,6 +54,8 @@ CVideoSettings::CVideoSettings()
   m_AudioDelay = 0.0f;
   m_OutputToAllSpeakers = false;
   m_ResumeTime = 0;
+  m_StereoMode = RENDER_STEREO_MODE_OFF;
+  m_StereoInvert = false;
   m_Crop = false;
   m_CropTop = 0;
   m_CropBottom = 0;
@@ -85,6 +88,8 @@ bool CVideoSettings::operator!=(const CVideoSettings &right) const
   if (m_AudioDelay != right.m_AudioDelay) return true;
   if (m_OutputToAllSpeakers != right.m_OutputToAllSpeakers) return true;
   if (m_ResumeTime != right.m_ResumeTime) return true;
+  if (m_StereoMode != right.m_StereoMode) return true;
+  if (m_StereoInvert != right.m_StereoInvert) return true;
   if (m_Crop != right.m_Crop) return true;
   if (m_CropTop != right.m_CropTop) return true;
   if (m_CropBottom != right.m_CropBottom) return true;

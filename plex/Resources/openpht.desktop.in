@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=OpenPHT
+GenericName=OpenPHT
+Comment=OpenPHT is a community driven fork of Plex Home Theater.
+Exec=@CMAKE_INSTALL_PREFIX@/bin/openpht
+Icon=openpht
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=AudioVideo;Audio;Video;Player;

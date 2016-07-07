@@ -23,7 +23,7 @@
 
 #include "system.h"
 
-#ifdef HAS_XRANDR
+#ifdef HAVE_X11
 
 #include "utils/StdString.h"
 #include <vector>
@@ -33,32 +33,36 @@ class XMode
 {
 public:
   XMode()
-    {
-      id="";
-      name="";
-      hz=0.0f;
-      isPreferred=false;
-      isCurrent=false;
-      w=h=0;
-    }
+  {
+    id="";
+    name="";
+    hz=0.0f;
+    isPreferred=false;
+    isCurrent=false;
+    w=h=0;
+  }
   bool operator==(XMode& mode) const
-    {
-      if (id!=mode.id)
-        return false;
-      if (name!=mode.name)
-        return false;
-      if (hz!=mode.hz)
-        return false;
-      if (isPreferred!=mode.isPreferred)
-        return false;
-      if (isCurrent!=mode.isCurrent)
-        return false;
-      if (w!=mode.w)
-        return false;
-      if (h!=mode.h)
-        return false;
-      return true;
-    }
+  {
+    if (id != mode.id)
+      return false;
+    if (name != mode.name)
+      return false;
+    if (hz != mode.hz)
+      return false;
+    if (isPreferred != mode.isPreferred)
+      return false;
+    if (isCurrent != mode.isCurrent)
+      return false;
+    if (w != mode.w)
+      return false;
+    if (h != mode.h)
+      return false;
+    return true;
+  }
+  bool IsInterlaced()
+  {
+    return name.Right(1) == "i";
+  }
   CStdString id;
   CStdString name;
   float hz;
@@ -72,34 +76,43 @@ class XOutput
 {
 public:
   XOutput()
-    {
-      name="";
-      isConnected=false;
-      w=h=x=y=wmm=hmm=0;
-    }
+  {
+    name = "";
+    isConnected = false;
+    w = h = x = y = wmm = hmm = 0;
+  }
   CStdString name;
   bool isConnected;
+  int screen;
   int w;
   int h;
   int x;
   int y;
+  int crtc;
   int wmm;
   int hmm;
   std::vector<XMode> modes;
+  bool isRotated;
 };
 
 class CXRandR
 {
 public:
   CXRandR(bool query=false);
-  bool Query(bool force=false);
+  bool Query(bool force=false, bool ignoreoff=true);
+  bool Query(bool force, int screennum, bool ignoreoff=true);
   std::vector<XOutput> GetModes(void);
-  XOutput GetCurrentOutput();
-  XMode   GetCurrentMode(CStdString outputName);
+  XMode GetCurrentMode(const CStdString& outputName);
+  XMode GetPreferredMode(const CStdString& outputName);
+  XOutput *GetOutput(const CStdString& outputName);
   bool SetMode(XOutput output, XMode mode);
   void LoadCustomModeLinesToAllOutputs(void);
   void SaveState();
-  void RestoreState();
+  void SetNumScreens(unsigned int num);
+  bool IsOutputConnected(const CStdString& name);
+  bool TurnOffOutput(const CStdString& name);
+  bool TurnOnOutput(const CStdString& name);
+  int GetCrtc(int x, int y, float &hz);
   //bool Has1080i();
   //bool Has1080p();
   //bool Has720p();
@@ -107,10 +120,10 @@ public:
 
 private:
   bool m_bInit;
-  std::vector<XOutput> m_current;
   std::vector<XOutput> m_outputs;
   CStdString m_currentOutput;
   CStdString m_currentMode;
+  unsigned int m_numScreens;
 };
 
 extern CXRandR g_xrandr;

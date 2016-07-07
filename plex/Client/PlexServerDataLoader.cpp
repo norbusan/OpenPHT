@@ -290,7 +290,7 @@ CFileItemListPtr CPlexServerDataLoader::GetAllSharedSections() const
 CFileItemListPtr CPlexServerDataLoader::GetAllSections() const
 {
   CSingleLock lk(m_dataLock);
-  CFileItemList* list = new CFileItemList;
+  CFileItemListPtr list(new CFileItemList);
   std::map<std::string, CFileItemPtr> sectionNameMap;
 
   BOOST_FOREACH(ServerDataPair pair, m_sectionMap)
@@ -324,7 +324,7 @@ CFileItemListPtr CPlexServerDataLoader::GetAllSections() const
     }
   }
 
-  return CFileItemListPtr(list);
+  return list;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -361,7 +361,7 @@ void CPlexServerDataLoader::OnTimeout()
   CSingleLock lk(m_serverLock);
 
   // don't run any checks during video playback
-  if (g_application.IsPlayingVideo())
+  if (g_application.m_pPlayer->IsPlayingVideo())
   {
     g_plexApplication.timer->SetTimeout(SECTION_REFRESH_INTERVAL, this);
     return;
@@ -421,12 +421,7 @@ CFileItemPtr CPlexServerDataLoader::GetSection(const CURL& sectionUrl)
     {
       CFileItemPtr item = sections->Get(i);
       if (item && item->GetPath() == sectionUrl.Get())
-      {
-        if (item->GetPlexDirectoryType() == PLEX_DIR_TYPE_MOVIE &&
-            item->GetProperty("agent").asString() == "com.plexapp.agents.none")
-          item->SetPlexDirectoryType(PLEX_DIR_TYPE_HOME_MOVIES);
         return item;
-      }
     }
   }
   return CFileItemPtr();

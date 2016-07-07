@@ -64,7 +64,7 @@ extern HWND g_hWnd;
 
 CExternalPlayer::CExternalPlayer(IPlayerCallback& callback)
     : IPlayer(callback),
-      CThread("CExternalPlayer")
+      CThread("ExternalPlayer")
 {
   m_bAbortRequest = false;
   m_bIsPlaying = false;
@@ -82,6 +82,9 @@ CExternalPlayer::CExternalPlayer(IPlayerCallback& callback)
   m_playOneStackItem = false;
 
   m_dialog = NULL;
+  m_hwndXbmc = NULL;
+  m_xPos = 0;
+  m_yPos = 0;
 
 #if defined(_WIN32)
   memset(&m_processInfo, 0, sizeof(m_processInfo));
@@ -112,7 +115,7 @@ bool CExternalPlayer::OpenFile(const CFileItem& file, const CPlayerOptions &opti
   }
 }
 
-bool CExternalPlayer::CloseFile()
+bool CExternalPlayer::CloseFile(bool reopen)
 {
   m_bAbortRequest = true;
 
@@ -501,7 +504,7 @@ bool CExternalPlayer::CanSeek()
   return false;
 }
 
-void CExternalPlayer::Seek(bool bPlus, bool bLargeStep)
+void CExternalPlayer::Seek(bool bPlus, bool bLargeStep, bool bChapterOverride)
 {
 }
 
@@ -593,7 +596,7 @@ CStdString CExternalPlayer::GetPlayerState()
   return "";
 }
 
-bool CExternalPlayer::SetPlayerState(CStdString state)
+bool CExternalPlayer::SetPlayerState(const CStdString& state)
 {
   return true;
 }

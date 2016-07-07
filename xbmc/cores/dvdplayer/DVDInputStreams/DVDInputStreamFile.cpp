@@ -21,11 +21,11 @@
 #include "DVDInputStreamFile.h"
 #include "filesystem/File.h"
 #include "filesystem/IFile.h"
+#include "settings/AdvancedSettings.h"
 #include "utils/log.h"
 #include "utils/URIUtils.h"
 
 /* PLEX */
-#include "AdvancedSettings.h"
 #include "GUISettings.h"
 #include "Variant.h"
 /* END PLEX */
@@ -57,6 +57,30 @@ bool CDVDInputStreamFile::Open(const char* strFile, const std::string& content)
   if (!m_pFile)
     return false;
 
+  unsigned int flags = READ_TRUNCATED | READ_BITRATE | READ_CHUNKED | READ_CACHED;
+
+  /*
+   * There are 4 buffer modes available (configurable in as.xml)
+   * 0) Buffer all internet filesystems (like 2 but additionally also ftp, webdav, etc.) (default)
+   * 1) Buffer all filesystems (including local)
+   * 2) Only buffer true internet filesystems (streams) (http, etc.)
+   * 3) No buffer
+   */
+  /*
+  if (!URIUtils::IsOnDVD(strFile) && !URIUtils::IsBluray(strFile)) // Never cache these
+  {
+    if (g_advancedSettings.m_networkBufferMode == 0 || g_advancedSettings.m_networkBufferMode == 2)
+    {
+      if (URIUtils::IsInternetStream(CURL(strFile), (g_advancedSettings.m_networkBufferMode == 0) ) )
+        flags |= READ_CACHED;
+    }
+    else if (g_advancedSettings.m_networkBufferMode == 1)
+    {
+      flags |= READ_CACHED; // In buffer mode 1 force cache for (almost) all files
+    }
+  }
+  */
+
   /* PLEX */
   unsigned int fileCacheSize = 0;
   if (m_item.IsPlexMediaServerLibrary() &&
@@ -84,16 +108,25 @@ bool CDVDInputStreamFile::Open(const char* strFile, const std::string& content)
         cacheSize = 1024 * 1024 * 100;
       if (selectedQuality.Equals("720p"))
         cacheSize = 1024 * 1024 * 70;
-      else
-        cacheSize = 1024 * 1024 * 50;
     }
 
     fileCacheSize = std::min(cacheSize, g_advancedSettings.m_smartCacheUpperLimit);
   }
-  /* END PLEX */
+
+  if (!(flags & READ_CACHED))
+    flags |= READ_NO_CACHE; // Make sure CFile honors our no-cache hint
+
+  /*
+  if (content == "video/mp4" ||
+      content == "video/x-msvideo" ||
+      content == "video/avi" ||
+      content == "video/x-matroska" ||
+      content == "video/x-matroska-3d")
+    flags |= READ_MULTI_STREAM;
+  */
 
   // open file in binary mode
-  if (!m_pFile->Open(strFile, READ_TRUNCATED | READ_BITRATE | READ_CHUNKED | READ_CACHED, fileCacheSize)) // PLEX - added arguments here
+  if (!m_pFile->Open(strFile, flags, fileCacheSize)) // PLEX - added arguments here
   {
     delete m_pFile;
     m_pFile = NULL;
@@ -121,16 +154,20 @@ void CDVDInputStreamFile::Close()
   m_eof = true;
 }
 
-int CDVDInputStreamFile::Read(BYTE* buf, int buf_size)
+int CDVDInputStreamFile::Read(uint8_t* buf, int buf_size)
 {
   if(!m_pFile) return -1;
 
-  unsigned int ret = m_pFile->Read(buf, buf_size);
+  ssize_t ret = m_pFile->Read(buf, buf_size);
+
+  if (ret < 0)
+    return -1; // player will retry read in case of error until playback is stopped
 
   /* we currently don't support non completing reads */
-  if( ret <= 0 ) m_eof = true;
+  if (ret == 0) 
+    m_eof = true;
 
-  return (int)(ret & 0xFFFFFFFF);
+  return (int)ret;
 }
 
 int64_t CDVDInputStreamFile::Seek(int64_t offset, int whence)

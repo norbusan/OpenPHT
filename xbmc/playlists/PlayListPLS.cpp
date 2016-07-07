@@ -380,7 +380,7 @@ bool CPlayListASX::LoadData(istream& stream)
         value = pElement->Attribute("href");
         if (value != "")
         { // found an entryref, let's try loading that url
-          auto_ptr<CPlayList> playlist(CPlayListFactory::Create(value));
+          unique_ptr<CPlayList> playlist(CPlayListFactory::Create(value));
           if (NULL != playlist.get())
             if (playlist->Load(value))
               Add(*playlist);

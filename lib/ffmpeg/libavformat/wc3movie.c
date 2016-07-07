@@ -1,6 +1,6 @@
 /*
  * Wing Commander III Movie (.mve) File Demuxer
- * Copyright (c) 2003 The ffmpeg Project
+ * Copyright (c) 2003 The FFmpeg Project
  *
  * This file is part of FFmpeg.
  *
@@ -27,6 +27,8 @@
  *   http://www.pcisys.net/~melanson/codecs/
  */
 
+#include "libavutil/avstring.h"
+#include "libavutil/channel_layout.h"
 #include "libavutil/intreadwrite.h"
 #include "libavutil/dict.h"
 #include "avformat.h"
@@ -83,8 +85,7 @@ static int wc3_probe(AVProbeData *p)
     return AVPROBE_SCORE_MAX;
 }
 
-static int wc3_read_header(AVFormatContext *s,
-                           AVFormatParameters *ap)
+static int wc3_read_header(AVFormatContext *s)
 {
     Wc3DemuxContext *wc3 = s->priv_data;
     AVIOContext *pb = s->pb;
@@ -158,7 +159,7 @@ static int wc3_read_header(AVFormatContext *s,
         fourcc_tag = avio_rl32(pb);
         /* chunk sizes are 16-bit aligned */
         size = (avio_rb32(pb) + 1) & (~1);
-        if (url_feof(pb))
+        if (avio_feof(pb))
             return AVERROR(EIO);
 
     } while (fourcc_tag != BRCH_TAG);
@@ -170,7 +171,7 @@ static int wc3_read_header(AVFormatContext *s,
     avpriv_set_pts_info(st, 33, 1, WC3_FRAME_FPS);
     wc3->video_stream_index = st->index;
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id = CODEC_ID_XAN_WC3;
+    st->codec->codec_id = AV_CODEC_ID_XAN_WC3;
     st->codec->codec_tag = 0;  /* no fourcc */
     st->codec->width = wc3->width;
     st->codec->height = wc3->height;
@@ -181,9 +182,10 @@ static int wc3_read_header(AVFormatContext *s,
     avpriv_set_pts_info(st, 33, 1, WC3_FRAME_FPS);
     wc3->audio_stream_index = st->index;
     st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
-    st->codec->codec_id = CODEC_ID_PCM_S16LE;
+    st->codec->codec_id = AV_CODEC_ID_PCM_S16LE;
     st->codec->codec_tag = 1;
     st->codec->channels = WC3_AUDIO_CHANNELS;
+    st->codec->channel_layout = AV_CH_LAYOUT_MONO;
     st->codec->bits_per_coded_sample = WC3_AUDIO_BITS;
     st->codec->sample_rate = WC3_SAMPLE_RATE;
     st->codec->bit_rate = st->codec->channels * st->codec->sample_rate *
@@ -209,7 +211,7 @@ static int wc3_read_packet(AVFormatContext *s,
         fourcc_tag = avio_rl32(pb);
         /* chunk sizes are 16-bit aligned */
         size = (avio_rb32(pb) + 1) & (~1);
-        if (url_feof(pb))
+        if (avio_feof(pb))
             return AVERROR(EIO);
 
         switch (fourcc_tag) {
@@ -248,10 +250,16 @@ static int wc3_read_packet(AVFormatContext *s,
             else {
                 int i = 0;
                 av_log (s, AV_LOG_DEBUG, "Subtitle time!\n");
+                if (i >= size || av_strnlen(&text[i + 1], size - i - 1) >= size - i - 1)
+                    return AVERROR_INVALIDDATA;
                 av_log (s, AV_LOG_DEBUG, "  inglish: %s\n", &text[i + 1]);
                 i += text[i] + 1;
+                if (i >= size || av_strnlen(&text[i + 1], size - i - 1) >= size - i - 1)
+                    return AVERROR_INVALIDDATA;
                 av_log (s, AV_LOG_DEBUG, "  doytsch: %s\n", &text[i + 1]);
                 i += text[i] + 1;
+                if (i >= size || av_strnlen(&text[i + 1], size - i - 1) >= size - i - 1)
+                    return AVERROR_INVALIDDATA;
                 av_log (s, AV_LOG_DEBUG, "  fronsay: %s\n", &text[i + 1]);
             }
 #endif
@@ -294,7 +302,7 @@ static int wc3_read_close(AVFormatContext *s)
 
 AVInputFormat ff_wc3_demuxer = {
     .name           = "wc3movie",
-    .long_name      = NULL_IF_CONFIG_SMALL("Wing Commander III movie format"),
+    .long_name      = NULL_IF_CONFIG_SMALL("Wing Commander III movie"),
     .priv_data_size = sizeof(Wc3DemuxContext),
     .read_probe     = wc3_probe,
     .read_header    = wc3_read_header,

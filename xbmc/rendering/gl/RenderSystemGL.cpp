@@ -27,11 +27,13 @@
 #include "guilib/GraphicContext.h"
 #include "settings/AdvancedSettings.h"
 #include "guilib/MatrixGLES.h"
+#include "settings/GUISettings.h"
 #include "utils/log.h"
 #include "utils/GLUtils.h"
 #include "utils/TimeUtils.h"
 #include "utils/SystemInfo.h"
 #include "utils/MathUtils.h"
+#include "utils/StringUtils.h"
 
 CRenderSystemGL::CRenderSystemGL() : CRenderSystemBase()
 {
@@ -47,8 +49,8 @@ CRenderSystemGL::~CRenderSystemGL()
 void CRenderSystemGL::CheckOpenGLQuirks()
 
 {
-#ifdef __APPLE__	
-  if (m_RenderVendor.Find("NVIDIA") > -1)
+#ifdef TARGET_DARWIN_OSX
+  if (m_RenderVendor.find("NVIDIA") != std::string::npos)
   {             
     // Nvidia 7300 (AppleTV) and 7600 cannot do DXT with NPOT under OSX
     // Nvidia 9400M is slow as a dog
@@ -67,18 +69,18 @@ void CRenderSystemGL::CheckOpenGLQuirks()
   }
 #ifdef __ppc__
   // ATI Radeon 9600 on osx PPC cannot do NPOT
-  if (m_RenderRenderer.Find("ATI Radeon 9600") > -1)
+  if (m_RenderRenderer.find("ATI Radeon 9600") != std::string::npos)
   {
     m_renderCaps &= ~ RENDER_CAPS_NPOT;
     m_renderCaps &= ~ RENDER_CAPS_DXT_NPOT;
   }
 #endif
 #endif
-  if (m_RenderVendor.ToLower() == "nouveau")
+  if (StringUtils::EqualsNoCase(m_RenderVendor, "nouveau"))
     m_renderQuirks |= RENDER_QUIRKS_YV12_PREFERED;
 
-  if (m_RenderVendor.Equals("Tungsten Graphics, Inc.")
-  ||  m_RenderVendor.Equals("Tungsten Graphics, Inc"))
+  if (StringUtils::EqualsNoCase(m_RenderVendor, "Tungsten Graphics, Inc.")
+  ||  StringUtils::EqualsNoCase(m_RenderVendor, "Tungsten Graphics, Inc"))
   {
     unsigned major, minor, micro;
     if (sscanf(m_RenderVersion.c_str(), "%*s Mesa %u.%u.%u", &major, &minor, &micro) == 3)
@@ -92,7 +94,7 @@ void CRenderSystemGL::CheckOpenGLQuirks()
     else
       CLog::Log(LOGNOTICE, "CRenderSystemGL::CheckOpenGLQuirks - unable to parse mesa version string");
 
-    if(m_RenderRenderer.Find("Poulsbo") >= 0)
+    if(m_RenderRenderer.find("Poulsbo") != std::string::npos)
       m_renderCaps &= ~RENDER_CAPS_DXT_NPOT;
 
     m_renderQuirks |= RENDER_QUIRKS_BROKEN_OCCLUSION_QUERY;
@@ -145,8 +147,15 @@ bool CRenderSystemGL::InitRenderSystem()
   }
 
   // Get our driver vendor and renderer
-  m_RenderVendor = (const char*) glGetString(GL_VENDOR);
-  m_RenderRenderer = (const char*) glGetString(GL_RENDERER);
+  const char* tmpVendor = (const char*) glGetString(GL_VENDOR);
+  m_RenderVendor.clear();
+  if (tmpVendor != NULL)
+    m_RenderVendor = tmpVendor;
+
+  const char* tmpRenderer = (const char*) glGetString(GL_RENDERER);
+  m_RenderRenderer.clear();
+  if (tmpRenderer != NULL)
+    m_RenderRenderer = tmpRenderer;
 
   // grab our capabilities
   if (glewIsSupported("GL_EXT_texture_compression_s3tc"))
@@ -162,7 +171,11 @@ bool CRenderSystemGL::InitRenderSystem()
   CheckOpenGLQuirks();
 	
   m_RenderExtensions  = " ";
-  m_RenderExtensions += (const char*) glGetString(GL_EXTENSIONS);
+
+  const char *tmpExtensions = (const char*) glGetString(GL_EXTENSIONS);
+  if (tmpExtensions != NULL)
+    m_RenderExtensions += tmpExtensions;
+
   m_RenderExtensions += " ";
 
   LogGraphicsInfo();
@@ -188,7 +201,7 @@ bool CRenderSystemGL::ResetRenderSystem(int width, int height, bool fullScreen, 
   glEnable(GL_SCISSOR_TEST);
 
   glMatrixProject.Clear();
-  glMatrixModview->LoadIdentity();
+  glMatrixProject->LoadIdentity();
   glMatrixProject->Ortho(0.0f, width-1, height-1, 0.0f, -1.0f, 1.0f);
   glMatrixProject.Load();
 
@@ -265,6 +278,10 @@ bool CRenderSystemGL::ClearBuffers(color_t color)
   if (!m_bRenderCreated)
     return false;
 
+  /* clear is not affected by stipple pattern, so we can only clear on first frame */
+  if(m_stereoMode == RENDER_STEREO_MODE_INTERLACED && m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+    return true;
+
   float r = GET_R(color) / 255.0f;
   float g = GET_G(color) / 255.0f;
   float b = GET_B(color) / 255.0f;
@@ -280,12 +297,12 @@ bool CRenderSystemGL::ClearBuffers(color_t color)
 
 bool CRenderSystemGL::IsExtSupported(const char* extension)
 {
-  CStdString name;
+  std::string name;
   name  = " ";
   name += extension;
   name += " ";
 
-  return m_RenderExtensions.find(name) != std::string::npos;;
+  return m_RenderExtensions.find(name) != std::string::npos;
 }
 
 bool CRenderSystemGL::PresentRender(const CDirtyRegionList& dirty)
@@ -420,7 +437,7 @@ void CRenderSystemGL::ApplyStateBlock()
   glEnable(GL_SCISSOR_TEST);
 }
 
-void CRenderSystemGL::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight)
+void CRenderSystemGL::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor)
 {
   if (!m_bRenderCreated)
     return;
@@ -434,7 +451,7 @@ void CRenderSystemGL::SetCameraPosition(const CPoint &camera, int screenWidth, i
   float h = (float)m_viewPort[3]*0.5f;
 
   glMatrixModview->LoadIdentity();
-  glMatrixModview->Translatef(-(w + offset.x), +(h + offset.y), 0);
+  glMatrixModview->Translatef(-(w + offset.x - stereoFactor), +(h + offset.y), 0);
   glMatrixModview->LookAt(0.0, 0.0, -2.0*h, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0);
   glMatrixModview.Load();
 
@@ -532,17 +549,17 @@ void CRenderSystemGL::CalculateMaxTexturesize()
     }
   }
 
-#ifdef __APPLE__
+#ifdef TARGET_DARWIN_OSX
   // Max Texture size reported on some apple machines seems incorrect
   // Displaying a picture with that resolution results in a corrupted output
   // So force it to a lower value
   // Problem noticed on:
   // iMac with ATI Radeon X1600, both on 10.5.8 (GL_VERSION: 2.0 ATI-1.5.48)
   // and 10.6.2 (GL_VERSION: 2.0 ATI-1.6.6)
-  if (strcmp(m_RenderRenderer, "ATI Radeon X1600 OpenGL Engine") == 0)
+  if (m_RenderRenderer == "ATI Radeon X1600 OpenGL Engine")
     m_maxTextureSize = 2048;
   // Mac mini G4 with ATI Radeon 9200 (GL_VERSION: 1.3 ATI-1.5.48)
-  else if (strcmp(m_RenderRenderer, "ATI Radeon 9200 OpenGL Engine") == 0)
+  else if (m_RenderRenderer == "ATI Radeon 9200 OpenGL Engine")
     m_maxTextureSize = 1024;
 #endif
 
@@ -608,5 +625,113 @@ void CRenderSystemGL::ResetGLErrors()
     }
   }
 }
+static const GLubyte stipple_3d[] = {
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
+};
+
+void CRenderSystemGL::SetStereoMode(RENDER_STEREO_MODE mode, RENDER_STEREO_VIEW view)
+{
+  CRenderSystemBase::SetStereoMode(mode, view);
+
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  glDisable(GL_POLYGON_STIPPLE);
+  glDrawBuffer(GL_BACK);
+
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
+  }
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE);
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      glColorMask(GL_TRUE, GL_FALSE, GL_TRUE, GL_TRUE);
+  }
+  if(m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
+  }
+
+  if(m_stereoMode == RENDER_STEREO_MODE_INTERLACED)
+  {
+    glEnable(GL_POLYGON_STIPPLE);
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      glPolygonStipple(stipple_3d);
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      glPolygonStipple(stipple_3d+4);
+  }
+
+  if(m_stereoMode == RENDER_STEREO_MODE_HARDWAREBASED)
+  {
+    if(m_stereoView == RENDER_STEREO_VIEW_LEFT)
+      glDrawBuffer(GL_BACK_LEFT);
+    else if(m_stereoView == RENDER_STEREO_VIEW_RIGHT)
+      glDrawBuffer(GL_BACK_RIGHT);
+  }
+
+}
+
+bool CRenderSystemGL::SupportsStereo(RENDER_STEREO_MODE mode) const
+{
+  switch(mode)
+  {
+    case RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN:
+    case RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA:
+    case RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE:
+    case RENDER_STEREO_MODE_INTERLACED:
+      return true;
+    case RENDER_STEREO_MODE_HARDWAREBASED: {
+      //This is called by setting init, at which point GL is not inited
+      //luckily if GL doesn't support this, it will just behave as if
+      //it was not in effect.
+      //GLboolean stereo = GL_FALSE;
+      //glGetBooleanv(GL_STEREO, &stereo);
+      //return stereo == GL_TRUE ? true : false;
+      return true;
+    }
+    default:
+      return CRenderSystemBase::SupportsStereo(mode);
+  }
+}
+
 
 #endif

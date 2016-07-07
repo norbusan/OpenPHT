@@ -31,7 +31,7 @@
 #include "URL.h"
 
 #ifdef _WIN32
-#pragma comment(lib, "libmicrohttpd.dll.lib")
+#pragma comment(lib, "libmicrohttpd-dll.lib")
 #endif
 
 #define MAX_POST_BUFFER_SIZE 2048

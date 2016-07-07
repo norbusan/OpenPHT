@@ -163,7 +163,7 @@ CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContaine
   {
     item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("playQueueItemID").asInteger(), "video");
   }
-  else if (item.HasProperty("ratingKey"))
+  else if (item.HasProperty("ratingKey") && item.GetProperty("ratingKey").asInteger(-1) >= 0)
   {
     item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("ratingKey").asInteger(), "video");
   }

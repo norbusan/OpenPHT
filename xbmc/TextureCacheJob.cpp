@@ -22,9 +22,9 @@
 #include "TextureCache.h"
 #include "guilib/Texture.h"
 #include "guilib/DDSImage.h"
-#include "settings/Settings.h"
-#include "settings/AdvancedSettings.h"
 #include "settings/GUISettings.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
 #include "utils/log.h"
 #include "filesystem/File.h"
 #include "pictures/Picture.h"
@@ -38,11 +38,11 @@
 #include "cores/omxplayer/OMXImage.h"
 #endif
 
-CTextureCacheJob::CTextureCacheJob(const CStdString &url, const CStdString &oldHash)
+CTextureCacheJob::CTextureCacheJob(const CStdString &url, const CStdString &oldHash):
+  m_url(url),
+  m_oldHash(oldHash),
+  m_cachePath(CTextureCache::GetCacheFile(m_url))
 {
-  m_url = url;
-  m_oldHash = oldHash;
-  m_cachePath = CTextureCache::GetCacheFile(m_url);
 }
 
 CTextureCacheJob::~CTextureCacheJob()
@@ -80,7 +80,8 @@ bool CTextureCacheJob::CacheTexture(CBaseTexture **out_texture)
   // unwrap the URL as required
   std::string additional_info;
   unsigned int width, height;
-  CStdString image = DecodeImageURL(m_url, width, height, additional_info);
+  CPictureScalingAlgorithm::Algorithm scalingAlgorithm;
+  CStdString image = DecodeImageURL(m_url, width, height, scalingAlgorithm, additional_info);
 
   m_details.updateable = additional_info != "music" && UpdateableURL(image);
 
@@ -98,12 +99,12 @@ bool CTextureCacheJob::CacheTexture(CBaseTexture **out_texture)
     m_details.height = height;
     m_details.file = m_cachePath + ".jpg";
     if (out_texture)
-      *out_texture = LoadImage(CTextureCache::GetCachedPath(m_details.file), width, height, additional_info);
+      *out_texture = LoadImage(CTextureCache::GetCachedPath(m_details.file), width, height, "" /* already flipped */);
     CLog::Log(LOGDEBUG, "Fast %s image '%s' to '%s': %p", m_oldHash.IsEmpty() ? "Caching" : "Recaching", image.c_str(), m_details.file.c_str(), out_texture);
     return true;
   }
 #endif
-  CBaseTexture *texture = LoadImage(image, width, height, additional_info);
+  CBaseTexture *texture = LoadImage(image, width, height, additional_info, true);
   if (texture)
   {
     if (texture->HasAlpha())
@@ -113,7 +114,7 @@ bool CTextureCacheJob::CacheTexture(CBaseTexture **out_texture)
 
     CLog::Log(LOGDEBUG, "%s image '%s' to '%s':", m_oldHash.IsEmpty() ? "Caching" : "Recaching", image.c_str(), m_details.file.c_str());
 
-    if (CPicture::CacheTexture(texture, width, height, CTextureCache::GetCachedPath(m_details.file)))
+    if (CPicture::CacheTexture(texture, width, height, CTextureCache::GetCachedPath(m_details.file), scalingAlgorithm))
     {
       m_details.width = width;
       m_details.height = height;
@@ -128,12 +129,13 @@ bool CTextureCacheJob::CacheTexture(CBaseTexture **out_texture)
   return false;
 }
 
-CStdString CTextureCacheJob::DecodeImageURL(const CStdString &url, unsigned int &width, unsigned int &height, std::string &additional_info)
+CStdString CTextureCacheJob::DecodeImageURL(const CStdString &url, unsigned int &width, unsigned int &height, CPictureScalingAlgorithm::Algorithm& scalingAlgorithm, std::string &additional_info)
 {
   // unwrap the URL as required
   CStdString image(url);
   additional_info.clear();
   width = height = 0;
+  scalingAlgorithm = CPictureScalingAlgorithm::NoAlgorithm;
   if (url.compare(0, 8, "image://") == 0)
   {
     // format is image://[type@]<url_encoded_path>?options
@@ -146,39 +148,26 @@ CStdString CTextureCacheJob::DecodeImageURL(const CStdString &url, unsigned int 
 
     image = thumbURL.GetHostName();
 
-    CStdString optionString = thumbURL.GetOptions().Mid(1);
-    optionString.TrimRight('/'); // in case XBMC adds a slash
+    if (thumbURL.HasOption("flipped"))
+      additional_info = "flipped";
 
-    std::vector<CStdString> options;
-    StringUtils::SplitString(optionString, "&", options);
-    for (std::vector<CStdString>::iterator i = options.begin(); i != options.end(); i++)
+    if (thumbURL.GetOption("size") == "thumb")
+      width = height = g_advancedSettings.GetThumbSize();
+    else
     {
-      CStdString option, value;
-      int pos = i->Find('=');
-      if (pos != -1)
-      {
-        option = i->Left(pos);
-        value  = i->Mid(pos + 1);
-      }
-      else
-      {
-        option = *i;
-        value = "";
-      }
-      if (option == "size" && value == "thumb")
-      {
-        width = height = g_advancedSettings.GetThumbSize();
-      }
-      else if (option == "flipped")
-      {
-        additional_info = "flipped";
-      }
+      if (thumbURL.HasOption("width") && StringUtils::IsInteger(thumbURL.GetOption("width")))
+        width = strtol(thumbURL.GetOption("width").c_str(), NULL, 0);
+      if (thumbURL.HasOption("height") && StringUtils::IsInteger(thumbURL.GetOption("height")))
+        height = strtol(thumbURL.GetOption("height").c_str(), NULL, 0);
     }
+
+    if (thumbURL.HasOption("scaling_algorithm"))
+      scalingAlgorithm = CPictureScalingAlgorithm::FromString(thumbURL.GetOption("scaling_algorithm"));
   }
   return image;
 }
 
-CBaseTexture *CTextureCacheJob::LoadImage(const CStdString &image, unsigned int width, unsigned int height, const std::string &additional_info)
+CBaseTexture *CTextureCacheJob::LoadImage(const CStdString &image, unsigned int width, unsigned int height, const std::string &additional_info, bool requirePixels)
 {
   if (additional_info == "music")
   { // special case for embedded music images
@@ -193,7 +182,7 @@ CBaseTexture *CTextureCacheJob::LoadImage(const CStdString &image, unsigned int 
       && !file.GetMimeType().Left(6).Equals("image/") && !file.GetMimeType().Equals("application/octet-stream")) // ignore non-pictures
     return NULL;
 
-  CBaseTexture *texture = CBaseTexture::LoadFromFile(image, width, height, g_guiSettings.GetBool("pictures.useexifrotation"));
+  CBaseTexture *texture = CBaseTexture::LoadFromFile(image, width, height, requirePixels);
   if (!texture)
     return NULL;
 
@@ -234,7 +223,7 @@ CStdString CTextureCacheJob::GetImageHash(const CStdString &url)
     if (time || st.st_size)
     {
       CStdString hash;
-      hash.Format("d%"PRId64"s%"PRId64, time, st.st_size);
+      hash.Format("d%" PRId64"s%" PRId64, time, st.st_size);
       return hash;
     }
 
@@ -246,9 +235,9 @@ CStdString CTextureCacheJob::GetImageHash(const CStdString &url)
   return "";
 }
 
-CTextureDDSJob::CTextureDDSJob(const CStdString &original)
+CTextureDDSJob::CTextureDDSJob(const CStdString &original):
+  m_original(original)
 {
-  m_original = original;
 }
 
 bool CTextureDDSJob::operator==(const CJob* job) const

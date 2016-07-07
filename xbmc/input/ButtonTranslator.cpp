@@ -84,9 +84,12 @@ static const ActionMapping actions[] =
         {"stepback"          , ACTION_STEP_BACK},
         {"bigstepforward"    , ACTION_BIG_STEP_FORWARD},
         {"bigstepback"       , ACTION_BIG_STEP_BACK},
+        {"chapterorbigstepforward"  , ACTION_CHAPTER_OR_BIG_STEP_FORWARD},
+        {"chapterorbigstepback"     , ACTION_CHAPTER_OR_BIG_STEP_BACK},
         {"osd"               , ACTION_SHOW_OSD},
         {"showsubtitles"     , ACTION_SHOW_SUBTITLES},
         {"nextsubtitle"      , ACTION_NEXT_SUBTITLE},
+        {"cyclesubtitle"     , ACTION_CYCLE_SUBTITLE},
         {"codecinfo"         , ACTION_SHOW_CODEC},
         {"nextpicture"       , ACTION_NEXT_PICTURE},
         {"previouspicture"   , ACTION_PREV_PICTURE},
@@ -220,6 +223,14 @@ static const ActionMapping actions[] =
         {"decreasepar"       , ACTION_DECREASE_PAR},
         {"volampup"          , ACTION_VOLAMP_UP},
         {"volampdown"        , ACTION_VOLAMP_DOWN},
+        {"volumeamplification"   , ACTION_VOLAMP},
+
+        // 3D movie playback/GUI
+        {"stereomode"            , ACTION_STEREOMODE_SELECT},          // cycle 3D modes, for now an alias for next
+        {"nextstereomode"        , ACTION_STEREOMODE_NEXT},
+        {"previousstereomode"    , ACTION_STEREOMODE_PREVIOUS},
+        {"togglestereomode"      , ACTION_STEREOMODE_TOGGLE},
+        {"stereomodetomono"      , ACTION_STEREOMODE_TOMONO},
 
         // PVR actions
         {"channelup"             , ACTION_CHANNEL_UP},
@@ -246,7 +257,8 @@ static const ActionMapping actions[] =
         {"playtrailer"          , ACTION_PLEX_PLAY_TRAILER},
         /* END PLEX */
 
-        // Do nothing action
+        // Do nothing / error action
+        { "error"            , ACTION_ERROR},
         { "noop"             , ACTION_NOOP}
 };
 

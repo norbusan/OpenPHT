@@ -21,9 +21,8 @@
 #include "DVDAudioCodecPassthrough.h"
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDStreamInfo.h"
-#include "settings/GUISettings.h"
-#include "settings/Settings.h"
-#include "utils/log.h"
+
+#include <algorithm>
 
 #include "cores/AudioEngine/AEFactory.h"
 
@@ -40,29 +39,11 @@ CDVDAudioCodecPassthrough::~CDVDAudioCodecPassthrough(void)
 
 bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
-  /* dont open if AE doesnt support RAW */
-  if (!CAEFactory::SupportsRaw())
-    return false;
-
-  bool bSupportsAC3Out    = false;
-  bool bSupportsEAC3Out   = false;
-  bool bSupportsDTSOut    = false;
-  bool bSupportsTrueHDOut = false;
-  bool bSupportsDTSHDOut  = false;
-
-  int audioMode = g_guiSettings.GetInt("audiooutput.mode");
-  if (AUDIO_IS_BITSTREAM(audioMode))
-  {
-    bSupportsAC3Out = g_guiSettings.GetBool("audiooutput.ac3passthrough");
-    bSupportsEAC3Out = g_guiSettings.GetBool("audiooutput.eac3passthrough");
-    bSupportsDTSOut = g_guiSettings.GetBool("audiooutput.dtspassthrough");
-  }
-
-  if (audioMode == AUDIO_HDMI)
-  {
-    bSupportsTrueHDOut = g_guiSettings.GetBool("audiooutput.truehdpassthrough");
-    bSupportsDTSHDOut  = g_guiSettings.GetBool("audiooutput.dtshdpassthrough" ) && bSupportsDTSOut;
-  }
+  bool bSupportsAC3Out    = CAEFactory::SupportsRaw(AE_FMT_AC3, hints.samplerate);
+  bool bSupportsEAC3Out   = CAEFactory::SupportsRaw(AE_FMT_EAC3, 192000);
+  bool bSupportsDTSOut    = CAEFactory::SupportsRaw(AE_FMT_DTS, hints.samplerate);
+  bool bSupportsTrueHDOut = CAEFactory::SupportsRaw(AE_FMT_TRUEHD, 192000);
+  bool bSupportsDTSHDOut  = CAEFactory::SupportsRaw(AE_FMT_DTSHD, 192000);
 
   /* only get the dts core from the parser if we don't support dtsHD */
   m_info.SetCoreOnly(!bSupportsDTSHDOut);
@@ -71,12 +52,12 @@ bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &op
   /* 32kHz E-AC-3 passthrough requires 128kHz IEC 60958 stream
    * which HDMI does not support, and IEC 61937 does not mention
    * reduced sample rate support, so support only 44.1 and 48 */
-  if ((hints.codec == CODEC_ID_AC3 && bSupportsAC3Out) ||
-      (hints.codec == CODEC_ID_EAC3 && bSupportsEAC3Out && (hints.samplerate == 44100 || hints.samplerate == 48000)) ||
-      (hints.codec == CODEC_ID_DTS && bSupportsDTSOut) ||
-      (hints.codec == CODEC_ID_TRUEHD && bSupportsTrueHDOut))
+  if ((hints.codec == AV_CODEC_ID_AC3 && bSupportsAC3Out) ||
+      (hints.codec == AV_CODEC_ID_EAC3 && bSupportsEAC3Out && (hints.samplerate == 44100 || hints.samplerate == 48000)) ||
+      (hints.codec == AV_CODEC_ID_DTS && bSupportsDTSOut) ||
+      (hints.codec == AV_CODEC_ID_TRUEHD && bSupportsTrueHDOut))
   {
-     return true;
+    return true;
   }
 
   return false;
@@ -145,7 +126,7 @@ void CDVDAudioCodecPassthrough::Dispose()
   m_bufferSize = 0;
 }
 
-int CDVDAudioCodecPassthrough::Decode(BYTE* pData, int iSize)
+int CDVDAudioCodecPassthrough::Decode(uint8_t* pData, int iSize)
 {
   if (iSize <= 0) return 0;
 
@@ -160,7 +141,7 @@ int CDVDAudioCodecPassthrough::Decode(BYTE* pData, int iSize)
   return used;
 }
 
-int CDVDAudioCodecPassthrough::GetData(BYTE** dst)
+int CDVDAudioCodecPassthrough::GetData(uint8_t** dst)
 {
   int size = m_packer.GetSize();
   *dst     = m_packer.GetBuffer();

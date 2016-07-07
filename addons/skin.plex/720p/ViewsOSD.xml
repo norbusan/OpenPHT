@@ -292,10 +292,12 @@
 	<!-- DialogSeekBar.xml -->
 	<!-- variables for "VideoSeek" -->
 	<variable name="SeekingLabels">
-		<value condition="Player.Seeking">SEEKING</value>
-		<value condition="Player.Caching">CACHING</value>
-		<value condition="Player.DisplayAfterSeek + ![Player.Forwarding | Player.Rewinding] + !Player.Paused">$INFO[Player.SeekOffset]</value>
-		<value condition="Player.DisplayAfterSeek + ![Player.Forwarding | Player.Rewinding] + Player.Paused">PAUSED $INFO[Player.SeekOffset]</value>
+		<value condition="Player.Playing + !Player.Seeking + !Player.DisplayAfterSeek">PLAYING</value>
+		<value condition="[Player.Paused + !Player.Caching] + !Player.Seeking + !Player.DisplayAfterSeek">PAUSED</value>
+		<value condition="[Player.Paused + Player.Caching] + !Player.Seeking">CACHING $INFO[Player.CacheLevel]%</value>
+		<value condition="!IsEmpty(Player.SeekStepSize) + ![player.forwarding | player.rewinding]">SEEKING $INFO[Player.SeekStepSize]</value>
+		<value condition="Player.DisplayAfterSeek + ![player.forwarding | player.rewinding]">SEEKING $INFO[Player.SeekOffset]</value>
+		<value condition="!Player.DisplayAfterSeek + Player.Seeking">SEEKING</value>
 		<value condition="Player.Forwarding2x">FORWARDING 2x</value>
 		<value condition="Player.Forwarding4x">FORWARDING 4x</value>
 		<value condition="Player.Forwarding8x">FORWARDING 8x</value>
@@ -306,7 +308,6 @@
 		<value condition="Player.Rewinding8x">REWINDING 8x</value>
 		<value condition="Player.Rewinding16x">REWINDING 16x</value>
 		<value condition="Player.Rewinding32x">REWINDING 32x</value>
-		<value></value>
 	</variable>
 	<include name="VideoSeek">
 		<visible>!Window.IsActive(2901)</visible>
@@ -360,6 +361,15 @@
 						<font>Regular-16</font>
 						<label>$INFO[Player.Time]</label>
 						<textcolor>white</textcolor>
+						<visible>!Player.Seeking</visible>
+					</control>
+					<control type="label">
+						<width>200</width>
+						<align>left</align>
+						<font>Regular-16</font>
+						<label>$INFO[Player.SeekTime]</label>
+						<textcolor>white</textcolor>
+						<visible>Player.Seeking</visible>
 					</control>
 					<!-- duration -->
 					<control type="label">
@@ -401,6 +411,25 @@
 				<posy>20</posy>
 				<width>1040</width>
 				<info>Player.Progress</info>
+				<visible>!Player.Seeking</visible>
+			</control>
+			<control type="progress" id="401">
+				<description>Seek Slider</description>
+				<posx>100</posx>
+				<posy>20</posy>
+				<width>1040</width>
+				<info>Player.Seekbar</info>
+				<visible>Player.Seeking</visible>
+			</control>
+			<control type="image">
+				<posx>20</posx>
+				<posy>-222</posy>
+				<height>180</height>
+				<width>320</width>
+				<fadetime>1</fadetime>
+				<aspectratio align="left" aligny="bottom">keep</aspectratio>
+				<texture>$INFO[VideoPlayer.SeekImage]</texture>
+				<visible>Player.Seeking + !IsEmpty(VideoPlayer.SeekImage)</visible>
 			</control>
 		</control>
 	</include>
@@ -473,6 +502,15 @@
 						<font>Regular-18</font>
 						<label>$INFO[Player.Time]</label>
 						<textcolor>white</textcolor>
+						<visible>!Player.Seeking</visible>
+					</control>
+					<control type="label">
+						<width>200</width>
+						<align>left</align>
+						<font>Regular-18</font>
+						<label>$INFO[Player.SeekTime]</label>
+						<textcolor>white</textcolor>
+						<visible>Player.Seeking</visible>
 					</control>
 					<!-- duration -->
 					<control type="label">
@@ -498,6 +536,16 @@
 					<label>$VAR[SeekingLabels]</label>
 					<textcolor>white</textcolor>
 				</control>
+			</control>
+			<control type="image">
+				<posx>20</posx>
+				<posy>-222</posy>
+				<height>180</height>
+				<width>320</width>
+				<fadetime>1</fadetime>
+				<aspectratio align="left" aligny="bottom">keep</aspectratio>
+				<texture>$INFO[VideoPlayer.SeekImage]</texture>
+				<visible>Player.Seeking + !IsEmpty(VideoPlayer.SeekImage)</visible>
 			</control>
 			<!-- buttons -->
 			<control type="group" id="200">
@@ -904,6 +952,15 @@
 				<posy>66</posy>
 				<width>1040</width>
 				<info>Player.Progress</info>
+				<visible>!Player.Seeking</visible>
+			</control>
+			<control type="progress">
+				<description>Seek Slider</description>
+				<posx>100</posx>
+				<posy>66</posy>
+				<width>1040</width>
+				<info>Player.Seekbar</info>
+				<visible>Player.Seeking</visible>
 			</control>
 		</control>
 	</include>
@@ -922,12 +979,12 @@
 			<include>FadeQuick</include>
 			<!-- bg's -->
 			<control type="group">
-				<posy>110</posy>
+				<posy>50</posy>
 				<control type="image">
 					<posx>-1</posx>
 					<posy>-1</posy>
 					<width>602</width>
-					<height>442</height>
+					<height>517</height>
 					<texture>transparent.png</texture>
 					<bordertexture border="10">border-black.png</bordertexture>
 					<bordersize>1</bordersize>
@@ -937,7 +994,7 @@
 				<control type="image">
 					<posy>80</posy>
 					<width>600</width>
-					<height>360</height>
+					<height>435</height>
 					<texture border="10">base-rounded-half.png</texture>
 					<colordiffuse>FF000000</colordiffuse>
 					<animation effect="fade" start="0" end="80" time="0" condition="true">Conditional</animation>
@@ -960,17 +1017,17 @@
 				<!-- arrow up -->
 				<control type="image">
 					<posx>285</posx>
-					<posy>440</posy>
+					<posy>515</posy>
 					<include>ArrowBlackDown</include>
 				</control>
 			</control>
 			<!-- settings -->
 			<control type="group">
 				<posx>10</posx>
-				<posy>130</posy>
+				<posy>65</posy>
 				<control type="group">
 					<control type="label" id="2">
-						<posy>20</posy>
+						<posy>25</posy>
 						<width>580</width>
 						<include>DialogHeading</include>
 					</control>
@@ -978,7 +1035,7 @@
 					<control type="grouplist" id="5">
 						<posy>80</posy>
 						<width>560</width>
-						<height>300</height>
+						<height>400</height>
 						<itemgap>0</itemgap>
 						<onleft>-</onleft>
 						<onright>-</onright>
@@ -998,10 +1055,10 @@
 				</control>
 				<control type="scrollbar" id="61">
 					<description>Scroll Bar</description>
-					<posx>570</posx>
-					<posy>75</posy>
+					<posx>566</posx>
+					<posy>73</posy>
 					<width>20</width>
-					<height>310</height>
+					<height>410</height>
 				</control>
 			</control>
 		</control>

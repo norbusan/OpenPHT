@@ -5,10 +5,10 @@
 		<!-- Library Movies & TV Shows -->
 		<control type="group" id="777">
 			<include>FadeDialog</include>
-			<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | Container.PlexContent(TVShows)]</visible>
+			<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | Container.PlexContent(TVShows)] | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)]</visible>
 			<include>rightSideSlide</include>
 			<control type="panel" id="51">
-				<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | Container.PlexContent(TVShows)]</visible>
+				<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)] | Container.PlexContent(TVShows)]</visible>
 				<viewtype label="LibraryPostersBigger">panel</viewtype>
 				<onup>51</onup>
 				<ondown>51</ondown>
@@ -42,10 +42,10 @@
 		<!-- Library Movies & TV Shows -->
 		<control type="group" id="777">
 			<include>FadeDialog</include>
-			<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | Container.PlexContent(TVShows)]</visible>
+			<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)] | Container.PlexContent(TVShows)]</visible>
 			<include>rightSideSlide</include>
 			<control type="panel" id="50">
-				<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | Container.PlexContent(TVShows)]</visible>
+				<visible>!Container.PlexContent(Secondary) + [Container.PlexContent(Movies) | [Container.PlexContent(Homemovies) + Skin.HasSetting(HomeVideosPortrait)] | Container.PlexContent(TVShows)]</visible>
 				<viewtype label="LibraryPosters">panel</viewtype>
 				<onup>50</onup>
 				<ondown>50</ondown>

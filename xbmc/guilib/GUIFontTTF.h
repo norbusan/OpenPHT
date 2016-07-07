@@ -27,6 +27,8 @@
  *
  */
 
+#include "utils/auto_buffer.h"
+
 // forward definition
 class CBaseTexture;
 
@@ -75,11 +77,7 @@ public:
 
   void Clear();
 
-#ifndef __PLEX__
   bool Load(const CStdString& strFilename, float height = 20.0f, float aspect = 1.0f, float lineSpacing = 1.0f, bool border = false);
-#else
-  bool Load(const CStdString& strFilename, float height = 20.0f, float aspect = 1.0f, float lineSpacing = 1.0f, bool border = false, const CStdString& variant="");
-#endif
 
   virtual void Begin() = 0;
   virtual void End() = 0;
@@ -122,7 +120,7 @@ protected:
 
   // modifying glyphs
   void EmboldenGlyph(FT_GlyphSlot slot);
-  void ObliqueGlyph(FT_GlyphSlot slot);
+  static void ObliqueGlyph(FT_GlyphSlot slot);
 
   CBaseTexture* m_texture;        // texture that holds our rendered characters (8bit alpha only)
 
@@ -158,7 +156,6 @@ protected:
   float m_originX;
   float m_originY;
 
-  bool m_bTextureLoaded;
   unsigned int m_nTexture;
 
   SVertex* m_vertex;
@@ -171,8 +168,11 @@ protected:
   static int justification_word_weight;
 
   CStdString m_strFileName;
+  XUTILS::auto_buffer m_fontFileInMemory; // used only in some cases, see CFreeTypeLibrary::GetFont()
 
 private:
+  CGUIFontTTFBase(const CGUIFontTTFBase&);
+  CGUIFontTTFBase& operator=(const CGUIFontTTFBase&);
   int m_referenceCount;
 };
 

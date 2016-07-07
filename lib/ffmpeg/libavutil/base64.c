@@ -27,6 +27,7 @@
 #include "common.h"
 #include "base64.h"
 #include "intreadwrite.h"
+#include "timer.h"
 
 /* ---------------- private code */
 static const uint8_t map2[256] =
@@ -125,7 +126,7 @@ out2:
     *dst++ = v >> 4;
 out1:
 out0:
-    return bits & 1 ? -1 : dst - out;
+    return bits & 1 ? AVERROR_INVALIDDATA : dst - out;
 }
 
 /*****************************************************************************
@@ -174,8 +175,6 @@ char *av_base64_encode(char *out, int out_size, const uint8_t *in, int in_size)
 
 #ifdef TEST
 // LCOV_EXCL_START
-
-#undef printf
 
 #define MAX_DATA_SIZE    1024
 #define MAX_ENCODED_SIZE 2048
@@ -272,7 +271,10 @@ int main(int argc, char ** argv)
         }
     }
 
-    return error_count;
+    if (error_count)
+        printf("Error Count: %d.\n", error_count);
+
+    return !!error_count;
 }
 
 // LCOV_EXCL_STOP

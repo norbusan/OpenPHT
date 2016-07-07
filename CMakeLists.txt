@@ -1,5 +1,5 @@
 project("OpenPHT")
-cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to 'Debug' as none was specified.")
@@ -7,6 +7,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   # Set the possible values of build type for cmake-gui
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
 endif()
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(root ${PROJECT_SOURCE_DIR})
 set(plexdir ${root}/plex)
@@ -27,7 +30,7 @@ else()
 endif()
 
 set(PLEX_VERSION_MAJOR 1)
-set(PLEX_VERSION_MINOR 5)
+set(PLEX_VERSION_MINOR 6)
 set(PLEX_VERSION_PATCH 2)
 if(DEFINED ENV{BUILD_NUMBER})
   set(PLEX_VERSION_BUILD "$ENV{BUILD_NUMBER}")
@@ -86,8 +89,6 @@ if(TARGET_WIN32)
     ${root}/xbmc/win32
     ${root}/lib/ffmpeg
     ${root}/lib/ffmpeg/include-xbmc-win32
-    ${root}/lib/liblame/include
-    ${root}/lib/win32/pcre
     ${root}/lib/win32
     "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Include"
   )
@@ -99,9 +100,7 @@ if(NOT OPENELEC)
 endif()
 
 # add our visualizations
-if(NOT TARGET_RPI)
-  add_subdirectory(xbmc/visualizations)
-endif()
+add_subdirectory(xbmc/visualizations)
 
 # global includes
 include_directories(
@@ -116,7 +115,6 @@ include_directories(
   ${root}/lib
   ${CMAKE_BINARY_DIR}/lib/cpluff/cpluff-prefix/src/cpluff/libcpluff
   
-  ${root}/tools/darwin/depends/libcrystalhd
   ${root}/xbmc/cores/AudioEngine
 )
 

@@ -11,15 +11,15 @@ SUBDIRS := \
 	liblzo2 freetype2 fontconfig \
 	openssl gmp nettle gnutls librtmp curl \
 	libjpeg-turbo tiff libpng libogg \
-	libvorbis libflac libmad fribidi libmpeg2 \
-	libass libcdio libsamplerate libcrystalhd \
+	libvorbis libflac fribidi libmpeg2 \
+	libass libcdio \
 	libGLEW libsdl libsdl_image \
-	libmicrohttpd libmodplug libyajl libffi \
-	libplist libshairport libcec tinyxml \
-	boost breakpad
+	libmicrohttpd libmodplug yajl libffi \
+	libplist libshairplay libcec tinyxml \
+	boost breakpad libdcadec
 
 ifeq ($(DARWIN), ios)
-  EXCLUDED = libcec libcrystalhd libGLEW libsdl libsdl_image
+  EXCLUDED = libcec libGLEW libsdl libsdl_image
 else
   EXCLUDED = Backrow
 endif

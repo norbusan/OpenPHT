@@ -26,6 +26,7 @@
  * @see http://wiki.multimedia.cx/index.php?title=BFI
  */
 
+#include "libavutil/channel_layout.h"
 #include "libavutil/intreadwrite.h"
 #include "avformat.h"
 #include "internal.h"
@@ -47,7 +48,7 @@ static int bfi_probe(AVProbeData * p)
         return 0;
 }
 
-static int bfi_read_header(AVFormatContext * s, AVFormatParameters * ap)
+static int bfi_read_header(AVFormatContext * s)
 {
     BFIContext *bfi = s->priv_data;
     AVIOContext *pb = s->pb;
@@ -80,6 +81,8 @@ static int bfi_read_header(AVFormatContext * s, AVFormatParameters * ap)
     /*Load the palette to extradata */
     avio_skip(pb, 8);
     vstream->codec->extradata      = av_malloc(768);
+    if (!vstream->codec->extradata)
+        return AVERROR(ENOMEM);
     vstream->codec->extradata_size = 768;
     avio_read(pb, vstream->codec->extradata,
                vstream->codec->extradata_size);
@@ -89,13 +92,16 @@ static int bfi_read_header(AVFormatContext * s, AVFormatParameters * ap)
     /* Set up the video codec... */
     avpriv_set_pts_info(vstream, 32, 1, fps);
     vstream->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    vstream->codec->codec_id   = CODEC_ID_BFI;
-    vstream->codec->pix_fmt    = PIX_FMT_PAL8;
+    vstream->codec->codec_id   = AV_CODEC_ID_BFI;
+    vstream->codec->pix_fmt    = AV_PIX_FMT_PAL8;
+    vstream->nb_frames         =
+    vstream->duration          = bfi->nframes;
 
     /* Set up the audio codec now... */
     astream->codec->codec_type      = AVMEDIA_TYPE_AUDIO;
-    astream->codec->codec_id        = CODEC_ID_PCM_U8;
+    astream->codec->codec_id        = AV_CODEC_ID_PCM_U8;
     astream->codec->channels        = 1;
+    astream->codec->channel_layout  = AV_CH_LAYOUT_MONO;
     astream->codec->bits_per_coded_sample = 8;
     astream->codec->bit_rate        =
         astream->codec->sample_rate * astream->codec->bits_per_coded_sample;
@@ -110,15 +116,15 @@ static int bfi_read_packet(AVFormatContext * s, AVPacket * pkt)
     BFIContext *bfi = s->priv_data;
     AVIOContext *pb = s->pb;
     int ret, audio_offset, video_offset, chunk_size, audio_size = 0;
-    if (bfi->nframes == 0 || url_feof(pb)) {
-        return AVERROR(EIO);
+    if (bfi->nframes == 0 || avio_feof(pb)) {
+        return AVERROR_EOF;
     }
 
     /* If all previous chunks were completely read, then find a new one... */
     if (!bfi->avflag) {
         uint32_t state = 0;
         while(state != MKTAG('S','A','V','I')){
-            if (url_feof(pb))
+            if (avio_feof(pb))
                 return AVERROR(EIO);
             state = 256*state + avio_r8(pb);
         }

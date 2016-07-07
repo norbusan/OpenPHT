@@ -19,7 +19,6 @@
  */
 
 #include "system.h"
-#include "DVDClock.h"
 #include "DVDOverlayCodecText.h"
 #include "DVDOverlayText.h"
 #include "DVDStreamInfo.h"
@@ -41,8 +40,10 @@ CDVDOverlayCodecText::~CDVDOverlayCodecText()
 
 bool CDVDOverlayCodecText::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
-  m_bIsSSA = (hints.codec == CODEC_ID_SSA);
-  if(hints.codec == CODEC_ID_TEXT || hints.codec == CODEC_ID_SSA)
+  m_bIsSSA = (hints.codec == AV_CODEC_ID_SSA);
+  if(hints.codec == AV_CODEC_ID_TEXT || hints.codec == AV_CODEC_ID_SSA)
+    return true;
+  if(hints.codec == AV_CODEC_ID_SUBRIP)
     return true;
   return false;
 }
@@ -61,8 +62,8 @@ int CDVDOverlayCodecText::Decode(DemuxPacket *pPacket)
   if(!pPacket)
     return OC_ERROR;
   
-  BYTE *data = pPacket->pData;
-  int size = pPacket->iSize;
+  uint8_t *data = pPacket->pData;
+  int      size = pPacket->iSize;
   
   m_pOverlay = new CDVDOverlayText();
   CDVDOverlayCodec::GetAbsoluteTimes(m_pOverlay->iPTSStartTime, m_pOverlay->iPTSStopTime, pPacket, m_pOverlay->replace);

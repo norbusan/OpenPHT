@@ -48,7 +48,6 @@ public:
     replace = false;
 
     m_references = 1;
-    iGroupId = 0;
     m_overlay = NULL;
   }
 
@@ -59,7 +58,6 @@ public:
     iPTSStopTime  = src.iPTSStopTime;
     bForced       = src.bForced;
     replace       = src.replace;
-    iGroupId      = src.iGroupId;
     if(src.m_overlay)
       m_overlay   = src.m_overlay->Acquire();
     else
@@ -75,8 +73,8 @@ public:
   }
 
   /**
-   * decrease the reference counter by one.
-   */
+  * increase the reference counter by one.
+  */
   CDVDOverlay* Acquire()
   {
     AtomicIncrement(&m_references);
@@ -84,8 +82,8 @@ public:
   }
 
   /**
-   * increase the reference counter by one.
-   */
+  * decrease the reference counter by one.
+  */
   long Release()
   {
     long count = AtomicDecrement(&m_references);
@@ -94,7 +92,7 @@ public:
   }
 
   /**
-   * static release function for use with boost shared ptr for example
+   * static release function for use with shared ptr for example
    */
   static void Release(CDVDOverlay* ov)
   {
@@ -113,7 +111,6 @@ public:
   double iPTSStopTime;
   bool bForced; // display, no matter what
   bool replace; // replace by next nomatter what stoptime it has
-  int iGroupId;
   OVERLAY::COverlay* m_overlay;
 protected:
   DVDOverlayType m_type;

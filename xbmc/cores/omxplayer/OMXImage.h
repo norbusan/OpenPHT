@@ -133,6 +133,7 @@ protected:
   OMX_PARAM_PORTDEFINITIONTYPE  m_decoded_format;
   CCriticalSection              m_OMXSection;
   bool                          m_success;
+  bool                          m_gpu;
 };
 
 class COMXImageEnc
@@ -144,6 +145,7 @@ public:
   // Required overrides
   bool CreateThumbnailFromSurface(unsigned char* buffer, unsigned int width, unsigned int height,
       unsigned int format, unsigned int pitch, const CStdString& destFile);
+  bool Gpu() { return m_gpu; }
 protected:
   bool Encode(unsigned char *buffer, int size, unsigned int width, unsigned int height, unsigned int pitch);
   // Components
@@ -152,6 +154,7 @@ protected:
   OMX_PARAM_PORTDEFINITIONTYPE  m_encoded_format;
   CCriticalSection              m_OMXSection;
   bool                          m_success;
+  bool                          m_gpu;
 };
 
 class COMXImageReEnc
@@ -163,6 +166,7 @@ public:
   // Required overrides
   void Close();
   bool ReEncode(COMXImageFile &srcFile, unsigned int width, unsigned int height, void * &pDestBuffer, unsigned int &nDestSize);
+  bool Gpu() { return m_gpu; }
 protected:
   bool HandlePortSettingChange(unsigned int resize_width, unsigned int resize_height, int orientation, bool port_settings_changed);
   // Components
@@ -176,6 +180,7 @@ protected:
   void                          *m_pDestBuffer;
   unsigned int                  m_nDestAllocSize;
   bool                          m_success;
+  bool                          m_gpu;
 };
 
 class COMXTexture
@@ -187,6 +192,7 @@ public:
   // Required overrides
   void Close(void);
   bool Decode(const uint8_t *data, unsigned size, unsigned int width, unsigned int height, void *egl_image);
+  bool Gpu() { return m_gpu; }
 protected:
   bool HandlePortSettingChange(unsigned int resize_width, unsigned int resize_height, void *egl_image, bool port_settings_changed);
 
@@ -201,6 +207,7 @@ protected:
   OMX_BUFFERHEADERTYPE *m_egl_buffer;
   CCriticalSection              m_OMXSection;
   bool              m_success;
+  bool              m_gpu;
 };
 
 extern COMXImage g_OMXImage;

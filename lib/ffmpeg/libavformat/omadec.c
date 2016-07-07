@@ -1,7 +1,7 @@
 /*
  * Sony OpenMG (OMA) demuxer
  *
- * Copyright (c) 2008 Maxim Poliakovski
+ * Copyright (c) 2008, 2013 Maxim Poliakovski
  *               2008 Benjamin Larsson
  *               2011 David Goldwich
  *
@@ -37,16 +37,19 @@
  * - Sound data organized in packets follow the EA3 header
  *   (can be encrypted using the Sony DRM!).
  *
- * CODEC SUPPORT: Only ATRAC3 codec is currently supported!
+ * Supported decoders: ATRAC3, ATRAC3+, MP3, LPCM
  */
 
+#include <inttypes.h>
+
+#include "libavutil/channel_layout.h"
 #include "avformat.h"
 #include "internal.h"
 #include "libavutil/intreadwrite.h"
 #include "libavutil/des.h"
+#include "libavutil/mathematics.h"
 #include "oma.h"
 #include "pcm.h"
-#include "riff.h"
 #include "id3v2.h"
 
 
@@ -74,18 +77,20 @@ typedef struct OMAContext {
     struct AVDES av_des;
 } OMAContext;
 
-static void hex_log(AVFormatContext *s, int level, const char *name, const uint8_t *value, int len)
+static void hex_log(AVFormatContext *s, int level,
+                    const char *name, const uint8_t *value, int len)
 {
     char buf[33];
     len = FFMIN(len, 16);
     if (av_log_get_level() < level)
         return;
     ff_data_to_hex(buf, value, len, 1);
-    buf[len<<1] = '\0';
+    buf[len << 1] = '\0';
     av_log(s, level, "%s: %s\n", name, buf);
 }
 
-static int kset(AVFormatContext *s, const uint8_t *r_val, const uint8_t *n_val, int len)
+static int kset(AVFormatContext *s, const uint8_t *r_val, const uint8_t *n_val,
+                int len)
 {
     OMAContext *oc = s->priv_data;
 
@@ -167,19 +172,12 @@ static int nprobe(AVFormatContext *s, uint8_t *enc_header, unsigned size,
     if (AV_RB32(&enc_header[pos]) != oc->rid)
         av_log(s, AV_LOG_DEBUG, "Mismatching RID\n");
 
-    taglen = AV_RB32(&enc_header[pos+32]);
-    datalen = AV_RB32(&enc_header[pos+36]) >> 4;
+    taglen  = AV_RB32(&enc_header[pos + 32]);
+    datalen = AV_RB32(&enc_header[pos + 36]) >> 4;
 
-    if(taglen + (((uint64_t)datalen)<<4) + 44 > size)
-        return -1;
+    pos += 44LL + taglen;
 
-    pos += 44;
-    if (size - pos < taglen)
-        return -1;
-
-    pos += taglen;
-
-    if (datalen << 4 > size - pos)
+    if (pos + (((uint64_t)datalen) << 4) > size)
         return -1;
 
     av_des_init(&av_des, n_val, 192, 1);
@@ -215,12 +213,13 @@ static int decrypt_init(AVFormatContext *s, ID3v2ExtraMeta *em, uint8_t *header)
     }
     if (!em) {
         av_log(s, AV_LOG_ERROR, "No encryption header found\n");
-        return -1;
+        return AVERROR_INVALIDDATA;
     }
 
     if (geob->datasize < 64) {
-        av_log(s, AV_LOG_ERROR, "Invalid GEOB data size: %u\n", geob->datasize);
-        return -1;
+        av_log(s, AV_LOG_ERROR,
+               "Invalid GEOB data size: %"PRIu32"\n", geob->datasize);
+        return AVERROR_INVALIDDATA;
     }
 
     gdata = geob->data;
@@ -235,15 +234,22 @@ static int decrypt_init(AVFormatContext *s, ID3v2ExtraMeta *em, uint8_t *header)
 
     if (memcmp(&gdata[OMA_ENC_HEADER_SIZE], "KEYRING     ", 12)) {
         av_log(s, AV_LOG_ERROR, "Invalid encryption header\n");
-        return -1;
+        return AVERROR_INVALIDDATA;
+    }
+    if (OMA_ENC_HEADER_SIZE + oc->k_size + oc->e_size + oc->i_size + 8 > geob->datasize ||
+        OMA_ENC_HEADER_SIZE + 48 > geob->datasize) {
+        av_log(s, AV_LOG_ERROR, "Too little GEOB data\n");
+        return AVERROR_INVALIDDATA;
     }
     oc->rid = AV_RB32(&gdata[OMA_ENC_HEADER_SIZE + 28]);
-    av_log(s, AV_LOG_DEBUG, "RID: %.8x\n", oc->rid);
+    av_log(s, AV_LOG_DEBUG, "RID: %.8"PRIx32"\n", oc->rid);
 
     memcpy(oc->iv, &header[0x58], 8);
     hex_log(s, AV_LOG_DEBUG, "IV", oc->iv, 8);
 
-    hex_log(s, AV_LOG_DEBUG, "CBC-MAC", &gdata[OMA_ENC_HEADER_SIZE+oc->k_size+oc->e_size+oc->i_size], 8);
+    hex_log(s, AV_LOG_DEBUG, "CBC-MAC",
+            &gdata[OMA_ENC_HEADER_SIZE + oc->k_size + oc->e_size + oc->i_size],
+            8);
 
     if (s->keylen > 0) {
         kset(s, s->key, s->key, s->keylen);
@@ -254,22 +260,23 @@ static int decrypt_init(AVFormatContext *s, ID3v2ExtraMeta *em, uint8_t *header)
         int i;
         for (i = 0; i < FF_ARRAY_ELEMS(leaf_table); i += 2) {
             uint8_t buf[16];
-            AV_WL64(buf, leaf_table[i]);
-            AV_WL64(&buf[8], leaf_table[i+1]);
+            AV_WL64(buf,     leaf_table[i]);
+            AV_WL64(&buf[8], leaf_table[i + 1]);
             kset(s, buf, buf, 16);
             if (!rprobe(s, gdata, geob->datasize, oc->r_val) ||
                 !nprobe(s, gdata, geob->datasize, oc->n_val))
                 break;
         }
-        if (i >= sizeof(leaf_table)) {
+        if (i >= FF_ARRAY_ELEMS(leaf_table)) {
             av_log(s, AV_LOG_ERROR, "Invalid key\n");
-            return -1;
+            return AVERROR_INVALIDDATA;
         }
     }
 
     /* e_val */
     av_des_init(&oc->av_des, oc->m_val, 64, 0);
-    av_des_crypt(&oc->av_des, oc->e_val, &gdata[OMA_ENC_HEADER_SIZE + 40], 1, NULL, 0);
+    av_des_crypt(&oc->av_des, oc->e_val,
+                 &gdata[OMA_ENC_HEADER_SIZE + 40], 1, NULL, 0);
     hex_log(s, AV_LOG_DEBUG, "EK", oc->e_val, 8);
 
     /* init e_val */
@@ -278,11 +285,10 @@ static int decrypt_init(AVFormatContext *s, ID3v2ExtraMeta *em, uint8_t *header)
     return 0;
 }
 
-static int oma_read_header(AVFormatContext *s,
-                           AVFormatParameters *ap)
+static int oma_read_header(AVFormatContext *s)
 {
     int     ret, framesize, jsflag, samplerate;
-    uint32_t codec_params;
+    uint32_t codec_params, channel_id;
     int16_t eid;
     uint8_t buf[EA3_HEADER_SIZE];
     uint8_t *edata;
@@ -290,14 +296,15 @@ static int oma_read_header(AVFormatContext *s,
     ID3v2ExtraMeta *extra_meta = NULL;
     OMAContext *oc = s->priv_data;
 
-    ff_id3v2_read_all(s, ID3v2_EA3_MAGIC, &extra_meta);
+    ff_id3v2_read(s, ID3v2_EA3_MAGIC, &extra_meta, 0);
     ret = avio_read(s->pb, buf, EA3_HEADER_SIZE);
     if (ret < EA3_HEADER_SIZE)
         return -1;
 
-    if (memcmp(buf, ((const uint8_t[]){'E', 'A', '3'}),3) || buf[4] != 0 || buf[5] != EA3_HEADER_SIZE) {
+    if (memcmp(buf, ((const uint8_t[]){'E', 'A', '3'}), 3) ||
+        buf[4] != 0 || buf[5] != EA3_HEADER_SIZE) {
         av_log(s, AV_LOG_ERROR, "Couldn't find the EA3 header !\n");
-        return -1;
+        return AVERROR_INVALIDDATA;
     }
 
     oc->content_start = avio_tell(s->pb);
@@ -318,73 +325,84 @@ static int oma_read_header(AVFormatContext *s,
         return AVERROR(ENOMEM);
 
     st->start_time = 0;
-    st->codec->codec_type  = AVMEDIA_TYPE_AUDIO;
-    st->codec->codec_tag   = buf[32];
-    st->codec->codec_id    = ff_codec_get_id(ff_oma_codec_tags, st->codec->codec_tag);
+    st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
+    st->codec->codec_tag  = buf[32];
+    st->codec->codec_id   = ff_codec_get_id(ff_oma_codec_tags,
+                                            st->codec->codec_tag);
 
     switch (buf[32]) {
-        case OMA_CODECID_ATRAC3:
-            samplerate = ff_oma_srate_tab[(codec_params >> 13) & 7] * 100;
-            if (!samplerate) {
-                av_log(s, AV_LOG_ERROR, "Unsupported sample rate\n");
-                return AVERROR_INVALIDDATA;
-            }
-            if (samplerate != 44100)
-                av_log_ask_for_sample(s, "Unsupported sample rate: %d\n",
-                                      samplerate);
+    case OMA_CODECID_ATRAC3:
+        samplerate = ff_oma_srate_tab[(codec_params >> 13) & 7] * 100;
+        if (!samplerate) {
+            av_log(s, AV_LOG_ERROR, "Unsupported sample rate\n");
+            return AVERROR_INVALIDDATA;
+        }
+        if (samplerate != 44100)
+            avpriv_request_sample(s, "Sample rate %d", samplerate);
 
-            framesize = (codec_params & 0x3FF) * 8;
-            jsflag = (codec_params >> 17) & 1; /* get stereo coding mode, 1 for joint-stereo */
-            st->codec->channels    = 2;
-            st->codec->sample_rate = samplerate;
-            st->codec->bit_rate    = st->codec->sample_rate * framesize * 8 / 1024;
+        framesize = (codec_params & 0x3FF) * 8;
 
-            /* fake the atrac3 extradata (wav format, makes stream copy to wav work) */
-            st->codec->extradata_size = 14;
-            edata = av_mallocz(14 + FF_INPUT_BUFFER_PADDING_SIZE);
-            if (!edata)
-                return AVERROR(ENOMEM);
+        /* get stereo coding mode, 1 for joint-stereo */
+        jsflag = (codec_params >> 17) & 1;
 
-            st->codec->extradata = edata;
-            AV_WL16(&edata[0],  1);             // always 1
-            AV_WL32(&edata[2],  samplerate);    // samples rate
-            AV_WL16(&edata[6],  jsflag);        // coding mode
-            AV_WL16(&edata[8],  jsflag);        // coding mode
-            AV_WL16(&edata[10], 1);             // always 1
-            // AV_WL16(&edata[12], 0);          // always 0
+        st->codec->channels    = 2;
+        st->codec->channel_layout = AV_CH_LAYOUT_STEREO;
+        st->codec->sample_rate = samplerate;
+        st->codec->bit_rate    = st->codec->sample_rate * framesize * 8 / 1024;
 
-            avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
-            break;
-        case OMA_CODECID_ATRAC3P:
-            st->codec->channels = (codec_params >> 10) & 7;
-            framesize = ((codec_params & 0x3FF) * 8) + 8;
-            samplerate = ff_oma_srate_tab[(codec_params >> 13) & 7] * 100;
-            if (!samplerate) {
-                av_log(s, AV_LOG_ERROR, "Unsupported sample rate\n");
-                return AVERROR_INVALIDDATA;
-            }
-            st->codec->sample_rate = samplerate;
-            st->codec->bit_rate    = samplerate * framesize * 8 / 1024;
-            avpriv_set_pts_info(st, 64, 1, samplerate);
-            av_log(s, AV_LOG_ERROR, "Unsupported codec ATRAC3+!\n");
-            break;
-        case OMA_CODECID_MP3:
-            st->need_parsing = AVSTREAM_PARSE_FULL;
-            framesize = 1024;
-            break;
-        case OMA_CODECID_LPCM:
-            /* PCM 44.1 kHz 16 bit stereo big-endian */
-            st->codec->channels = 2;
-            st->codec->sample_rate = 44100;
-            framesize = 1024;
-            /* bit rate = sample rate x PCM block align (= 4) x 8 */
-            st->codec->bit_rate = st->codec->sample_rate * 32;
-            st->codec->bits_per_coded_sample = av_get_bits_per_sample(st->codec->codec_id);
-            avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
-            break;
-        default:
-            av_log(s, AV_LOG_ERROR, "Unsupported codec %d!\n",buf[32]);
-            return -1;
+        /* fake the ATRAC3 extradata
+         * (wav format, makes stream copy to wav work) */
+        if (ff_alloc_extradata(st->codec, 14))
+            return AVERROR(ENOMEM);
+
+        edata = st->codec->extradata;
+        AV_WL16(&edata[0],  1);             // always 1
+        AV_WL32(&edata[2],  samplerate);    // samples rate
+        AV_WL16(&edata[6],  jsflag);        // coding mode
+        AV_WL16(&edata[8],  jsflag);        // coding mode
+        AV_WL16(&edata[10], 1);             // always 1
+        // AV_WL16(&edata[12], 0);          // always 0
+
+        avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
+        break;
+    case OMA_CODECID_ATRAC3P:
+        channel_id = (codec_params >> 10) & 7;
+        if (!channel_id) {
+            av_log(s, AV_LOG_ERROR,
+                   "Invalid ATRAC-X channel id: %"PRIu32"\n", channel_id);
+            return AVERROR_INVALIDDATA;
+        }
+        st->codec->channel_layout = ff_oma_chid_to_native_layout[channel_id - 1];
+        st->codec->channels       = ff_oma_chid_to_num_channels[channel_id - 1];
+        framesize = ((codec_params & 0x3FF) * 8) + 8;
+        samplerate = ff_oma_srate_tab[(codec_params >> 13) & 7] * 100;
+        if (!samplerate) {
+            av_log(s, AV_LOG_ERROR, "Unsupported sample rate\n");
+            return AVERROR_INVALIDDATA;
+        }
+        st->codec->sample_rate = samplerate;
+        st->codec->bit_rate    = samplerate * framesize * 8 / 2048;
+        avpriv_set_pts_info(st, 64, 1, samplerate);
+        break;
+    case OMA_CODECID_MP3:
+        st->need_parsing = AVSTREAM_PARSE_FULL_RAW;
+        framesize = 1024;
+        break;
+    case OMA_CODECID_LPCM:
+        /* PCM 44.1 kHz 16 bit stereo big-endian */
+        st->codec->channels = 2;
+        st->codec->channel_layout = AV_CH_LAYOUT_STEREO;
+        st->codec->sample_rate = 44100;
+        framesize = 1024;
+        /* bit rate = sample rate x PCM block align (= 4) x 8 */
+        st->codec->bit_rate = st->codec->sample_rate * 32;
+        st->codec->bits_per_coded_sample =
+            av_get_bits_per_sample(st->codec->codec_id);
+        avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
+        break;
+    default:
+        av_log(s, AV_LOG_ERROR, "Unsupported codec %d!\n", buf[32]);
+        return AVERROR(ENOSYS);
     }
 
     st->codec->block_align = framesize;
@@ -395,17 +413,28 @@ static int oma_read_header(AVFormatContext *s,
 
 static int oma_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
-    OMAContext *oc = s->priv_data;
-    int packet_size = s->streams[0]->codec->block_align;
-    int ret = av_get_packet(s->pb, pkt, packet_size);
+    OMAContext *oc  = s->priv_data;
+    AVStream *st    = s->streams[0];
+    int packet_size = st->codec->block_align;
+    int byte_rate   = st->codec->bit_rate >> 3;
+    int64_t pos     = avio_tell(s->pb);
+    int ret         = av_get_packet(s->pb, pkt, packet_size);
 
     if (ret < packet_size)
         pkt->flags |= AV_PKT_FLAG_CORRUPT;
 
-    if (ret <= 0)
-        return AVERROR(EIO);
+    if (ret < 0)
+        return ret;
+    if (!ret)
+        return AVERROR_EOF;
 
     pkt->stream_index = 0;
+
+    if (pos >= oc->content_start && byte_rate > 0) {
+        pkt->pts =
+        pkt->dts = av_rescale(pos - oc->content_start, st->time_base.den,
+                              byte_rate * (int64_t)st->time_base.num);
+    }
 
     if (oc->encrypted) {
         /* previous unencrypted block saved in IV for
@@ -422,23 +451,16 @@ static int oma_read_packet(AVFormatContext *s, AVPacket *pkt)
 
 static int oma_read_probe(AVProbeData *p)
 {
-    const uint8_t *buf;
+    const uint8_t *buf = p->buf;
     unsigned tag_len = 0;
 
-    buf = p->buf;
-
-    if (p->buf_size < ID3v2_HEADER_SIZE ||
-        !ff_id3v2_match(buf, ID3v2_EA3_MAGIC) ||
-        buf[3] != 3 || // version must be 3
-        buf[4]) // flags byte zero
-        return 0;
-
-    tag_len = ff_id3v2_tag_len(buf);
+    if (p->buf_size >= ID3v2_HEADER_SIZE && ff_id3v2_match(buf, ID3v2_EA3_MAGIC))
+        tag_len = ff_id3v2_tag_len(buf);
 
     /* This check cannot overflow as tag_len has at most 28 bits */
     if (p->buf_size < tag_len + 5)
         /* EA3 header comes late, might be outside of the probe buffer */
-        return AVPROBE_SCORE_MAX / 2;
+        return tag_len ? AVPROBE_SCORE_EXTENSION/2 : 0;
 
     buf += tag_len;
 
@@ -448,11 +470,11 @@ static int oma_read_probe(AVProbeData *p)
         return 0;
 }
 
-static int oma_read_seek(struct AVFormatContext *s, int stream_index, int64_t timestamp, int flags)
+static int oma_read_seek(struct AVFormatContext *s,
+                         int stream_index, int64_t timestamp, int flags)
 {
     OMAContext *oc = s->priv_data;
-
-    int err = pcm_read_seek(s, stream_index, timestamp, flags);
+    int64_t err = ff_pcm_read_seek(s, stream_index, timestamp, flags);
 
     if (!oc->encrypted)
         return err;
@@ -486,4 +508,3 @@ AVInputFormat ff_oma_demuxer = {
     .extensions     = "oma,omg,aa3",
     .codec_tag      = (const AVCodecTag* const []){ff_oma_codec_tags, 0},
 };
-

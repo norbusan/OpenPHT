@@ -71,7 +71,7 @@ void CDVDDemuxSPU::FlushCurrentPacket()
   memset(&m_spuData, 0, sizeof(m_spuData));
 }
 
-CDVDOverlaySpu* CDVDDemuxSPU::AddData(BYTE* data, int iSize, double pts)
+CDVDOverlaySpu* CDVDDemuxSPU::AddData(uint8_t* data, int iSize, double pts)
 {
   SPUData* pSPUData = &m_spuData;
 
@@ -104,13 +104,21 @@ CDVDOverlaySpu* CDVDDemuxSPU::AddData(BYTE* data, int iSize, double pts)
     else pSPUData->iNeededSize = iSize;
 
     // set presentation time stamp
-    if (pts > 0) pSPUData->pts = pts;
+    pSPUData->pts = pts;
   }
 
   // allocate data if not already done ( done in blocks off 16384 bytes )
   // or allocate some more if 16384 bytes is not enough
-  if((pSPUData->iSize + iSize) > pSPUData->iAllocatedSize)
-    pSPUData->data = (BYTE*)realloc(pSPUData->data, ALIGN(pSPUData->iSize + iSize, 0x4000));
+  if ((pSPUData->iSize + iSize) > pSPUData->iAllocatedSize)
+  {
+    uint8_t* tmpptr = (uint8_t*)realloc(pSPUData->data, ALIGN(pSPUData->iSize + iSize, 0x4000));
+    if (!tmpptr)
+    {
+      free(pSPUData->data);
+      return NULL;
+    }
+    pSPUData->data = tmpptr;
+  }
 
   if(!pSPUData->data)
     return NULL; // crap realloc failed, this will have leaked some memory due to odd realloc
@@ -150,7 +158,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::AddData(BYTE* data, int iSize, double pts)
 CDVDOverlaySpu* CDVDDemuxSPU::ParsePacket(SPUData* pSPUData)
 {
   unsigned int alpha[4];
-  BYTE* pUnparsedData = NULL;
+  uint8_t* pUnparsedData = NULL;
 
   if (pSPUData->iNeededSize != pSPUData->iSize)
   {
@@ -163,7 +171,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParsePacket(SPUData* pSPUData)
   }
 
   CDVDOverlaySpu* pSPUInfo = new CDVDOverlaySpu();
-  BYTE* p = pSPUData->data; // pointer to walk through all data
+  uint8_t* p = pSPUData->data; // pointer to walk through all data
 
   // get data length
   unsigned __int16 datalength = p[2] << 8 | p[3]; // datalength + 4 control bytes
@@ -235,7 +243,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParsePacket(SPUData* pSPUData)
 
             for (int i = 0; i < 4 ; i++) // emphasis 1, emphasis 2, pattern, back ground
             {
-              BYTE* iColor = m_clut[idx[i]];
+              uint8_t* iColor = m_clut[idx[i]];
 
               pSPUInfo->color[3 - i][0] = iColor[0]; // Y
               pSPUInfo->color[3 - i][1] = iColor[1]; // Cr
@@ -327,7 +335,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParsePacket(SPUData* pSPUData)
 /*****************************************************************************
  * AddNibble: read a nibble from a source packet and add it to our integer.
  *****************************************************************************/
-inline unsigned int AddNibble( unsigned int i_code, BYTE* p_src, unsigned int* pi_index )
+inline unsigned int AddNibble( unsigned int i_code, uint8_t* p_src, unsigned int* pi_index )
 {
   if ( *pi_index & 0x1 )
   {
@@ -346,9 +354,9 @@ inline unsigned int AddNibble( unsigned int i_code, BYTE* p_src, unsigned int* p
  * convenient structure for later decoding. For more information on the
  * subtitles format, see http://sam.zoy.org/doc/dvd/subtitles/index.html
  *****************************************************************************/
-CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData)
+CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, uint8_t* pUnparsedData)
 {
-  BYTE* p_src = pUnparsedData;
+  uint8_t* p_src = pUnparsedData;
 
   unsigned int i_code = 0;
 
@@ -362,8 +370,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
   /* The subtitles are interlaced, we need two offsets */
   unsigned int i_id = 0;                   /* Start on the even SPU layer */
   unsigned int pi_table[2];
-  unsigned int *pi_offset;
-
+  
   /* Colormap statistics */
   int i_border = -1;
   int stats[4]; stats[0] = stats[1] = stats[2] = stats[3] = 0;
@@ -373,7 +380,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
 
   for ( i_y = 0 ; i_y < i_height ; i_y++ )
   {
-    pi_offset = pi_table + i_id;
+    unsigned int *pi_offset = pi_table + i_id;
 
     for ( i_x = 0 ; i_x < i_width ; i_x += i_code >> 2 )
     {
@@ -403,6 +410,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
               {
                 /* We have a boo boo ! */
                 CLog::Log(LOGERROR, "ParseRLE: unknown RLE code 0x%.4x", i_code);
+                pSPU->Release();
                 return NULL;
               }
             }
@@ -414,6 +422,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
       {
         CLog::Log(LOGERROR, "ParseRLE: out of bounds, %i at (%i,%i) is out of %ix%i",
                  i_code >> 2, i_x, i_y, i_width, i_height );
+        pSPU->Release();
         return NULL;
       }
 
@@ -431,9 +440,10 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
       /* Check we aren't overwriting our data range
          This occurs on "The Triplets of BelleVille" region 4 disk (NTSC)"
          where we use around 96k rather than 64k + 20bytes */
-      if ((BYTE *)p_dest >= pSPU->result + sizeof(pSPU->result))
+      if ((uint8_t *)p_dest >= pSPU->result + sizeof(pSPU->result))
       {
-        CLog::Log(LOGERROR, "ParseRLE: Overrunning our data range.  Need %li bytes", (long)((BYTE *)p_dest - pSPU->result));
+        CLog::Log(LOGERROR, "ParseRLE: Overrunning our data range.  Need %li bytes", (long)((uint8_t *)p_dest - pSPU->result));
+        pSPU->Release();
         return NULL;
       }
       *p_dest++ = i_code;
@@ -443,6 +453,7 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
     if ( i_x > i_width )
     {
       CLog::Log(LOGERROR, "ParseRLE: i_x overflowed, %i > %i", i_x, i_width );
+      pSPU->Release();
       return NULL;
     }
 
@@ -468,15 +479,17 @@ CDVDOverlaySpu* CDVDDemuxSPU::ParseRLE(CDVDOverlaySpu* pSPU, BYTE* pUnparsedData
       /* Check we aren't overwriting our data range
          This occurs on "The Triplets of BelleVille" region 4 disk (NTSC)"
          where we use around 96k rather than 64k + 20bytes */
-      if ((BYTE *)p_dest >= pSPU->result + sizeof(pSPU->result))
+      if ((uint8_t *)p_dest >= pSPU->result + sizeof(pSPU->result))
       {
-        CLog::Log(LOGERROR, "ParseRLE: Overrunning our data range.  Need %li bytes", (long)((BYTE *)p_dest - pSPU->result));
+        CLog::Log(LOGERROR, "ParseRLE: Overrunning our data range.  Need %li bytes", (long)((uint8_t *)p_dest - pSPU->result));
+        pSPU->Release();
         return NULL;
       }
       *p_dest++ = i_width << 2;
       i_y++;
     }
 
+    pSPU->Release();
     return NULL;
   }
 
@@ -534,19 +547,19 @@ void CDVDDemuxSPU::FindSubtitleColor(int last_color, int stats[4], CDVDOverlaySp
   const int COLOR_SHADE = 1;
   const int COLOR_BORDER = 2;
 
-  //BYTE custom_subtitle_color[4][3] = { // blue, yellow and something else (xine)
+  //uint8_t custom_subtitle_color[4][3] = { // blue, yellow and something else (xine)
   //  { 0x80, 0x90, 0x80 }, // inner color
   //  { 0x00, 0x90, 0x00 }, // shade color
   //  { 0x00, 0x90, 0xff }  // border color
   //};
 
-  BYTE custom_subtitle_color[4][3] = { // inner color white, gray shading and a black border
+  uint8_t custom_subtitle_color[4][3] = { // inner color white, gray shading and a black border
     { 0xff, 0x80, 0x80 }, // inner color, white
     { 0x80, 0x80, 0x80 }, // shade color, gray
     { 0x00, 0x80, 0x80 }  // border color, black
   };
 
-  //BYTE custom_subtitle_color[4][3] = { // completely white and a black border
+  //uint8_t custom_subtitle_color[4][3] = { // completely white and a black border
   //  { 0xff, 0x80, 0x80 }, // inner color, white
   //  { 0xff, 0x80, 0x80 }, // shade color, white
   //  { 0x00, 0x80, 0x80 }  // border color, black
@@ -582,10 +595,10 @@ void CDVDDemuxSPU::FindSubtitleColor(int last_color, int stats[4], CDVDOverlaySp
   else
   {
     // old code
-    int i, i_inner = -1, i_shade = -1;
 
     if (last_color >= 0 && last_color < 4)
     {
+      int i, i_inner = -1, i_shade = -1;
       // Set the border color, the last color is probably the border color
       pSPU->color[last_color][0] = custom_subtitle_color[COLOR_BORDER][0];
       pSPU->color[last_color][1] = custom_subtitle_color[COLOR_BORDER][1];

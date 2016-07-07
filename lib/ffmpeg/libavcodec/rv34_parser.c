@@ -2,20 +2,20 @@
  * RV30/40 parser
  * Copyright (c) 2011 Konstantin Shishkov
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -27,7 +27,7 @@
 #include "parser.h"
 #include "libavutil/intreadwrite.h"
 
-typedef struct {
+typedef struct RV34ParseContext {
     ParseContext pc;
     int64_t key_dts;
     int key_pts;
@@ -52,7 +52,7 @@ static int rv34_parse(AVCodecParserContext *s,
     }
 
     hdr = AV_RB32(buf + 9 + *buf * 8);
-    if (avctx->codec_id == CODEC_ID_RV30) {
+    if (avctx->codec_id == AV_CODEC_ID_RV30) {
         type = (hdr >> 27) & 3;
         pts  = (hdr >>  7) & 0x1FFF;
     } else {
@@ -78,7 +78,7 @@ static int rv34_parse(AVCodecParserContext *s,
 
 #if CONFIG_RV30_PARSER
 AVCodecParser ff_rv30_parser = {
-    .codec_ids      = { CODEC_ID_RV30 },
+    .codec_ids      = { AV_CODEC_ID_RV30 },
     .priv_data_size = sizeof(RV34ParseContext),
     .parser_parse   = rv34_parse,
 };
@@ -86,7 +86,7 @@ AVCodecParser ff_rv30_parser = {
 
 #if CONFIG_RV40_PARSER
 AVCodecParser ff_rv40_parser = {
-    .codec_ids      = { CODEC_ID_RV40 },
+    .codec_ids      = { AV_CODEC_ID_RV40 },
     .priv_data_size = sizeof(RV34ParseContext),
     .parser_parse   = rv34_parse,
 };

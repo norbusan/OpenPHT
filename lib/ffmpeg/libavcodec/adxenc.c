@@ -22,6 +22,7 @@
 #include "avcodec.h"
 #include "adx.h"
 #include "bytestream.h"
+#include "internal.h"
 #include "put_bits.h"
 
 /**
@@ -42,14 +43,12 @@ static void adx_encode(ADXContext *c, uint8_t *adx, const int16_t *wav,
     int s0, s1, s2, d;
     int max = 0;
     int min = 0;
-    int data[BLOCK_SAMPLES];
 
     s1 = prev->s1;
     s2 = prev->s2;
     for (i = 0, j = 0; j < 32; i += channels, j++) {
         s0 = wav[i];
         d = ((s0 << COEFF_BITS) - c->coeff[0] * s1 - c->coeff[1] * s2) >> COEFF_BITS;
-        data[j] = d;
         if (max < d)
             max = d;
         if (min > d)
@@ -57,10 +56,10 @@ static void adx_encode(ADXContext *c, uint8_t *adx, const int16_t *wav,
         s2 = s1;
         s1 = s0;
     }
-    prev->s1 = s1;
-    prev->s2 = s2;
 
     if (max == 0 && min == 0) {
+        prev->s1 = s1;
+        prev->s2 = s2;
         memset(adx, 0, BLOCK_SIZE);
         return;
     }
@@ -76,8 +75,23 @@ static void adx_encode(ADXContext *c, uint8_t *adx, const int16_t *wav,
     AV_WB16(adx, scale);
 
     init_put_bits(&pb, adx + 2, 16);
-    for (i = 0; i < BLOCK_SAMPLES; i++)
-        put_sbits(&pb, 4, av_clip(data[i] / scale, -8, 7));
+
+    s1 = prev->s1;
+    s2 = prev->s2;
+    for (i = 0, j = 0; j < 32; i += channels, j++) {
+        d = ((wav[i] << COEFF_BITS) - c->coeff[0] * s1 - c->coeff[1] * s2) >> COEFF_BITS;
+
+        d = av_clip_intp2(ROUNDED_DIV(d, scale), 3);
+
+        put_sbits(&pb, 4, d);
+
+        s0 = ((d << COEFF_BITS) * scale + c->coeff[0] * s1 + c->coeff[1] * s2) >> COEFF_BITS;
+        s2 = s1;
+        s1 = s0;
+    }
+    prev->s1 = s1;
+    prev->s2 = s2;
+
     flush_put_bits(&pb);
 }
 
@@ -86,9 +100,6 @@ static void adx_encode(ADXContext *c, uint8_t *adx, const int16_t *wav,
 static int adx_encode_header(AVCodecContext *avctx, uint8_t *buf, int bufsize)
 {
     ADXContext *c = avctx->priv_data;
-
-    if (bufsize < HEADER_SIZE)
-        return AVERROR(EINVAL);
 
     bytestream_put_be16(&buf, 0x8000);              /* header signature */
     bytestream_put_be16(&buf, HEADER_SIZE - 4);     /* copyright offset */
@@ -119,8 +130,6 @@ static av_cold int adx_encode_init(AVCodecContext *avctx)
     }
     avctx->frame_size = BLOCK_SAMPLES;
 
-    avctx->coded_frame = avcodec_alloc_frame();
-
     /* the cutoff can be adjusted, but this seems to work pretty well */
     c->cutoff = 500;
     ff_adx_calculate_coeffs(c->cutoff, avctx->sample_rate, COEFF_BITS, c->coeff);
@@ -128,51 +137,46 @@ static av_cold int adx_encode_init(AVCodecContext *avctx)
     return 0;
 }
 
-static av_cold int adx_encode_close(AVCodecContext *avctx)
-{
-    av_freep(&avctx->coded_frame);
-    return 0;
-}
-
-static int adx_encode_frame(AVCodecContext *avctx, uint8_t *frame,
-                            int buf_size, void *data)
+static int adx_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
+                            const AVFrame *frame, int *got_packet_ptr)
 {
     ADXContext *c          = avctx->priv_data;
-    const int16_t *samples = data;
-    uint8_t *dst           = frame;
-    int ch;
+    const int16_t *samples = (const int16_t *)frame->data[0];
+    uint8_t *dst;
+    int ch, out_size, ret;
+
+    out_size = BLOCK_SIZE * avctx->channels + !c->header_parsed * HEADER_SIZE;
+    if ((ret = ff_alloc_packet2(avctx, avpkt, out_size, 0)) < 0)
+        return ret;
+    dst = avpkt->data;
 
     if (!c->header_parsed) {
         int hdrsize;
-        if ((hdrsize = adx_encode_header(avctx, dst, buf_size)) < 0) {
+        if ((hdrsize = adx_encode_header(avctx, dst, avpkt->size)) < 0) {
             av_log(avctx, AV_LOG_ERROR, "output buffer is too small\n");
             return AVERROR(EINVAL);
         }
         dst      += hdrsize;
-        buf_size -= hdrsize;
         c->header_parsed = 1;
-    }
-    if (buf_size < BLOCK_SIZE * avctx->channels) {
-        av_log(avctx, AV_LOG_ERROR, "output buffer is too small\n");
-        return AVERROR(EINVAL);
     }
 
     for (ch = 0; ch < avctx->channels; ch++) {
         adx_encode(c, dst, samples + ch, &c->prev[ch], avctx->channels);
         dst += BLOCK_SIZE;
     }
-    return dst - frame;
+
+    *got_packet_ptr = 1;
+    return 0;
 }
 
 AVCodec ff_adpcm_adx_encoder = {
     .name           = "adpcm_adx",
+    .long_name      = NULL_IF_CONFIG_SMALL("SEGA CRI ADX ADPCM"),
     .type           = AVMEDIA_TYPE_AUDIO,
-    .id             = CODEC_ID_ADPCM_ADX,
+    .id             = AV_CODEC_ID_ADPCM_ADX,
     .priv_data_size = sizeof(ADXContext),
     .init           = adx_encode_init,
-    .encode         = adx_encode_frame,
-    .close          = adx_encode_close,
+    .encode2        = adx_encode_frame,
     .sample_fmts    = (const enum AVSampleFormat[]) { AV_SAMPLE_FMT_S16,
                                                       AV_SAMPLE_FMT_NONE },
-    .long_name      = NULL_IF_CONFIG_SMALL("SEGA CRI ADX ADPCM"),
 };

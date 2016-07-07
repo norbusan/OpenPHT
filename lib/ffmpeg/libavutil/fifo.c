@@ -19,20 +19,37 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
+
+#include "avassert.h"
 #include "common.h"
 #include "fifo.h"
 
+static AVFifoBuffer *fifo_alloc_common(void *buffer, size_t size)
+{
+    AVFifoBuffer *f;
+    if (!buffer)
+        return NULL;
+    f = av_mallocz(sizeof(AVFifoBuffer));
+    if (!f) {
+        av_free(buffer);
+        return NULL;
+    }
+    f->buffer = buffer;
+    f->end    = f->buffer + size;
+    av_fifo_reset(f);
+    return f;
+}
+
 AVFifoBuffer *av_fifo_alloc(unsigned int size)
 {
-    AVFifoBuffer *f= av_mallocz(sizeof(AVFifoBuffer));
-    if (!f)
-        return NULL;
-    f->buffer = av_malloc(size);
-    f->end = f->buffer + size;
-    av_fifo_reset(f);
-    if (!f->buffer)
-        av_freep(&f);
-    return f;
+    void *buffer = av_malloc(size);
+    return fifo_alloc_common(buffer, size);
+}
+
+AVFifoBuffer *av_fifo_alloc_array(size_t nmemb, size_t size)
+{
+    void *buffer = av_malloc_array(nmemb, size);
+    return fifo_alloc_common(buffer, nmemb * size);
 }
 
 void av_fifo_free(AVFifoBuffer *f)
@@ -43,18 +60,26 @@ void av_fifo_free(AVFifoBuffer *f)
     }
 }
 
+void av_fifo_freep(AVFifoBuffer **f)
+{
+    if (f) {
+        av_fifo_free(*f);
+        *f = NULL;
+    }
+}
+
 void av_fifo_reset(AVFifoBuffer *f)
 {
     f->wptr = f->rptr = f->buffer;
     f->wndx = f->rndx = 0;
 }
 
-int av_fifo_size(AVFifoBuffer *f)
+int av_fifo_size(const AVFifoBuffer *f)
 {
     return (uint32_t)(f->wndx - f->rndx);
 }
 
-int av_fifo_space(AVFifoBuffer *f)
+int av_fifo_space(const AVFifoBuffer *f)
 {
     return f->end - f->buffer - av_fifo_size(f);
 }
@@ -64,7 +89,7 @@ int av_fifo_realloc2(AVFifoBuffer *f, unsigned int new_size)
     unsigned int old_size = f->end - f->buffer;
 
     if (old_size < new_size) {
-        int len = av_fifo_size(f);
+        int len          = av_fifo_size(f);
         AVFifoBuffer *f2 = av_fifo_alloc(new_size);
 
         if (!f2)
@@ -79,8 +104,23 @@ int av_fifo_realloc2(AVFifoBuffer *f, unsigned int new_size)
     return 0;
 }
 
-// src must NOT be const as it can be a context for func that may need updating (like a pointer or byte counter)
-int av_fifo_generic_write(AVFifoBuffer *f, void *src, int size, int (*func)(void*, void*, int))
+int av_fifo_grow(AVFifoBuffer *f, unsigned int size)
+{
+    unsigned int old_size = f->end - f->buffer;
+    if(size + (unsigned)av_fifo_size(f) < size)
+        return AVERROR(EINVAL);
+
+    size += av_fifo_size(f);
+
+    if (old_size < size)
+        return av_fifo_realloc2(f, FFMAX(size, 2*size));
+    return 0;
+}
+
+/* src must NOT be const as it can be a context for func that may need
+ * updating (like a pointer or byte counter) */
+int av_fifo_generic_write(AVFifoBuffer *f, void *src, int size,
+                          int (*func)(void *, void *, int))
 {
     int total = size;
     uint32_t wndx= f->wndx;
@@ -89,34 +129,62 @@ int av_fifo_generic_write(AVFifoBuffer *f, void *src, int size, int (*func)(void
     do {
         int len = FFMIN(f->end - wptr, size);
         if (func) {
-            if (func(src, wptr, len) <= 0)
+            len = func(src, wptr, len);
+            if (len <= 0)
                 break;
         } else {
             memcpy(wptr, src, len);
-            src = (uint8_t*)src + len;
+            src = (uint8_t *)src + len;
         }
 // Write memory barrier needed for SMP here in theory
         wptr += len;
         if (wptr >= f->end)
             wptr = f->buffer;
-        wndx += len;
-        size -= len;
+        wndx    += len;
+        size    -= len;
     } while (size > 0);
     f->wndx= wndx;
     f->wptr= wptr;
     return total - size;
 }
 
+int av_fifo_generic_peek(AVFifoBuffer *f, void *dest, int buf_size,
+                         void (*func)(void *, void *, int))
+{
+// Read memory barrier needed for SMP here in theory
+    uint8_t *rptr = f->rptr;
+    uint32_t rndx = f->rndx;
 
-int av_fifo_generic_read(AVFifoBuffer *f, void *dest, int buf_size, void (*func)(void*, void*, int))
+    do {
+        int len = FFMIN(f->end - f->rptr, buf_size);
+        if (func)
+            func(dest, f->rptr, len);
+        else {
+            memcpy(dest, f->rptr, len);
+            dest = (uint8_t *)dest + len;
+        }
+// memory barrier needed for SMP here in theory
+        av_fifo_drain(f, len);
+        buf_size -= len;
+    } while (buf_size > 0);
+
+    f->rptr = rptr;
+    f->rndx = rndx;
+
+    return 0;
+}
+
+int av_fifo_generic_read(AVFifoBuffer *f, void *dest, int buf_size,
+                         void (*func)(void *, void *, int))
 {
 // Read memory barrier needed for SMP here in theory
     do {
         int len = FFMIN(f->end - f->rptr, buf_size);
-        if(func) func(dest, f->rptr, len);
-        else{
+        if (func)
+            func(dest, f->rptr, len);
+        else {
             memcpy(dest, f->rptr, len);
-            dest = (uint8_t*)dest + len;
+            dest = (uint8_t *)dest + len;
         }
 // memory barrier needed for SMP here in theory
         av_fifo_drain(f, len);
@@ -128,6 +196,7 @@ int av_fifo_generic_read(AVFifoBuffer *f, void *dest, int buf_size, void (*func)
 /** Discard data from the FIFO. */
 void av_fifo_drain(AVFifoBuffer *f, int size)
 {
+    av_assert2(av_fifo_size(f) >= size);
     f->rptr += size;
     if (f->rptr >= f->end)
         f->rptr -= f->end - f->buffer;
@@ -135,8 +204,6 @@ void av_fifo_drain(AVFifoBuffer *f, int size)
 }
 
 #ifdef TEST
-
-#undef printf
 
 int main(void)
 {
@@ -149,9 +216,9 @@ int main(void)
         av_fifo_generic_write(fifo, &i, sizeof(int), NULL);
 
     /* peek at FIFO */
-    n = av_fifo_size(fifo)/sizeof(int);
-    for (i = -n+1; i < n; i++) {
-        int *v = (int *)av_fifo_peek2(fifo, i*sizeof(int));
+    n = av_fifo_size(fifo) / sizeof(int);
+    for (i = -n + 1; i < n; i++) {
+        int *v = (int *)av_fifo_peek2(fifo, i * sizeof(int));
         printf("%d: %d\n", i, *v);
     }
     printf("\n");

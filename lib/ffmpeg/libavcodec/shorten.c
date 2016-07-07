@@ -28,10 +28,10 @@
 
 #include <limits.h>
 #include "avcodec.h"
-#include "internal.h"
 #include "bytestream.h"
 #include "get_bits.h"
 #include "golomb.h"
+#include "internal.h"
 
 #define MAX_CHANNELS 8
 #define MAX_BLOCKSIZE 65535
@@ -50,8 +50,12 @@
 #define ENERGYSIZE 3
 #define BITSHIFTSIZE 2
 
+#define TYPE_S8    1
+#define TYPE_U8    2
 #define TYPE_S16HL 3
+#define TYPE_U16HL 4
 #define TYPE_S16LH 5
+#define TYPE_U16LH 6
 
 #define NWRAP 3
 #define NSKIPSIZE 1
@@ -80,7 +84,6 @@ static const uint8_t is_audio_command[10] = { 1, 1, 1, 1, 0, 0, 0, 1, 1, 0 };
 
 typedef struct ShortenContext {
     AVCodecContext *avctx;
-    AVFrame frame;
     GetBitContext gb;
 
     int min_framesize, max_framesize;
@@ -113,52 +116,40 @@ static av_cold int shorten_decode_init(AVCodecContext *avctx)
 {
     ShortenContext *s = avctx->priv_data;
     s->avctx          = avctx;
-    avctx->sample_fmt = AV_SAMPLE_FMT_S16;
-
-    avcodec_get_frame_defaults(&s->frame);
-    avctx->coded_frame = &s->frame;
 
     return 0;
 }
 
 static int allocate_buffers(ShortenContext *s)
 {
-    int i, chan;
-    int *coeffs;
-    void *tmp_ptr;
+    int i, chan, err;
 
     for (chan = 0; chan < s->channels; chan++) {
         if (FFMAX(1, s->nmean) >= UINT_MAX / sizeof(int32_t)) {
             av_log(s->avctx, AV_LOG_ERROR, "nmean too large\n");
             return AVERROR_INVALIDDATA;
         }
-        if (s->blocksize + s->nwrap >= UINT_MAX / sizeof(int32_t) ||
-            s->blocksize + s->nwrap <= (unsigned)s->nwrap) {
+        if (s->blocksize + (uint64_t)s->nwrap >= UINT_MAX / sizeof(int32_t)) {
             av_log(s->avctx, AV_LOG_ERROR,
                    "s->blocksize + s->nwrap too large\n");
             return AVERROR_INVALIDDATA;
         }
 
-        tmp_ptr =
-            av_realloc(s->offset[chan], sizeof(int32_t) * FFMAX(1, s->nmean));
-        if (!tmp_ptr)
-            return AVERROR(ENOMEM);
-        s->offset[chan] = tmp_ptr;
+        if ((err = av_reallocp_array(&s->offset[chan],
+                               sizeof(int32_t),
+                               FFMAX(1, s->nmean))) < 0)
+            return err;
 
-        tmp_ptr = av_realloc(s->decoded_base[chan], (s->blocksize + s->nwrap) *
-                             sizeof(s->decoded_base[0][0]));
-        if (!tmp_ptr)
-            return AVERROR(ENOMEM);
-        s->decoded_base[chan] = tmp_ptr;
+        if ((err = av_reallocp_array(&s->decoded_base[chan], (s->blocksize + s->nwrap),
+                               sizeof(s->decoded_base[0][0]))) < 0)
+            return err;
         for (i = 0; i < s->nwrap; i++)
             s->decoded_base[chan][i] = 0;
         s->decoded[chan] = s->decoded_base[chan] + s->nwrap;
     }
 
-    coeffs = av_realloc(s->coeffs, s->nwrap * sizeof(*s->coeffs));
-    if (!coeffs)
-        return AVERROR(ENOMEM);
-    s->coeffs = coeffs;
+    if ((err = av_reallocp_array(&s->coeffs, s->nwrap, sizeof(*s->coeffs))) < 0)
+        return err;
 
     return 0;
 }
@@ -186,13 +177,17 @@ static int init_offset(ShortenContext *s)
     int nblock = FFMAX(1, s->nmean);
     /* initialise offset */
     switch (s->internal_ftype) {
+    case TYPE_U8:
+        s->avctx->sample_fmt = AV_SAMPLE_FMT_U8P;
+        mean = 0x80;
+        break;
     case TYPE_S16HL:
     case TYPE_S16LH:
-        mean = 0;
+        s->avctx->sample_fmt = AV_SAMPLE_FMT_S16P;
         break;
     default:
-        av_log(s->avctx, AV_LOG_ERROR, "unknown audio type");
-        return AVERROR_INVALIDDATA;
+        av_log(s->avctx, AV_LOG_ERROR, "unknown audio type\n");
+        return AVERROR_PATCHWELCOME;
     }
 
     for (chan = 0; chan < s->channels; chan++)
@@ -204,7 +199,7 @@ static int init_offset(ShortenContext *s)
 static int decode_wave_header(AVCodecContext *avctx, const uint8_t *header,
                               int header_size)
 {
-    int len;
+    int len, bps;
     short wave_format;
     GetByteContext gb;
 
@@ -225,7 +220,7 @@ static int decode_wave_header(AVCodecContext *avctx, const uint8_t *header,
     while (bytestream2_get_le32(&gb) != MKTAG('f', 'm', 't', ' ')) {
         len = bytestream2_get_le32(&gb);
         bytestream2_skip(&gb, len);
-        if (bytestream2_get_bytes_left(&gb) < 16) {
+        if (len < 0 || bytestream2_get_bytes_left(&gb) < 16) {
             av_log(avctx, AV_LOG_ERROR, "no fmt chunk found\n");
             return AVERROR_INVALIDDATA;
         }
@@ -251,10 +246,11 @@ static int decode_wave_header(AVCodecContext *avctx, const uint8_t *header,
     avctx->sample_rate = bytestream2_get_le32(&gb);
     bytestream2_skip(&gb, 4); // skip bit rate    (represents original uncompressed bit rate)
     bytestream2_skip(&gb, 2); // skip block align (not needed)
-    avctx->bits_per_coded_sample = bytestream2_get_le16(&gb);
+    bps = bytestream2_get_le16(&gb);
+    avctx->bits_per_coded_sample = bps;
 
-    if (avctx->bits_per_coded_sample != 16) {
-        av_log(avctx, AV_LOG_ERROR, "unsupported number of bits per sample\n");
+    if (bps != 16 && bps != 8) {
+        av_log(avctx, AV_LOG_ERROR, "unsupported number of bits per sample: %d\n", bps);
         return AVERROR(ENOSYS);
     }
 
@@ -265,16 +261,8 @@ static int decode_wave_header(AVCodecContext *avctx, const uint8_t *header,
     return 0;
 }
 
-static void interleave_buffer(int16_t *samples, int nchan, int blocksize,
-                              int32_t **buffer)
-{
-    int i, chan;
-    for (i=0; i<blocksize; i++)
-        for (chan=0; chan < nchan; chan++)
-            *samples++ = av_clip_int16(buffer[chan][i]);
-}
-
-static const int fixed_coeffs[3][3] = {
+static const int fixed_coeffs[][3] = {
+    { 0,  0,  0 },
     { 1,  0,  0 },
     { 2, -1,  0 },
     { 3, -3,  1 }
@@ -289,7 +277,7 @@ static int decode_subframe_lpc(ShortenContext *s, int command, int channel,
     if (command == FN_QLPC) {
         /* read/validate prediction order */
         pred_order = get_ur_golomb_shorten(&s->gb, LPCQSIZE);
-        if (pred_order > s->nwrap) {
+        if ((unsigned)pred_order > s->nwrap) {
             av_log(s->avctx, AV_LOG_ERROR, "invalid pred_order %d\n",
                    pred_order);
             return AVERROR(EINVAL);
@@ -303,7 +291,12 @@ static int decode_subframe_lpc(ShortenContext *s, int command, int channel,
     } else {
         /* fixed LPC coeffs */
         pred_order = command;
-        coeffs     = fixed_coeffs[pred_order - 1];
+        if (pred_order >= FF_ARRAY_ELEMS(fixed_coeffs)) {
+            av_log(s->avctx, AV_LOG_ERROR, "invalid pred_order %d\n",
+                   pred_order);
+            return AVERROR_INVALIDDATA;
+        }
+        coeffs     = fixed_coeffs[pred_order];
         qshift     = 0;
     }
 
@@ -376,6 +369,11 @@ static int read_header(ShortenContext *s)
         s->nmean = get_uint(s, 0);
 
         skip_bytes = get_uint(s, NSKIPSIZE);
+        if ((unsigned)skip_bytes > get_bits_left(&s->gb)/8) {
+            av_log(s->avctx, AV_LOG_ERROR, "invalid skip_bytes: %d\n", skip_bytes);
+            return AVERROR_INVALIDDATA;
+        }
+
         for (i = 0; i < skip_bytes; i++)
             skip_bits(&s->gb, 8);
     }
@@ -421,6 +419,7 @@ static int read_header(ShortenContext *s)
 static int shorten_decode_frame(AVCodecContext *avctx, void *data,
                                 int *got_frame_ptr, AVPacket *avpkt)
 {
+    AVFrame *frame     = data;
     const uint8_t *buf = avpkt->data;
     int buf_size       = avpkt->size;
     ShortenContext *s  = avctx->priv_data;
@@ -430,13 +429,14 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
     /* allocate internal bitstream buffer */
     if (s->max_framesize == 0) {
         void *tmp_ptr;
-        s->max_framesize = 1024; // should hopefully be enough for the first header
+        s->max_framesize = 8192; // should hopefully be enough for the first header
         tmp_ptr = av_fast_realloc(s->bitstream, &s->allocated_bitstream_size,
-                                  s->max_framesize + FF_INPUT_BUFFER_PADDING_SIZE);
+                                  s->max_framesize + AV_INPUT_BUFFER_PADDING_SIZE);
         if (!tmp_ptr) {
             av_log(avctx, AV_LOG_ERROR, "error allocating bitstream buffer\n");
             return AVERROR(ENOMEM);
         }
+        memset(tmp_ptr, 0, s->allocated_bitstream_size);
         s->bitstream = tmp_ptr;
     }
 
@@ -445,7 +445,7 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
         buf_size       = FFMIN(buf_size, s->max_framesize - s->bitstream_size);
         input_buf_size = buf_size;
 
-        if (s->bitstream_index + s->bitstream_size + buf_size >
+        if (s->bitstream_index + s->bitstream_size + buf_size + AV_INPUT_BUFFER_PADDING_SIZE >
             s->allocated_bitstream_size) {
             memmove(s->bitstream, &s->bitstream[s->bitstream_index],
                     s->bitstream_size);
@@ -466,7 +466,8 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
         }
     }
     /* init and position bitstream reader */
-    init_get_bits(&s->gb, buf, buf_size * 8);
+    if ((ret = init_get_bits8(&s->gb, buf, buf_size)) < 0)
+        return ret;
     skip_bits(&s->gb, s->bitindex);
 
     /* process header or next subblock */
@@ -485,7 +486,7 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
 
     s->cur_chan = 0;
     while (s->cur_chan < s->channels) {
-        int cmd;
+        unsigned cmd;
         int len;
 
         if (get_bits_left(&s->gb) < 3 + FNSIZE) {
@@ -509,9 +510,16 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
                 while (len--)
                     get_ur_golomb_shorten(&s->gb, VERBATIM_BYTE_SIZE);
                 break;
-            case FN_BITSHIFT:
-                s->bitshift = get_ur_golomb_shorten(&s->gb, BITSHIFTSIZE);
+            case FN_BITSHIFT: {
+                unsigned bitshift = get_ur_golomb_shorten(&s->gb, BITSHIFTSIZE);
+                if (bitshift > 31) {
+                    av_log(avctx, AV_LOG_ERROR, "bitshift %d is invalid\n",
+                           bitshift);
+                    return AVERROR_INVALIDDATA;
+                }
+                s->bitshift = bitshift;
                 break;
+            }
             case FN_BLOCKSIZE: {
                 unsigned blocksize = get_uint(s, av_log2(s->blocksize));
                 if (blocksize > s->blocksize) {
@@ -544,7 +552,8 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
             /* get Rice code for residual decoding */
             if (cmd != FN_ZERO) {
                 residual_size = get_ur_golomb_shorten(&s->gb, ENERGYSIZE);
-                /* this is a hack as version 0 differed in defintion of get_sr_golomb_shorten */
+                /* This is a hack as version 0 differed in the definition
+                 * of get_sr_golomb_shorten(). */
                 if (s->version == 0)
                     residual_size--;
             }
@@ -558,7 +567,7 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
                     sum += s->offset[channel][i];
                 coffset = sum / s->nmean;
                 if (s->version >= 2)
-                    coffset >>= FFMIN(1, s->bitshift);
+                    coffset = s->bitshift == 0 ? coffset : coffset >> s->bitshift - 1 >> 1;
             }
 
             /* decode samples for this channel */
@@ -597,18 +606,32 @@ static int shorten_decode_frame(AVCodecContext *avctx, void *data,
             /* if this is the last channel in the block, output the samples */
             s->cur_chan++;
             if (s->cur_chan == s->channels) {
-                /* get output buffer */
-                s->frame.nb_samples = s->blocksize;
-                if ((ret = ff_get_buffer(avctx, &s->frame)) < 0) {
-                    av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
-                    return ret;
-                }
-                /* interleave output */
-                interleave_buffer((int16_t *)s->frame.data[0], s->channels,
-                                  s->blocksize, s->decoded);
+                uint8_t *samples_u8;
+                int16_t *samples_s16;
+                int chan;
 
-                *got_frame_ptr   = 1;
-                *(AVFrame *)data = s->frame;
+                /* get output buffer */
+                frame->nb_samples = s->blocksize;
+                if ((ret = ff_get_buffer(avctx, frame, 0)) < 0)
+                    return ret;
+
+                for (chan = 0; chan < s->channels; chan++) {
+                    samples_u8  = ((uint8_t **)frame->extended_data)[chan];
+                    samples_s16 = ((int16_t **)frame->extended_data)[chan];
+                    for (i = 0; i < s->blocksize; i++) {
+                        switch (s->internal_ftype) {
+                        case TYPE_U8:
+                            *samples_u8++ = av_clip_uint8(s->decoded[chan][i]);
+                            break;
+                        case TYPE_S16HL:
+                        case TYPE_S16LH:
+                            *samples_s16++ = av_clip_int16(s->decoded[chan][i]);
+                            break;
+                        }
+                    }
+                }
+
+                *got_frame_ptr = 1;
             }
         }
     }
@@ -650,12 +673,15 @@ static av_cold int shorten_decode_close(AVCodecContext *avctx)
 
 AVCodec ff_shorten_decoder = {
     .name           = "shorten",
+    .long_name      = NULL_IF_CONFIG_SMALL("Shorten"),
     .type           = AVMEDIA_TYPE_AUDIO,
-    .id             = CODEC_ID_SHORTEN,
+    .id             = AV_CODEC_ID_SHORTEN,
     .priv_data_size = sizeof(ShortenContext),
     .init           = shorten_decode_init,
     .close          = shorten_decode_close,
     .decode         = shorten_decode_frame,
-    .capabilities   = CODEC_CAP_DELAY | CODEC_CAP_DR1,
-    .long_name= NULL_IF_CONFIG_SMALL("Shorten"),
+    .capabilities   = AV_CODEC_CAP_DELAY | AV_CODEC_CAP_DR1,
+    .sample_fmts    = (const enum AVSampleFormat[]) { AV_SAMPLE_FMT_S16P,
+                                                      AV_SAMPLE_FMT_U8P,
+                                                      AV_SAMPLE_FMT_NONE },
 };

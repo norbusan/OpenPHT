@@ -1,4 +1,5 @@
 include ../Makefile.include
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=flac
@@ -12,26 +13,23 @@ CONFIGURE=./configure --prefix=$(PREFIX) \
   --disable-xmms-plugin \
   --disable-cpplibs
 
-LIBDYLIB=$(SOURCE)/$(LIBNAME)/.libs/$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/src/libFLAC/.libs/libFLAC.dylib
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
-	$(ARCHIVE_TOOL) xJf $(TARBALLS_LOCATION)/$(ARCHIVE)
+	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
 	cd $(SOURCE); $(CONFIGURE)
-	if test "$(DARWIN)" = "ios"; then \
-		sed -ie "s|CC -dynamiclib|CC -arch armv7 -dynamiclib|" "$(SOURCE)/libtool"; \
-	fi
 
 $(LIBDYLIB): $(SOURCE)
-	make -j $(MAKE_JOBS) -C $(SOURCE)
+	make -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

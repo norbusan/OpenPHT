@@ -18,19 +18,19 @@
  *
  */
 
-#if (defined HAVE_CONFIG_H) && (!defined WIN32)
+#if (defined HAVE_CONFIG_H) && (!defined TARGET_WINDOWS)
   #include "config.h"
-#elif defined(_WIN32)
+#elif defined(TARGET_WINDOWS)
 #include "system.h"
 #endif
 
 #if defined(HAVE_LIBOPENMAX)
 #include "DVDClock.h"
-#include "settings/GUISettings.h"
 #include "DVDStreamInfo.h"
 #include "DVDVideoCodecOpenMax.h"
 #include "OpenMaxVideo.h"
 #include "utils/log.h"
+#include "settings/Settings.h"
 
 #define CLASSNAME "COpenMax"
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +58,7 @@ bool CDVDVideoCodecOpenMax::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
 
     switch (hints.codec)
     {
-      case CODEC_ID_H264:
+      case AV_CODEC_ID_H264:
       {
         m_pFormatName = "omx-h264";
         if (hints.extrasize < 7 || hints.extradata == NULL)
@@ -72,13 +72,13 @@ bool CDVDVideoCodecOpenMax::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
           m_convert_bitstream = bitstream_convert_init(hints.extradata, hints.extrasize);
       }
       break;
-      case CODEC_ID_MPEG4:
+      case AV_CODEC_ID_MPEG4:
         m_pFormatName = "omx-mpeg4";
       break;
-      case CODEC_ID_MPEG2VIDEO:
+      case AV_CODEC_ID_MPEG2VIDEO:
         m_pFormatName = "omx-mpeg2";
       break;
-      case CODEC_ID_VC1:
+      case AV_CODEC_ID_VC1:
         m_pFormatName = "omx-vc1";
       break;
       default:
@@ -98,8 +98,6 @@ bool CDVDVideoCodecOpenMax::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
     // allocate a YV12 DVDVideoPicture buffer.
     // first make sure all properties are reset.
     memset(&m_videobuffer, 0, sizeof(DVDVideoPicture));
-    unsigned int luma_pixels = hints.width * hints.height;
-    unsigned int chroma_pixels = luma_pixels/4;
 
     m_videobuffer.dts = DVD_NOPTS_VALUE;
     m_videobuffer.pts = DVD_NOPTS_VALUE;
@@ -124,7 +122,7 @@ void CDVDVideoCodecOpenMax::Dispose()
   if (m_omx_decoder)
   {
     m_omx_decoder->Close();
-    delete m_omx_decoder;
+    m_omx_decoder->Release();
     m_omx_decoder = NULL;
   }
   if (m_videobuffer.iFlags & DVP_FLAG_ALLOCATED)
@@ -146,7 +144,7 @@ void CDVDVideoCodecOpenMax::SetDropState(bool bDrop)
   m_omx_decoder->SetDropState(bDrop);
 }
 
-int CDVDVideoCodecOpenMax::Decode(BYTE* pData, int iSize, double dts, double pts)
+int CDVDVideoCodecOpenMax::Decode(uint8_t* pData, int iSize, double dts, double pts)
 {
   if (pData)
   {
@@ -178,7 +176,7 @@ int CDVDVideoCodecOpenMax::Decode(BYTE* pData, int iSize, double dts, double pts
     return rtn;
   }
   
-  return VC_BUFFER;
+  return m_omx_decoder->Decode(0, 0, 0, 0);
 }
 
 void CDVDVideoCodecOpenMax::Reset(void)
@@ -191,8 +189,15 @@ bool CDVDVideoCodecOpenMax::GetPicture(DVDVideoPicture* pDvdVideoPicture)
   m_omx_decoder->GetPicture(&m_videobuffer);
   *pDvdVideoPicture = m_videobuffer;
 
+  // TODO what's going on here? bool is required as return value.
   return VC_PICTURE | VC_BUFFER;
 }
+
+bool CDVDVideoCodecOpenMax::ClearPicture(DVDVideoPicture* pDvdVideoPicture)
+{
+  return m_omx_decoder->ClearPicture(pDvdVideoPicture);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 bool CDVDVideoCodecOpenMax::bitstream_convert_init(void *in_extradata, int in_extrasize)
@@ -235,9 +240,17 @@ bool CDVDVideoCodecOpenMax::bitstream_convert_init(void *in_extradata, int in_ex
       free(out);
       return false;
     }
-    out = (uint8_t*)realloc(out, total_size);
-    if (!out)
+    uint8_t* new_out = (uint8_t*)realloc(out, total_size);
+    if (new_out)
+    {
+      out = new_out;
+    }
+    else
+    {
+      CLog::Log(LOGERROR, "bitstream_convert_init failed - %s : could not realloc the buffer out",  __FUNCTION__);
+      free(out);
       return false;
+    }
 
     memcpy(out + total_size - unit_size - 4, nalu_header, 4);
     memcpy(out + total_size - unit_size, extradata + 2, unit_size);
@@ -254,7 +267,7 @@ bool CDVDVideoCodecOpenMax::bitstream_convert_init(void *in_extradata, int in_ex
   return true;
 }
 
-bool CDVDVideoCodecOpenMax::bitstream_convert(BYTE* pData, int iSize, uint8_t **poutbuf, int *poutbuf_size)
+bool CDVDVideoCodecOpenMax::bitstream_convert(uint8_t* pData, int iSize, uint8_t **poutbuf, int *poutbuf_size)
 {
   // based on h264_mp4toannexb_bsf.c (ffmpeg)
   // which is Copyright (c) 2007 Benoit Fouet <benoit.fouet@free.fr>

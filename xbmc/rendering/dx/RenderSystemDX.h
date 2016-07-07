@@ -61,6 +61,7 @@ public:
 
   virtual void SetViewPort(CRect& viewPort);
   virtual void GetViewPort(CRect& viewPort);
+  virtual void RestoreViewPort();
 
   virtual void SetScissors(const CRect &rect);
   virtual void ResetScissors();
@@ -68,11 +69,12 @@ public:
   virtual void CaptureStateBlock();
   virtual void ApplyStateBlock();
 
-  virtual void SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight);
+  virtual void SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor = 0.f);
 
   virtual void ApplyHardwareTransform(const TransformMatrix &matrix);
   virtual void RestoreHardwareTransform();
-
+  virtual void SetStereoMode(RENDER_STEREO_MODE mode, RENDER_STEREO_VIEW view);
+  virtual bool SupportsStereo(RENDER_STEREO_MODE mode) const;
   virtual bool TestRender();
 
   virtual void Project(float &x, float &y, float &z);
@@ -106,7 +108,7 @@ public:
   */
   void Unregister(ID3DResource *resource);
 
-  static CStdString GetErrorDescription(HRESULT hr);
+  static std::string GetErrorDescription(HRESULT hr);
 
 protected:
   bool CreateDevice();

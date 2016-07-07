@@ -26,7 +26,7 @@
 #include "bytestream.h"
 
 static av_cold int decode_init(AVCodecContext *avctx) {
-    avctx->pix_fmt = PIX_FMT_PAL8;
+    avctx->pix_fmt = AV_PIX_FMT_PAL8;
     return 0;
 }
 
@@ -59,8 +59,8 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
     int has_alpha = avctx->codec_tag == MKTAG('D','X','S','A');
 
     // check that at least header fits
-    if (buf_size < 27 + 7 * 2 + 4 * 3) {
-        av_log(avctx, AV_LOG_ERROR, "coded frame too small\n");
+    if (buf_size < 27 + 7 * 2 + 4 * (3 + has_alpha)) {
+        av_log(avctx, AV_LOG_ERROR, "coded frame size %d too small\n", buf_size);
         return -1;
     }
 
@@ -87,14 +87,20 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
     bytestream_get_le16(&buf);
     // The following value is supposed to indicate the start offset
     // (relative to the palette) of the data for the second field,
-    // however there are files  where it has a bogus value and thus
+    // however there are files in which it has a bogus value and thus
     // we just ignore it
     bytestream_get_le16(&buf);
 
     // allocate sub and set values
     sub->rects =  av_mallocz(sizeof(*sub->rects));
+    if (!sub->rects)
+        return AVERROR(ENOMEM);
+
     sub->rects[0] = av_mallocz(sizeof(*sub->rects[0]));
-    sub->num_rects = 1;
+    if (!sub->rects[0]) {
+        av_freep(&sub->rects);
+        return AVERROR(ENOMEM);
+    }
     sub->rects[0]->x = x; sub->rects[0]->y = y;
     sub->rects[0]->w = w; sub->rects[0]->h = h;
     sub->rects[0]->type = SUBTITLE_BITMAP;
@@ -102,13 +108,27 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
     sub->rects[0]->pict.data[0] = av_malloc(w * h);
     sub->rects[0]->nb_colors = 4;
     sub->rects[0]->pict.data[1] = av_mallocz(AVPALETTE_SIZE);
+    if (!sub->rects[0]->pict.data[0] || !sub->rects[0]->pict.data[1]) {
+        av_freep(&sub->rects[0]->pict.data[1]);
+        av_freep(&sub->rects[0]->pict.data[0]);
+        av_freep(&sub->rects[0]);
+        av_freep(&sub->rects);
+        return AVERROR(ENOMEM);
+    }
+    sub->num_rects = 1;
 
     // read palette
     for (i = 0; i < sub->rects[0]->nb_colors; i++)
         ((uint32_t*)sub->rects[0]->pict.data[1])[i] = bytestream_get_be24(&buf);
-    // make all except background (first entry) non-transparent
-    for (i = 0; i < sub->rects[0]->nb_colors; i++)
-        ((uint32_t*)sub->rects[0]->pict.data[1])[i] |= (has_alpha ? *buf++ : (i ? 0xff : 0)) << 24;
+
+    if (!has_alpha) {
+        // make all except background (first entry) non-transparent
+        for (i = 1; i < sub->rects[0]->nb_colors; i++)
+            ((uint32_t *)sub->rects[0]->pict.data[1])[i] |= 0xff000000;
+    } else {
+        for (i = 0; i < sub->rects[0]->nb_colors; i++)
+            ((uint32_t *)sub->rects[0]->pict.data[1])[i] |= *buf++ << 24;
+    }
 
     // process RLE-compressed data
     init_get_bits(&gb, buf, (buf_end - buf) * 8);
@@ -137,9 +157,9 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
 
 AVCodec ff_xsub_decoder = {
     .name      = "xsub",
+    .long_name = NULL_IF_CONFIG_SMALL("XSUB"),
     .type      = AVMEDIA_TYPE_SUBTITLE,
-    .id        = CODEC_ID_XSUB,
+    .id        = AV_CODEC_ID_XSUB,
     .init      = decode_init,
     .decode    = decode_frame,
-    .long_name = NULL_IF_CONFIG_SMALL("XSUB"),
 };

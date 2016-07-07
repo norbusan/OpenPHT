@@ -27,17 +27,150 @@
 #include "GUIInfoManager.h"
 #include "threads/SingleLock.h"
 #include "utils/URIUtils.h"
+#include "settings/AdvancedSettings.h"
 #include "settings/GUISettings.h"
 #include "settings/Settings.h"
-#include "settings/AdvancedSettings.h"
 #include "addons/Skin.h"
 #include "GUITexture.h"
 #include "windowing/WindowingFactory.h"
 #include "utils/Variant.h"
-#include "PlexApplication.h"
-#include "GUI/GUIWindowStartup.h"
+
+#include "windows/GUIWindowHome.h"
+#include "settings/GUIWindowSettings.h"
+#include "windows/GUIWindowFileManager.h"
+#include "settings/GUIWindowSettingsCategory.h"
+#include "music/windows/GUIWindowMusicPlaylist.h"
+#include "music/windows/GUIWindowMusicSongs.h"
+#include "music/windows/GUIWindowMusicNav.h"
+#include "music/windows/GUIWindowMusicPlaylistEditor.h"
+#include "video/windows/GUIWindowVideoPlaylist.h"
+#include "music/dialogs/GUIDialogMusicInfo.h"
+#include "video/dialogs/GUIDialogVideoInfo.h"
+#include "video/windows/GUIWindowVideoNav.h"
+#include "settings/GUIWindowSettingsProfile.h"
+#ifdef HAS_GL
+#include "rendering/gl/GUIWindowTestPatternGL.h"
+#endif
+#ifdef HAS_DX
+#include "rendering/dx/GUIWindowTestPatternDX.h"
+#endif
+#include "settings/GUIWindowSettingsScreenCalibration.h"
+#include "programs/GUIWindowPrograms.h"
+#include "pictures/GUIWindowPictures.h"
+#include "windows/GUIWindowWeather.h"
+#include "windows/GUIWindowLoginScreen.h"
+#include "addons/GUIWindowAddonBrowser.h"
+#include "music/windows/GUIWindowVisualisation.h"
+#include "windows/GUIWindowDebugInfo.h"
+#include "windows/GUIWindowPointer.h"
+#include "windows/GUIWindowSystemInfo.h"
+#include "windows/GUIWindowScreensaver.h"
+#include "windows/GUIWindowScreensaverDim.h"
+#include "pictures/GUIWindowSlideShow.h"
+#include "windows/GUIWindowStartup.h"
+#include "video/windows/GUIWindowFullScreen.h"
+#include "video/dialogs/GUIDialogVideoOSD.h"
+#include "music/dialogs/GUIDialogMusicOverlay.h"
+#include "video/dialogs/GUIDialogVideoOverlay.h"
+#include "video/VideoInfoScanner.h"
+
+// Dialog includes
+#include "music/dialogs/GUIDialogMusicOSD.h"
+#include "music/dialogs/GUIDialogVisualisationPresetList.h"
+#include "dialogs/GUIDialogTextViewer.h"
+#include "network/GUIDialogNetworkSetup.h"
+#include "dialogs/GUIDialogMediaSource.h"
+#include "video/dialogs/GUIDialogVideoSettings.h"
+#include "video/dialogs/GUIDialogAudioSubtitleSettings.h"
+#include "video/dialogs/GUIDialogVideoBookmarks.h"
+#include "settings/GUIDialogProfileSettings.h"
+#include "settings/GUIDialogLockSettings.h"
+#include "settings/GUIDialogContentSettings.h"
+#include "dialogs/GUIDialogBusy.h"
+#include "dialogs/GUIDialogKeyboardGeneric.h"
+#include "dialogs/GUIDialogYesNo.h"
+#include "dialogs/GUIDialogOK.h"
+#include "dialogs/GUIDialogProgress.h"
+#include "dialogs/GUIDialogExtendedProgressBar.h"
+#include "dialogs/GUIDialogSelect.h"
+#include "dialogs/GUIDialogSeekBar.h"
+#include "dialogs/GUIDialogKaiToast.h"
+#include "dialogs/GUIDialogVolumeBar.h"
+#include "dialogs/GUIDialogMuteBug.h"
+#include "video/dialogs/GUIDialogFileStacking.h"
+#include "dialogs/GUIDialogNumeric.h"
+#include "dialogs/GUIDialogGamepad.h"
+#include "dialogs/GUIDialogSubMenu.h"
+#include "dialogs/GUIDialogFavourites.h"
+#include "dialogs/GUIDialogButtonMenu.h"
+#include "dialogs/GUIDialogContextMenu.h"
+#include "dialogs/GUIDialogPlayerControls.h"
+#include "music/dialogs/GUIDialogSongInfo.h"
+#include "dialogs/GUIDialogSmartPlaylistEditor.h"
+#include "dialogs/GUIDialogSmartPlaylistRule.h"
+#include "pictures/GUIDialogPictureInfo.h"
+#include "addons/GUIDialogAddonSettings.h"
+#include "addons/GUIDialogAddonInfo.h"
+#ifdef __PLEX__
+#include "plex/GUI/GUIDialogPlexSettingsMenu.h"
+#endif
+
+#ifdef HAS_LINUX_NETWORK
+#include "network/GUIDialogAccessPoints.h"
+#endif
+
+/* PVR related include Files */
+#include "pvr/PVRManager.h"
+#include "pvr/timers/PVRTimers.h"
+#include "pvr/windows/GUIWindowPVR.h"
+#include "pvr/dialogs/GUIDialogPVRChannelManager.h"
+#include "pvr/dialogs/GUIDialogPVRChannelsOSD.h"
+#include "pvr/dialogs/GUIDialogPVRCutterOSD.h"
+#include "pvr/dialogs/GUIDialogPVRDirectorOSD.h"
+#include "pvr/dialogs/GUIDialogPVRGroupManager.h"
+#include "pvr/dialogs/GUIDialogPVRGuideInfo.h"
+#include "pvr/dialogs/GUIDialogPVRGuideOSD.h"
+#include "pvr/dialogs/GUIDialogPVRGuideSearch.h"
+#include "pvr/dialogs/GUIDialogPVRRecordingInfo.h"
+#include "pvr/dialogs/GUIDialogPVRTimerSettings.h"
+
+#include "video/dialogs/GUIDialogFullScreenInfo.h"
+#include "video/dialogs/GUIDialogTeletext.h"
+#include "dialogs/GUIDialogSlider.h"
+#include "dialogs/GUIDialogPlayEject.h"
+#include "dialogs/GUIDialogMediaFilter.h"
+#include "peripherals/dialogs/GUIDialogPeripheralManager.h"
+#include "peripherals/dialogs/GUIDialogPeripheralSettings.h"
+#include "addons/AddonInstaller.h"
+
+/* PLEX */
+#include "plex/Client/PlexServerManager.h"
+#include "plex/GUI/GUIDialogRating.h"
+#include "plex/GUI/GUIWindowSharedContent.h"
+#include "plex/GUI/GUIDialogTimer.h"
+#include "plex/GUI/GUIWindowNowPlaying.h"
+#include "plex/GUI/GUIWindowPlexSearch.h"
+#include "plex/GUI/GUIPlexMediaWindow.h"
+#include "plex/GUI/GUIDialogFilterSort.h"
+#include "plex/GUI/GUIWindowMyPlex.h"
+#include "plex/GUI/GUIDialogPlexPluginSettings.h"
+#include "plex/GUI/GUIWindowPlexPreplayVideo.h"
+#include "plex/GUI/GUIWindowPlexMyChannels.h"
+#include "plex/GUI/GUIDialogPlexAudioSubtitlePicker.h"
+#include "plex/GUI/GUIWindowPlexStartupHelper.h"
+#include "plex/GUI/GUIPlexScreenSaverPhoto.h"
+#include "plex/GUI/GUIWindowPlexPlayQueue.h"
+#include "plex/Playlists/GUIDialogPlexPlayQueue.h"
+#include "plex/GUI/GUIDialogPlexGlobalCacher.h"
+#include "plex/GUI/GUIDialogPlexVideoOSD.h"
+#include "plex/GUI/GUIWindowPlexPlaylistSelection.h"
+#include "plex/GUI/GUIDialogPlayListSelection.h"
+#include "plex/GUI/GUIDialogPlexUserSelect.h"
+/* END PLEX */
 
 using namespace std;
+using namespace PVR;
+using namespace PERIPHERALS;
 
 CGUIWindowManager::CGUIWindowManager(void)
 {
@@ -61,6 +194,302 @@ void CGUIWindowManager::Initialize()
   m_initialized = true;
 
   LoadNotOnDemandWindows();
+}
+
+void CGUIWindowManager::CreateWindows()
+{
+  Add(new CGUIWindowHome);
+  Add(new CGUIWindowPrograms);
+#ifndef __PLEX__
+  Add(new CGUIWindowPictures);
+  Add(new CGUIWindowFileManager);
+#endif
+  Add(new CGUIWindowSettings);
+#ifndef __PLEX__
+  Add(new CGUIWindowSystemInfo);
+#endif
+#ifdef HAS_GL
+  Add(new CGUIWindowTestPatternGL);
+#endif
+#ifdef HAS_DX
+  Add(new CGUIWindowTestPatternDX);
+#endif
+  Add(new CGUIWindowSettingsScreenCalibration);
+  Add(new CGUIWindowSettingsCategory);
+#ifndef __PLEX__
+  Add(new CGUIWindowVideoNav);
+  Add(new CGUIWindowVideoPlaylist);
+#else
+  Add(new CGUIDialogPlexSettingsMenu);
+#endif
+  Add(new CGUIWindowLoginScreen);
+  Add(new CGUIWindowSettingsProfile);
+  Add(new CGUIWindow(WINDOW_SKIN_SETTINGS, "SkinSettings.xml"));
+#ifndef __PLEX__
+  Add(new CGUIWindowAddonBrowser);
+#endif
+  Add(new CGUIWindowScreensaverDim);
+  Add(new CGUIWindowDebugInfo);
+#ifndef TARGET_RASPBERRY_PI
+  Add(new CGUIWindowPointer);
+#endif
+  Add(new CGUIDialogYesNo);
+  Add(new CGUIDialogProgress);
+  Add(new CGUIDialogExtendedProgressBar);
+  Add(new CGUIDialogKeyboardGeneric);
+  Add(new CGUIDialogVolumeBar);
+  Add(new CGUIDialogSeekBar);
+  Add(new CGUIDialogSubMenu);
+  Add(new CGUIDialogContextMenu);
+  Add(new CGUIDialogKaiToast);
+  Add(new CGUIDialogNumeric);
+  Add(new CGUIDialogGamepad);
+#ifndef __PLEX__
+  Add(new CGUIDialogButtonMenu);
+#endif
+  Add(new CGUIDialogMuteBug);
+#ifndef __PLEX__
+  Add(new CGUIDialogPlayerControls);
+#endif
+#ifdef HAS_KARAOKE
+  Add(new CGUIDialogKaraokeSongSelectorSmall);
+  Add(new CGUIDialogKaraokeSongSelectorLarge);
+#endif
+  Add(new CGUIDialogSlider);
+  Add(new CGUIDialogMusicOSD);
+  Add(new CGUIDialogVisualisationPresetList);
+  Add(new CGUIDialogVideoSettings);
+  Add(new CGUIDialogAudioSubtitleSettings);
+  Add(new CGUIDialogVideoBookmarks);
+  // Don't add the filebrowser dialog - it's created and added when it's needed
+  Add(new CGUIDialogNetworkSetup);
+  Add(new CGUIDialogMediaSource);
+  Add(new CGUIDialogProfileSettings);
+  Add(new CGUIDialogFavourites);
+  Add(new CGUIDialogSongInfo);
+  Add(new CGUIDialogSmartPlaylistEditor);
+  Add(new CGUIDialogSmartPlaylistRule);
+  Add(new CGUIDialogBusy);
+  Add(new CGUIDialogPictureInfo);
+  Add(new CGUIDialogAddonInfo);
+  Add(new CGUIDialogAddonSettings);
+#ifdef HAS_LINUX_NETWORK
+  Add(new CGUIDialogAccessPoints);
+#endif
+
+  Add(new CGUIDialogLockSettings);
+
+  Add(new CGUIDialogContentSettings);
+
+  Add(new CGUIDialogPlayEject);
+
+  Add(new CGUIDialogPeripheralManager);
+  Add(new CGUIDialogPeripheralSettings);
+
+  Add(new CGUIDialogMediaFilter);
+
+#ifndef __PLEX__
+  Add(new CGUIWindowMusicPlayList);
+  Add(new CGUIWindowMusicSongs);
+  Add(new CGUIWindowMusicNav);
+  Add(new CGUIWindowMusicPlaylistEditor);
+#endif
+
+  /* Load PVR related Windows and Dialogs */
+#ifndef __PLEX__
+  Add(new CGUIDialogTeletext);
+  Add(new CGUIWindowPVR);
+  Add(new CGUIDialogPVRGuideInfo);
+  Add(new CGUIDialogPVRRecordingInfo);
+  Add(new CGUIDialogPVRTimerSettings);
+  Add(new CGUIDialogPVRGroupManager);
+  Add(new CGUIDialogPVRChannelManager);
+  Add(new CGUIDialogPVRGuideSearch);
+  Add(new CGUIDialogPVRChannelsOSD);
+  Add(new CGUIDialogPVRGuideOSD);
+  Add(new CGUIDialogPVRDirectorOSD);
+  Add(new CGUIDialogPVRCutterOSD);
+#endif
+
+  Add(new CGUIDialogSelect);
+  Add(new CGUIDialogMusicInfo);
+  Add(new CGUIDialogOK);
+  Add(new CGUIDialogVideoInfo);
+  Add(new CGUIDialogTextViewer);
+  Add(new CGUIWindowFullScreen);
+  Add(new CGUIWindowVisualisation);
+  Add(new CGUIWindowSlideShow);
+  Add(new CGUIDialogFileStacking);
+#ifdef HAS_KARAOKE
+  Add(new CGUIWindowKaraokeLyrics);
+#endif
+
+#ifndef __PLEX__
+  Add(new CGUIDialogVideoOSD);
+#endif
+  Add(new CGUIDialogMusicOverlay);
+  Add(new CGUIDialogVideoOverlay);
+  Add(new CGUIWindowScreensaver);
+  Add(new CGUIWindowWeather);
+  Add(new CGUIWindowStartup);
+
+  /* PLEX */
+  Add(new CGUIWindowSharedContent);
+  Add(new CGUIWindowNowPlaying);         // window id = 50
+  Add(new CGUIWindowPlexSearch);         // window id = 51
+  Add(new CGUIDialogRating);                 // window id = 200
+  Add(new CGUIDialogTimer);                 // window id = 201
+  Add(new CGUIDialogFilterSort);
+  Add(new CGUIPlexMediaWindow);
+  Add(new CGUIPlexMusicWindow);
+  Add(new CGUIWindowPlexPreplayVideo);
+  Add(new CGUIWindowMyPlex);
+  Add(new CGUIDialogPlexPluginSettings);
+  Add(new CGUIWindowPlexMyChannels);
+  Add(new CGUIDialogPlexAudioPicker);
+  Add(new CGUIDialogPlexSubtitlePicker);
+  Add(new CGUIWindowPlexStartupHelper);
+  Add(new CGUIPlexPictureWindow);
+  Add(new CGUIPlexScreenSaverPhoto);
+  Add(new CGUIWindowPlexPlayQueue);
+  Add(new CGUIDialogPlexPlayQueue);
+  Add(new CGUIDialogPlexGlobalCacher);
+  Add(new CGUIDialogPlexVideoOSD);
+  Add(new CGUIWindowPlexPlaylistSelection);
+  Add(new CGUIDialogPlaylistSelection);
+  Add(new CGUIDialogPlexUserSelect);
+  /* END PLEX */
+}
+
+bool CGUIWindowManager::DestroyWindows()
+{
+  try
+  {
+    /* PLEX */
+    Delete(WINDOW_PLEX_MYCHANNELS);
+    Delete(WINDOW_SHARED_CONTENT);
+    Delete(WINDOW_NOW_PLAYING);
+    Delete(WINDOW_PLEX_SEARCH);
+    Delete(WINDOW_DIALOG_TIMER);
+    Delete(WINDOW_DIALOG_RATING);
+    Delete(WINDOW_DIALOG_FILTER_SORT);
+    Delete(WINDOW_DIALOG_PLEX_AUDIO_PICKER);
+    Delete(WINDOW_DIALOG_PLEX_SUBTITLE_PICKER);
+    Delete(WINDOW_PLEX_STARTUP_HELPER);
+    Delete(WINDOW_PLEX_PLAY_QUEUE);
+    Delete(WINDOW_DIALOG_PLEX_PLAYQUEUE);
+    Delete(WINDOW_PLEX_PLAYLIST_SELECTION);
+    /* END PLEX */
+
+    Delete(WINDOW_MUSIC_PLAYLIST);
+    Delete(WINDOW_MUSIC_PLAYLIST_EDITOR);
+    Delete(WINDOW_MUSIC_FILES);
+    Delete(WINDOW_MUSIC_NAV);
+    Delete(WINDOW_DIALOG_MUSIC_INFO);
+    Delete(WINDOW_DIALOG_VIDEO_INFO);
+    Delete(WINDOW_VIDEO_FILES);
+    Delete(WINDOW_VIDEO_PLAYLIST);
+    Delete(WINDOW_VIDEO_NAV);
+    Delete(WINDOW_FILES);
+    Delete(WINDOW_DIALOG_YES_NO);
+    Delete(WINDOW_DIALOG_PROGRESS);
+    Delete(WINDOW_DIALOG_NUMERIC);
+    Delete(WINDOW_DIALOG_GAMEPAD);
+    Delete(WINDOW_DIALOG_SUB_MENU);
+    Delete(WINDOW_DIALOG_BUTTON_MENU);
+    Delete(WINDOW_DIALOG_CONTEXT_MENU);
+    Delete(WINDOW_DIALOG_PLAYER_CONTROLS);
+    Delete(WINDOW_DIALOG_KARAOKE_SONGSELECT);
+    Delete(WINDOW_DIALOG_KARAOKE_SELECTOR);
+    Delete(WINDOW_DIALOG_MUSIC_OSD);
+    Delete(WINDOW_DIALOG_VIS_PRESET_LIST);
+    Delete(WINDOW_DIALOG_SELECT);
+    Delete(WINDOW_DIALOG_OK);
+    Delete(WINDOW_DIALOG_FILESTACKING);
+    Delete(WINDOW_DIALOG_KEYBOARD);
+    Delete(WINDOW_FULLSCREEN_VIDEO);
+    Delete(WINDOW_DIALOG_PROFILE_SETTINGS);
+    Delete(WINDOW_DIALOG_LOCK_SETTINGS);
+    Delete(WINDOW_DIALOG_NETWORK_SETUP);
+    Delete(WINDOW_DIALOG_MEDIA_SOURCE);
+    Delete(WINDOW_DIALOG_VIDEO_OSD_SETTINGS);
+    Delete(WINDOW_DIALOG_AUDIO_OSD_SETTINGS);
+    Delete(WINDOW_DIALOG_VIDEO_BOOKMARKS);
+    Delete(WINDOW_DIALOG_CONTENT_SETTINGS);
+    Delete(WINDOW_DIALOG_FAVOURITES);
+    Delete(WINDOW_DIALOG_SONG_INFO);
+    Delete(WINDOW_DIALOG_SMART_PLAYLIST_EDITOR);
+    Delete(WINDOW_DIALOG_SMART_PLAYLIST_RULE);
+    Delete(WINDOW_DIALOG_BUSY);
+    Delete(WINDOW_DIALOG_PICTURE_INFO);
+    Delete(WINDOW_DIALOG_ADDON_INFO);
+    Delete(WINDOW_DIALOG_ADDON_SETTINGS);
+    Delete(WINDOW_DIALOG_ACCESS_POINTS);
+    Delete(WINDOW_DIALOG_SLIDER);
+    Delete(WINDOW_DIALOG_MEDIA_FILTER);
+
+    /* Delete PVR related windows and dialogs */
+    Delete(WINDOW_PVR);
+    Delete(WINDOW_DIALOG_PVR_GUIDE_INFO);
+    Delete(WINDOW_DIALOG_PVR_RECORDING_INFO);
+    Delete(WINDOW_DIALOG_PVR_TIMER_SETTING);
+    Delete(WINDOW_DIALOG_PVR_GROUP_MANAGER);
+    Delete(WINDOW_DIALOG_PVR_CHANNEL_MANAGER);
+    Delete(WINDOW_DIALOG_PVR_GUIDE_SEARCH);
+    Delete(WINDOW_DIALOG_PVR_CHANNEL_SCAN);
+    Delete(WINDOW_DIALOG_PVR_UPDATE_PROGRESS);
+    Delete(WINDOW_DIALOG_PVR_OSD_CHANNELS);
+    Delete(WINDOW_DIALOG_PVR_OSD_GUIDE);
+    Delete(WINDOW_DIALOG_PVR_OSD_DIRECTOR);
+    Delete(WINDOW_DIALOG_PVR_OSD_CUTTER);
+    Delete(WINDOW_DIALOG_OSD_TELETEXT);
+
+    Delete(WINDOW_DIALOG_TEXT_VIEWER);
+    Delete(WINDOW_DIALOG_PLAY_EJECT);
+    Delete(WINDOW_STARTUP_ANIM);
+    Delete(WINDOW_LOGIN_SCREEN);
+    Delete(WINDOW_VISUALISATION);
+    Delete(WINDOW_KARAOKELYRICS);
+    Delete(WINDOW_SETTINGS_MENU);
+    Delete(WINDOW_SETTINGS_PROFILES);
+    Delete(WINDOW_SETTINGS_MYPICTURES);  // all the settings categories
+    Delete(WINDOW_TEST_PATTERN);
+    Delete(WINDOW_SCREEN_CALIBRATION);
+    Delete(WINDOW_SYSTEM_INFORMATION);
+    Delete(WINDOW_SCREENSAVER);
+    Delete(WINDOW_DIALOG_VIDEO_OSD);
+    Delete(WINDOW_DIALOG_MUSIC_OVERLAY);
+    Delete(WINDOW_DIALOG_VIDEO_OVERLAY);
+    Delete(WINDOW_SLIDESHOW);
+    Delete(WINDOW_ADDON_BROWSER);
+    Delete(WINDOW_SKIN_SETTINGS);
+
+    Delete(WINDOW_HOME);
+    Delete(WINDOW_PROGRAMS);
+    Delete(WINDOW_PICTURES);
+    Delete(WINDOW_WEATHER);
+
+    Delete(WINDOW_SETTINGS_MYPICTURES);
+    Remove(WINDOW_SETTINGS_MYPROGRAMS);
+    Remove(WINDOW_SETTINGS_MYWEATHER);
+    Remove(WINDOW_SETTINGS_MYMUSIC);
+    Remove(WINDOW_SETTINGS_SYSTEM);
+    Remove(WINDOW_SETTINGS_MYVIDEOS);
+    Remove(WINDOW_SETTINGS_SERVICE);
+    Remove(WINDOW_SETTINGS_APPEARANCE);
+    Remove(WINDOW_SETTINGS_MYPVR);
+    Remove(WINDOW_DIALOG_KAI_TOAST);
+
+    Remove(WINDOW_DIALOG_SEEK_BAR);
+    Remove(WINDOW_DIALOG_VOLUME_BAR);
+  }
+  catch (...)
+  {
+    CLog::Log(LOGERROR, "Exception in CGUIWindowManager::DestroyWindows()");
+    return false;
+  }
+
+  return true;
 }
 
 bool CGUIWindowManager::SendMessage(int message, int senderID, int destID, int param1, int param2)
@@ -534,26 +963,21 @@ void CGUIWindowManager::Process(unsigned int currentTime)
   CSingleLock lock(g_graphicsContext);
 
   CDirtyRegionList dirtyregions;
-  /* PLEX move this if statement */
-  if (g_application.m_AppActive)
+
+  CGUIWindow* pWindow = GetWindow(GetActiveWindow());
+  if (pWindow)
+    pWindow->DoProcess(currentTime, dirtyregions);
+
+  // process all dialogs - visibility may change etc.
+  for (WindowMap::iterator it = m_mapWindows.begin(); it != m_mapWindows.end(); ++it)
   {
-
-    CGUIWindow* pWindow = GetWindow(GetActiveWindow());
-    if (pWindow)
+    CGUIWindow *pWindow = (*it).second;
+    if (pWindow && pWindow->IsDialog())
       pWindow->DoProcess(currentTime, dirtyregions);
-
-    // process all dialogs - visibility may change etc.
-    for (WindowMap::iterator it = m_mapWindows.begin(); it != m_mapWindows.end(); it++)
-    {
-      CGUIWindow *pWindow = (*it).second;
-      if (pWindow && pWindow->IsDialog())
-        pWindow->DoProcess(currentTime, dirtyregions);
-    }
-
-    for (CDirtyRegionList::iterator itr = dirtyregions.begin(); itr != dirtyregions.end(); itr++)
-      m_tracker.MarkDirtyRegion(*itr);
   }
-  /* END PLEX */
+
+  for (CDirtyRegionList::iterator itr = dirtyregions.begin(); itr != dirtyregions.end(); ++itr)
+    m_tracker.MarkDirtyRegion(*itr);
 }
 
 void CGUIWindowManager::MarkDirty()
@@ -568,11 +992,6 @@ void CGUIWindowManager::MarkDirty(const CRect& rect)
 
 void CGUIWindowManager::RenderPass()
 {
-  /* PLEX - No need to render when the App is not active */
-  if (!g_application.m_AppActive)
-    return;
-  /* END PLEX */
-
   CGUIWindow* pWindow = GetWindow(GetActiveWindow());
   if (pWindow)
   {
@@ -589,6 +1008,24 @@ void CGUIWindowManager::RenderPass()
     if ((*it)->IsDialogRunning())
       (*it)->DoRender();
   }
+}
+
+void CGUIWindowManager::RenderEx() const
+{
+  CGUIWindow* pWindow = GetWindow(GetActiveWindow());
+  if (pWindow)
+    pWindow->RenderEx();
+
+  // We don't call RenderEx for now on dialogs since it is used
+  // to trigger non gui video rendering. We can activate it later at any time.
+  /*
+  vector<CGUIWindow *> &activeDialogs = m_activeDialogs;
+  for (iDialog it = activeDialogs.begin(); it != activeDialogs.end(); ++it)
+  {
+    if ((*it)->IsDialogRunning())
+      (*it)->RenderEx();
+  }
+  */
 }
 
 bool CGUIWindowManager::Render()
@@ -637,16 +1074,13 @@ bool CGUIWindowManager::Render()
       CGUITexture::DrawQuad(*i, 0x4c00ff00);
   }
 
-  m_tracker.CleanMarkedRegions();
-
-  // execute post rendering actions (finalize window closing)
-  AfterRender();
-
   return hasRendered;
 }
 
 void CGUIWindowManager::AfterRender()
 {
+  m_tracker.CleanMarkedRegions();
+
   CGUIWindow* pWindow = GetWindow(GetActiveWindow());
   if (pWindow)
     pWindow->AfterRender();
@@ -685,6 +1119,8 @@ void CGUIWindowManager::FrameMove()
   vector<CGUIWindow *> dialogs = m_activeDialogs;
   for (iDialog it = dialogs.begin(); it != dialogs.end(); ++it)
     (*it)->FrameMove();
+
+  g_infoManager.UpdateAVInfo();
 }
 
 CGUIWindow* CGUIWindowManager::GetWindow(int id) const

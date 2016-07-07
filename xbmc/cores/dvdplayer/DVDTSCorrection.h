@@ -20,11 +20,12 @@
  *
  */
 
+#include "utils/StdString.h"
 #include <vector>
 
-#include "utils/StdString.h"
-
 #define DIFFRINGSIZE 120
+#define VFR_DETECTION_THRESHOLD 3
+#define VFR_PATTERN_THRESHOLD 2
 
 class CPullupCorrection
 {
@@ -32,11 +33,15 @@ class CPullupCorrection
     CPullupCorrection();
     void   Add(double pts);
     void   Flush(); //flush the saved pattern and the ringbuffer
+    void   ResetVFRDetection(void);
 
     double GetCorrection()    { return m_ptscorrection;            }
     int    GetPatternLength() { return m_patternlength;            }
     double GetFrameDuration() { return m_frameduration;            }
+    double GetMaxFrameDuration(void) { return m_maxframeduration;  }
+    double GetMinFrameDuration(void) { return m_minframeduration;  }
     bool   HasFullBuffer()    { return m_ringfill == DIFFRINGSIZE; }
+    bool   VFRDetection(void) { return ((m_VFRCounter >= VFR_DETECTION_THRESHOLD) && (m_patternCounter >= VFR_PATTERN_THRESHOLD)); }
 
   private:
     double m_prevpts;                //last pts added
@@ -48,8 +53,8 @@ class CPullupCorrection
     void GetPattern(std::vector<double>& pattern);     //gets the current pattern
     void GetDifftypes(std::vector<double>& difftypes); //gets the difftypes from the ringbuffer
 
-    bool MatchDiff(double diff1, double diff2); //checks if two diffs match by MAXERR
-    bool MatchDifftype(int* diffs1, int* diffs2, int nrdiffs); //checks if the difftypes match
+    static bool MatchDiff(double diff1, double diff2); //checks if two diffs match by MAXERR
+    static bool MatchDifftype(int* diffs1, int* diffs2, int nrdiffs); //checks if the difftypes match
 
     //builds a pattern of timestamps in the ringbuffer
     void BuildPattern(std::vector<double>& pattern, int patternlength);
@@ -59,12 +64,16 @@ class CPullupCorrection
 
     double CalcFrameDuration(); //calculates the frame duration from m_pattern
 
-    std::vector<double> m_pattern; //the last saved pattern
-    int    m_patternpos;           //the position of the pattern in the ringbuffer, moves one to the past each time a pts is added
+    std::vector<double> m_pattern, m_lastPattern; //the last saved pattern
+    int m_patternpos;              //the position of the pattern in the ringbuffer, moves one to the past each time a pts is added
     double m_ptscorrection;        //the correction needed for the last added pts
     double m_trackingpts;          //tracked pts for smoothing the timestamps
     double m_frameduration;        //frameduration exposed to dvdplayer, used for calculating the fps
-    bool   m_haspattern;           //for the log
-    int    m_patternlength;        //for the codec info
+    double m_maxframeduration;     //Max value detected for frame duration (for VFR files case)
+    double m_minframeduration;     //Min value detected for frame duration (for VFR files case)
+    bool m_haspattern;             //for the log and detecting VFR files case
+    int m_patternlength;           //for the codec info
+    int m_VFRCounter;              //retry counter for VFR detection
+    int m_patternCounter;
     CStdString GetPatternStr();    //also for the log
 };

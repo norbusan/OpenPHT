@@ -178,7 +178,9 @@ static CGEventRef tapEventCallback2(CGEventTapProxy proxy, CGEventType type, CGE
   int keyState = (keyFlags & 0xFF00) >> 8;
   BOOL keyIsRepeat = (keyFlags & 0x1) > 0;
   
-  if (keyIsRepeat) 
+  // allow repeated keypresses for volume buttons
+  // all other repeated keypresses are handled by the os (is this really good?)
+  if (keyIsRepeat && keyCode != NX_KEYTYPE_SOUND_UP && keyCode != NX_KEYTYPE_SOUND_DOWN) 
     return event;
   
   NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
@@ -292,8 +294,9 @@ static CGEventRef tapEventCallback(CGEventTapProxy proxy, CGEventType type, CGEv
     m_active = NO;
     m_eventPort = NULL;
     m_runLoopSource = NULL;
-    m_controlSysPower = NO;
-    m_controlSysVolume = NO;
+    // power button controls xbmc sleep button (this will also trigger the osx shutdown menu - we can't prevent this as it seems)
+    m_controlSysPower = YES;
+    m_controlSysVolume = NO; // volume keys control sys volume
   }
   return self;
 }

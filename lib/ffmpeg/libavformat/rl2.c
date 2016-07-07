@@ -32,6 +32,8 @@
  * optional background_frame
  */
 
+#include <stdint.h>
+
 #include "libavutil/intreadwrite.h"
 #include "libavutil/mathematics.h"
 #include "avformat.h"
@@ -69,11 +71,9 @@ static int rl2_probe(AVProbeData *p)
 /**
  * read rl2 header data and setup the avstreams
  * @param s demuxer context
- * @param ap format parameters
  * @return 0 on success, AVERROR otherwise
  */
-static av_cold int rl2_read_header(AVFormatContext *s,
-                            AVFormatParameters *ap)
+static av_cold int rl2_read_header(AVFormatContext *s)
 {
     AVIOContext *pb = s->pb;
     AVStream *st;
@@ -109,10 +109,6 @@ static av_cold int rl2_read_header(AVFormatContext *s,
     rate = avio_rl16(pb);
     channels = avio_rl16(pb);
     def_sound_size = avio_rl16(pb);
-    if (!channels || channels > 42) {
-        av_log(s, AV_LOG_ERROR, "Invalid number of channels: %d\n", channels);
-        return AVERROR_INVALIDDATA;
-    }
 
     /** setup video stream */
     st = avformat_new_stream(s, NULL);
@@ -120,7 +116,7 @@ static av_cold int rl2_read_header(AVFormatContext *s,
          return AVERROR(ENOMEM);
 
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id = CODEC_ID_RL2;
+    st->codec->codec_id = AV_CODEC_ID_RL2;
     st->codec->codec_tag = 0;  /* no fourcc */
     st->codec->width = 320;
     st->codec->height = 200;
@@ -131,19 +127,15 @@ static av_cold int rl2_read_header(AVFormatContext *s,
     if(signature == RLV3_TAG && back_size > 0)
         st->codec->extradata_size += back_size;
 
-    st->codec->extradata = av_mallocz(st->codec->extradata_size +
-                                          FF_INPUT_BUFFER_PADDING_SIZE);
-    if(!st->codec->extradata)
+    if(ff_get_extradata(st->codec, pb, st->codec->extradata_size) < 0)
         return AVERROR(ENOMEM);
-
-    if(avio_read(pb,st->codec->extradata,st->codec->extradata_size) !=
-                      st->codec->extradata_size)
-        return AVERROR(EIO);
 
     /** setup audio stream if present */
     if(sound_rate){
-        if(channels <= 0)
+        if (!channels || channels > 42) {
+            av_log(s, AV_LOG_ERROR, "Invalid number of channels: %d\n", channels);
             return AVERROR_INVALIDDATA;
+        }
 
         pts_num = def_sound_size;
         pts_den = rate;
@@ -152,7 +144,7 @@ static av_cold int rl2_read_header(AVFormatContext *s,
         if (!st)
             return AVERROR(ENOMEM);
         st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
-        st->codec->codec_id = CODEC_ID_PCM_U8;
+        st->codec->codec_id = AV_CODEC_ID_PCM_U8;
         st->codec->codec_tag = 1;
         st->codec->channels = channels;
         st->codec->bits_per_coded_sample = 8;
@@ -238,7 +230,7 @@ static int rl2_read_packet(AVFormatContext *s,
     }
 
     if(stream_id == -1)
-        return AVERROR(EIO);
+        return AVERROR_EOF;
 
     ++rl2->index_pos[stream_id];
 
@@ -295,11 +287,10 @@ static int rl2_read_seek(AVFormatContext *s, int stream_index, int64_t timestamp
 
 AVInputFormat ff_rl2_demuxer = {
     .name           = "rl2",
-    .long_name      = NULL_IF_CONFIG_SMALL("RL2 format"),
+    .long_name      = NULL_IF_CONFIG_SMALL("RL2"),
     .priv_data_size = sizeof(Rl2DemuxContext),
     .read_probe     = rl2_probe,
     .read_header    = rl2_read_header,
     .read_packet    = rl2_read_packet,
     .read_seek      = rl2_read_seek,
 };
-

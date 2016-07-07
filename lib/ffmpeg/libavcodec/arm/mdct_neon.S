@@ -19,9 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "asm.S"
-
-        preserve8
+#include "libavutil/arm/asm.S"
 
 #define ff_fft_calc_neon X(ff_fft_calc_neon)
 
@@ -131,7 +129,7 @@ function ff_imdct_calc_neon, export=1
         lsl             r4,  r4,  r3
         add             r1,  r1,  r4
 
-        bl              ff_imdct_half_neon
+        bl              X(ff_imdct_half_neon)
 
         add             r0,  r5,  r4,  lsl #2
         add             r1,  r5,  r4,  lsl #1

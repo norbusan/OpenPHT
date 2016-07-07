@@ -31,6 +31,9 @@ add_definitions(
   -D_MBCS
 )
 
-add_library(Milkdrop_win32dx MODULE ${mdrop_SRC} ${eval_SRC} MilkdropXBMC.cpp XMLDocument.cpp)
-target_link_libraries(Milkdrop_win32dx ${DirectX_LIBRARIES})
-install(TARGETS Milkdrop_win32dx LIBRARY DESTINATION ${RESOURCEPATH}/addons/visualization.milkdrop COMPONENT RUNTIME)
+remove_definitions(-D_USE_32BIT_TIME_T)
+
+add_library(MilkDrop_win32dx MODULE ${mdrop_SRC} ${eval_SRC} MilkdropXBMC.cpp XMLDocument.cpp)
+target_link_libraries(MilkDrop_win32dx ${DirectX_LIBRARIES})
+install(DIRECTORY ${root}/addons/visualization.milkdrop DESTINATION ${RESOURCEPATH}/addons COMPONENT RUNTIME)
+install(TARGETS MilkDrop_win32dx LIBRARY DESTINATION ${RESOURCEPATH}/addons/visualization.milkdrop COMPONENT RUNTIME)

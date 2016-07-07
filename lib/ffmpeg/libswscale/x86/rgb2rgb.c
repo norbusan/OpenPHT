@@ -26,12 +26,16 @@
 #include <stdint.h>
 
 #include "config.h"
-#include "libavutil/x86_cpu.h"
+#include "libavutil/attributes.h"
+#include "libavutil/x86/asm.h"
+#include "libavutil/x86/cpu.h"
 #include "libavutil/cpu.h"
 #include "libavutil/bswap.h"
 #include "libswscale/rgb2rgb.h"
 #include "libswscale/swscale.h"
 #include "libswscale/swscale_internal.h"
+
+#if HAVE_INLINE_ASM
 
 DECLARE_ASM_CONST(8, uint64_t, mmx_ff)       = 0x00000000000000FFULL;
 DECLARE_ASM_CONST(8, uint64_t, mmx_null)     = 0x0000000000000000ULL;
@@ -72,7 +76,10 @@ DECLARE_ASM_CONST(8, uint64_t, mul15_mid)    = 0x4200420042004200ULL;
 DECLARE_ASM_CONST(8, uint64_t, mul15_hi)     = 0x0210021002100210ULL;
 DECLARE_ASM_CONST(8, uint64_t, mul16_mid)    = 0x2080208020802080ULL;
 
-#define RGB2YUV_SHIFT 8
+DECLARE_ALIGNED(8, extern const uint64_t, ff_bgr2YOffset);
+DECLARE_ALIGNED(8, extern const uint64_t, ff_w1111);
+DECLARE_ALIGNED(8, extern const uint64_t, ff_bgr2UVOffset);
+
 #define BY ((int)( 0.098*(1<<RGB2YUV_SHIFT)+0.5))
 #define BV ((int)(-0.071*(1<<RGB2YUV_SHIFT)+0.5))
 #define BU ((int)( 0.439*(1<<RGB2YUV_SHIFT)+0.5))
@@ -83,59 +90,75 @@ DECLARE_ASM_CONST(8, uint64_t, mul16_mid)    = 0x2080208020802080ULL;
 #define RV ((int)( 0.439*(1<<RGB2YUV_SHIFT)+0.5))
 #define RU ((int)(-0.148*(1<<RGB2YUV_SHIFT)+0.5))
 
-//Note: We have C, MMX, MMX2, 3DNOW versions, there is no 3DNOW + MMX2 one.
+// Note: We have C, MMX, MMXEXT, 3DNOW versions, there is no 3DNOW + MMXEXT one.
 
-#define COMPILE_TEMPLATE_MMX2 0
+#define COMPILE_TEMPLATE_MMXEXT 0
 #define COMPILE_TEMPLATE_AMD3DNOW 0
 #define COMPILE_TEMPLATE_SSE2 0
+#define COMPILE_TEMPLATE_AVX 0
 
 //MMX versions
 #undef RENAME
-#define RENAME(a) a ## _MMX
+#define RENAME(a) a ## _mmx
 #include "rgb2rgb_template.c"
 
-//MMX2 versions
+// MMXEXT versions
 #undef RENAME
-#undef COMPILE_TEMPLATE_MMX2
-#define COMPILE_TEMPLATE_MMX2 1
-#define RENAME(a) a ## _MMX2
+#undef COMPILE_TEMPLATE_MMXEXT
+#define COMPILE_TEMPLATE_MMXEXT 1
+#define RENAME(a) a ## _mmxext
 #include "rgb2rgb_template.c"
 
 //SSE2 versions
 #undef RENAME
 #undef COMPILE_TEMPLATE_SSE2
 #define COMPILE_TEMPLATE_SSE2 1
-#define RENAME(a) a ## _SSE2
+#define RENAME(a) a ## _sse2
+#include "rgb2rgb_template.c"
+
+//AVX versions
+#undef RENAME
+#undef COMPILE_TEMPLATE_AVX
+#define COMPILE_TEMPLATE_AVX 1
+#define RENAME(a) a ## _avx
 #include "rgb2rgb_template.c"
 
 //3DNOW versions
 #undef RENAME
-#undef COMPILE_TEMPLATE_MMX2
+#undef COMPILE_TEMPLATE_MMXEXT
 #undef COMPILE_TEMPLATE_SSE2
+#undef COMPILE_TEMPLATE_AVX
 #undef COMPILE_TEMPLATE_AMD3DNOW
-#define COMPILE_TEMPLATE_MMX2 0
+#define COMPILE_TEMPLATE_MMXEXT 0
 #define COMPILE_TEMPLATE_SSE2 0
+#define COMPILE_TEMPLATE_AVX 0
 #define COMPILE_TEMPLATE_AMD3DNOW 1
-#define RENAME(a) a ## _3DNOW
+#define RENAME(a) a ## _3dnow
 #include "rgb2rgb_template.c"
 
 /*
  RGB15->RGB16 original by Strepto/Astral
  ported to gcc & bugfixed : A'rpi
- MMX2, 3DNOW optimization by Nick Kurshev
+ MMXEXT, 3DNOW optimization by Nick Kurshev
  32-bit C version, and and&add trick by Michael Niedermayer
 */
 
-void rgb2rgb_init_x86(void)
+#endif /* HAVE_INLINE_ASM */
+
+av_cold void rgb2rgb_init_x86(void)
 {
+#if HAVE_INLINE_ASM
     int cpu_flags = av_get_cpu_flags();
 
-    if (cpu_flags & AV_CPU_FLAG_MMX)
-        rgb2rgb_init_MMX();
-    if (HAVE_AMD3DNOW && cpu_flags & AV_CPU_FLAG_3DNOW)
-        rgb2rgb_init_3DNOW();
-    if (HAVE_MMX2     && cpu_flags & AV_CPU_FLAG_MMX2)
-        rgb2rgb_init_MMX2();
-    if (HAVE_SSE      && cpu_flags & AV_CPU_FLAG_SSE2)
-        rgb2rgb_init_SSE2();
+    if (INLINE_MMX(cpu_flags))
+        rgb2rgb_init_mmx();
+    if (INLINE_AMD3DNOW(cpu_flags))
+        rgb2rgb_init_3dnow();
+    if (INLINE_MMXEXT(cpu_flags))
+        rgb2rgb_init_mmxext();
+    if (INLINE_SSE2(cpu_flags))
+        rgb2rgb_init_sse2();
+    if (INLINE_AVX(cpu_flags))
+        rgb2rgb_init_avx();
+#endif /* HAVE_INLINE_ASM */
 }

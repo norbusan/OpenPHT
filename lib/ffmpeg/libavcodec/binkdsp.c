@@ -1,6 +1,6 @@
 /*
  * Bink DSP routines
- * Copyright (c) 2009 Kostya Shishkov
+ * Copyright (c) 2009 Konstantin Shishkov
  *
  * This file is part of FFmpeg.
  *
@@ -24,7 +24,8 @@
  * Bink DSP routines
  */
 
-#include "dsputil.h"
+#include "config.h"
+#include "libavutil/attributes.h"
 #include "binkdsp.h"
 
 #define A1  2896 /* (1/sqrt(2))<<12 */
@@ -128,9 +129,29 @@ static void scale_block_c(const uint8_t src[64]/*align 8*/, uint8_t *dst/*align 
     }
 }
 
-void ff_binkdsp_init(BinkDSPContext *c)
+static void add_pixels8_c(uint8_t *av_restrict pixels, int16_t *block,
+                          int line_size)
+{
+    int i;
+
+    for (i = 0; i < 8; i++) {
+        pixels[0] += block[0];
+        pixels[1] += block[1];
+        pixels[2] += block[2];
+        pixels[3] += block[3];
+        pixels[4] += block[4];
+        pixels[5] += block[5];
+        pixels[6] += block[6];
+        pixels[7] += block[7];
+        pixels    += line_size;
+        block     += 8;
+    }
+}
+
+av_cold void ff_binkdsp_init(BinkDSPContext *c)
 {
     c->idct_add    = bink_idct_add_c;
     c->idct_put    = bink_idct_put_c;
     c->scale_block = scale_block_c;
+    c->add_pixels8 = add_pixels8_c;
 }

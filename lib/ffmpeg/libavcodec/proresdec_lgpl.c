@@ -3,20 +3,20 @@
  *
  * Copyright (c) 2010-2011 Maxim Poliakovski
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -34,20 +34,26 @@
 
 #include "libavutil/intmath.h"
 #include "avcodec.h"
+#include "idctdsp.h"
+#include "internal.h"
+#include "proresdata.h"
 #include "proresdsp.h"
 #include "get_bits.h"
 
-typedef struct {
+typedef struct ProresThreadData {
     const uint8_t *index;            ///< pointers to the data of this slice
     int slice_num;
     int x_pos, y_pos;
     int slice_width;
-    DECLARE_ALIGNED(16, DCTELEM, blocks[8 * 4 * 64]);
+    int prev_slice_sf;               ///< scalefactor of the previous decoded slice
+    DECLARE_ALIGNED(16, int16_t, blocks)[8 * 4 * 64];
+    DECLARE_ALIGNED(16, int16_t, qmat_luma_scaled)[64];
+    DECLARE_ALIGNED(16, int16_t, qmat_chroma_scaled)[64];
 } ProresThreadData;
 
-typedef struct {
+typedef struct ProresContext {
     ProresDSPContext dsp;
-    AVFrame    picture;
+    AVFrame    *frame;
     ScanTable  scantable;
     int        scantable_type;           ///< -1 = uninitialized, 0 = progressive, 1/2 = interlaced
 
@@ -56,9 +62,6 @@ typedef struct {
     uint8_t    qmat_luma[64];            ///< dequantization matrix for luma
     uint8_t    qmat_chroma[64];          ///< dequantization matrix for chroma
     int        qmat_changed;             ///< 1 - global quantization matrices changed
-    int        prev_slice_sf;            ///< scalefactor of the previous decoded slice
-    DECLARE_ALIGNED(16, int16_t, qmat_luma_scaled[64]);
-    DECLARE_ALIGNED(16, int16_t, qmat_chroma_scaled[64]);
     int        total_slices;            ///< total number of slices in a picture
     ProresThreadData *slice_data;
     int        pic_num;
@@ -75,29 +78,6 @@ typedef struct {
 } ProresContext;
 
 
-static const uint8_t progressive_scan[64] = {
-     0,  1,  8,  9,  2,  3, 10, 11,
-    16, 17, 24, 25, 18, 19, 26, 27,
-     4,  5, 12, 20, 13,  6,  7, 14,
-    21, 28, 29, 22, 15, 23, 30, 31,
-    32, 33, 40, 48, 41, 34, 35, 42,
-    49, 56, 57, 50, 43, 36, 37, 44,
-    51, 58, 59, 52, 45, 38, 39, 46,
-    53, 60, 61, 54, 47, 55, 62, 63
-};
-
-static const uint8_t interlaced_scan[64] = {
-     0,  8,  1,  9, 16, 24, 17, 25,
-     2, 10,  3, 11, 18, 26, 19, 27,
-    32, 40, 33, 34, 41, 48, 56, 49,
-    42, 35, 43, 50, 57, 58, 51, 59,
-     4, 12,  5,  6, 13, 20, 28, 21,
-    14,  7, 15, 22, 29, 36, 44, 37,
-    30, 23, 31, 38, 45, 52, 60, 53,
-    46, 39, 47, 54, 61, 62, 55, 63
-};
-
-
 static av_cold int decode_init(AVCodecContext *avctx)
 {
     ProresContext *ctx = avctx->priv_data;
@@ -108,15 +88,9 @@ static av_cold int decode_init(AVCodecContext *avctx)
     avctx->bits_per_raw_sample = PRORES_BITS_PER_SAMPLE;
     ff_proresdsp_init(&ctx->dsp, avctx);
 
-    avctx->coded_frame = &ctx->picture;
-    avcodec_get_frame_defaults(&ctx->picture);
-    ctx->picture.type      = AV_PICTURE_TYPE_I;
-    ctx->picture.key_frame = 1;
-
     ctx->scantable_type = -1;   // set scantable type to uninitialized
     memset(ctx->qmat_luma, 4, 64);
     memset(ctx->qmat_chroma, 4, 64);
-    ctx->prev_slice_sf = 0;
 
     return 0;
 }
@@ -160,12 +134,22 @@ static int decode_frame_header(ProresContext *ctx, const uint8_t *buf,
     ctx->chroma_factor     = (buf[12] >> 6) & 3;
     ctx->mb_chroma_factor  = ctx->chroma_factor + 2;
     ctx->num_chroma_blocks = (1 << ctx->chroma_factor) >> 1;
+    ctx->alpha_info        = buf[17] & 0xf;
+
+    if (ctx->alpha_info > 2) {
+        av_log(avctx, AV_LOG_ERROR, "Invalid alpha mode %d\n", ctx->alpha_info);
+        return AVERROR_INVALIDDATA;
+    }
+    if (avctx->skip_alpha) ctx->alpha_info = 0;
+
     switch (ctx->chroma_factor) {
     case 2:
-        avctx->pix_fmt = PIX_FMT_YUV422P10;
+        avctx->pix_fmt = ctx->alpha_info ? AV_PIX_FMT_YUVA422P10
+                                         : AV_PIX_FMT_YUV422P10;
         break;
     case 3:
-        avctx->pix_fmt = PIX_FMT_YUV444P10;
+        avctx->pix_fmt = ctx->alpha_info ? AV_PIX_FMT_YUVA444P10
+                                         : AV_PIX_FMT_YUV444P10;
         break;
     default:
         av_log(avctx, AV_LOG_ERROR,
@@ -176,23 +160,23 @@ static int decode_frame_header(ProresContext *ctx, const uint8_t *buf,
     if (ctx->scantable_type != ctx->frame_type) {
         if (!ctx->frame_type)
             ff_init_scantable(ctx->dsp.idct_permutation, &ctx->scantable,
-                              progressive_scan);
+                              ff_prores_progressive_scan);
         else
             ff_init_scantable(ctx->dsp.idct_permutation, &ctx->scantable,
-                              interlaced_scan);
+                              ff_prores_interlaced_scan);
         ctx->scantable_type = ctx->frame_type;
     }
 
     if (ctx->frame_type) {      /* if interlaced */
-        ctx->picture.interlaced_frame = 1;
-        ctx->picture.top_field_first  = ctx->frame_type & 1;
+        ctx->frame->interlaced_frame = 1;
+        ctx->frame->top_field_first  = ctx->frame_type & 1;
     } else {
-        ctx->picture.interlaced_frame = 0;
+        ctx->frame->interlaced_frame = 0;
     }
 
-    ctx->alpha_info = buf[17] & 0xf;
-    if (ctx->alpha_info)
-        av_log_missing_feature(avctx, "alpha channel", 0);
+    avctx->color_primaries = buf[14];
+    avctx->color_trc       = buf[15];
+    avctx->colorspace      = buf[16];
 
     ctx->qmat_changed = 0;
     ptr   = buf + 20;
@@ -264,8 +248,8 @@ static int decode_picture_header(ProresContext *ctx, const uint8_t *buf,
 
     ctx->num_x_mbs = (avctx->width + 15) >> 4;
     ctx->num_y_mbs = (avctx->height +
-                      (1 << (4 + ctx->picture.interlaced_frame)) - 1) >>
-                     (4 + ctx->picture.interlaced_frame);
+                      (1 << (4 + ctx->frame->interlaced_frame)) - 1) >>
+                     (4 + ctx->frame->interlaced_frame);
 
     remainder    = ctx->num_x_mbs & ((1 << slice_width_factor) - 1);
     num_x_slices = (ctx->num_x_mbs >> slice_width_factor) + (remainder & 1) +
@@ -279,7 +263,7 @@ static int decode_picture_header(ProresContext *ctx, const uint8_t *buf,
 
     if (ctx->total_slices != num_slices) {
         av_freep(&ctx->slice_data);
-        ctx->slice_data = av_malloc((num_slices + 1) * sizeof(ctx->slice_data[0]));
+        ctx->slice_data = av_malloc_array(num_slices + 1, sizeof(ctx->slice_data[0]));
         if (!ctx->slice_data)
             return AVERROR(ENOMEM);
         ctx->total_slices = num_slices;
@@ -296,9 +280,11 @@ static int decode_picture_header(ProresContext *ctx, const uint8_t *buf,
 
     for (i = 0; i < num_slices; i++) {
         ctx->slice_data[i].index = data_ptr;
+        ctx->slice_data[i].prev_slice_sf = 0;
         data_ptr += AV_RB16(index_ptr + i * 2);
     }
     ctx->slice_data[i].index = data_ptr;
+    ctx->slice_data[i].prev_slice_sf = 0;
 
     if (data_ptr > buf + data_size) {
         av_log(avctx, AV_LOG_ERROR, "out of slice data\n");
@@ -312,7 +298,7 @@ static int decode_picture_header(ProresContext *ctx, const uint8_t *buf,
 /**
  * Read an unsigned rice/exp golomb codeword.
  */
-static inline int decode_vlc_codeword(GetBitContext *gb, uint8_t codebook)
+static inline int decode_vlc_codeword(GetBitContext *gb, unsigned codebook)
 {
     unsigned int rice_order, exp_order, switch_bits;
     unsigned int buf, code;
@@ -353,23 +339,13 @@ static inline int decode_vlc_codeword(GetBitContext *gb, uint8_t codebook)
 #define LSB2SIGN(x) (-((x) & 1))
 #define TOSIGNED(x) (((x) >> 1) ^ LSB2SIGN(x))
 
-#define FIRST_DC_CB 0xB8 // rice_order = 5, exp_golomb_order = 6, switch_bits = 0
-
-static uint8_t dc_codebook[4] = {
-    0x04, // rice_order = 0, exp_golomb_order = 1, switch_bits = 0
-    0x28, // rice_order = 1, exp_golomb_order = 2, switch_bits = 0
-    0x4D, // rice_order = 2, exp_golomb_order = 3, switch_bits = 1
-    0x70  // rice_order = 3, exp_golomb_order = 4, switch_bits = 0
-};
-
-
 /**
  * Decode DC coefficients for all blocks in a slice.
  */
-static inline void decode_dc_coeffs(GetBitContext *gb, DCTELEM *out,
+static inline void decode_dc_coeffs(GetBitContext *gb, int16_t *out,
                                     int nblocks)
 {
-    DCTELEM prev_dc;
+    int16_t prev_dc;
     int     i, sign;
     int16_t delta;
     unsigned int code;
@@ -381,7 +357,7 @@ static inline void decode_dc_coeffs(GetBitContext *gb, DCTELEM *out,
     delta  = 3;
 
     for (i = 1; i < nblocks; i++, out += 64) {
-        code = decode_vlc_codeword(gb, dc_codebook[FFMIN(FFABS(delta), 3)]);
+        code = decode_vlc_codeword(gb, ff_prores_dc_codebook[FFMIN(FFABS(delta), 3)]);
 
         sign     = -(((delta >> 15) & 1) ^ (code & 1));
         delta    = (((code + 1) >> 1) ^ sign) - sign;
@@ -390,34 +366,15 @@ static inline void decode_dc_coeffs(GetBitContext *gb, DCTELEM *out,
     }
 }
 
-
-static uint8_t ac_codebook[7] = {
-    0x04, // rice_order = 0, exp_golomb_order = 1, switch_bits = 0
-    0x28, // rice_order = 1, exp_golomb_order = 2, switch_bits = 0
-    0x4C, // rice_order = 2, exp_golomb_order = 3, switch_bits = 0
-    0x05, // rice_order = 0, exp_golomb_order = 1, switch_bits = 1
-    0x29, // rice_order = 1, exp_golomb_order = 2, switch_bits = 1
-    0x06, // rice_order = 0, exp_golomb_order = 1, switch_bits = 2
-    0x0A, // rice_order = 0, exp_golomb_order = 2, switch_bits = 2
-};
-
-/**
- * Lookup tables for adaptive switching between codebooks
- * according with previous run/level value.
- */
-static uint8_t run_to_cb_index[16] =
-    { 5, 5, 3, 3, 0, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 2 };
-
-static uint8_t lev_to_cb_index[10] = { 0, 6, 3, 5, 0, 1, 1, 1, 1, 2 };
-
+#define MAX_PADDING 16
 
 /**
  * Decode AC coefficients for all blocks in a slice.
  */
-static inline void decode_ac_coeffs(GetBitContext *gb, DCTELEM *out,
-                                    int blocks_per_slice,
-                                    int plane_size_factor,
-                                    const uint8_t *scan)
+static inline int decode_ac_coeffs(GetBitContext *gb, int16_t *out,
+                                   int blocks_per_slice,
+                                   int plane_size_factor,
+                                   const uint8_t *scan)
 {
     int pos, block_mask, run, level, sign, run_cb_index, lev_cb_index;
     int max_coeffs, bits_left;
@@ -430,20 +387,24 @@ static inline void decode_ac_coeffs(GetBitContext *gb, DCTELEM *out,
     block_mask = blocks_per_slice - 1;
 
     for (pos = blocks_per_slice - 1; pos < max_coeffs;) {
-        run_cb_index = run_to_cb_index[FFMIN(run, 15)];
-        lev_cb_index = lev_to_cb_index[FFMIN(level, 9)];
+        run_cb_index = ff_prores_run_to_cb_index[FFMIN(run, 15)];
+        lev_cb_index = ff_prores_lev_to_cb_index[FFMIN(level, 9)];
 
         bits_left = get_bits_left(gb);
-        if (bits_left <= 0 || (bits_left <= 8 && !show_bits(gb, bits_left)))
-            return;
+        if (bits_left <= 0 || (bits_left <= MAX_PADDING && !show_bits(gb, bits_left)))
+            return 0;
 
-        run = decode_vlc_codeword(gb, ac_codebook[run_cb_index]);
+        run = decode_vlc_codeword(gb, ff_prores_ac_codebook[run_cb_index]);
+        if (run < 0)
+            return AVERROR_INVALIDDATA;
 
         bits_left = get_bits_left(gb);
-        if (bits_left <= 0 || (bits_left <= 8 && !show_bits(gb, bits_left)))
-            return;
+        if (bits_left <= 0 || (bits_left <= MAX_PADDING && !show_bits(gb, bits_left)))
+            return AVERROR_INVALIDDATA;
 
-        level = decode_vlc_codeword(gb, ac_codebook[lev_cb_index]) + 1;
+        level = decode_vlc_codeword(gb, ff_prores_ac_codebook[lev_cb_index]) + 1;
+        if (level < 0)
+            return AVERROR_INVALIDDATA;
 
         pos += run + 1;
         if (pos >= max_coeffs)
@@ -453,22 +414,24 @@ static inline void decode_ac_coeffs(GetBitContext *gb, DCTELEM *out,
         out[((pos & block_mask) << 6) + scan[pos >> plane_size_factor]] =
             (level ^ sign) - sign;
     }
+
+    return 0;
 }
 
 
 /**
  * Decode a slice plane (luma or chroma).
  */
-static void decode_slice_plane(ProresContext *ctx, ProresThreadData *td,
-                               const uint8_t *buf,
-                               int data_size, uint16_t *out_ptr,
-                               int linesize, int mbs_per_slice,
-                               int blocks_per_mb, int plane_size_factor,
-                               const int16_t *qmat)
+static int decode_slice_plane(ProresContext *ctx, ProresThreadData *td,
+                              const uint8_t *buf,
+                              int data_size, uint16_t *out_ptr,
+                              int linesize, int mbs_per_slice,
+                              int blocks_per_mb, int plane_size_factor,
+                              const int16_t *qmat, int is_chroma)
 {
     GetBitContext gb;
-    DCTELEM *block_ptr;
-    int mb_num, blocks_per_slice;
+    int16_t *block_ptr;
+    int mb_num, blocks_per_slice, ret;
 
     blocks_per_slice = mbs_per_slice * blocks_per_mb;
 
@@ -478,28 +441,119 @@ static void decode_slice_plane(ProresContext *ctx, ProresThreadData *td,
 
     decode_dc_coeffs(&gb, td->blocks, blocks_per_slice);
 
-    decode_ac_coeffs(&gb, td->blocks, blocks_per_slice,
-                     plane_size_factor, ctx->scantable.permutated);
+    ret = decode_ac_coeffs(&gb, td->blocks, blocks_per_slice,
+                           plane_size_factor, ctx->scantable.permutated);
+    if (ret < 0)
+        return ret;
 
     /* inverse quantization, inverse transform and output */
     block_ptr = td->blocks;
 
-    for (mb_num = 0; mb_num < mbs_per_slice; mb_num++, out_ptr += blocks_per_mb * 4) {
-        ctx->dsp.idct_put(out_ptr,                    linesize, block_ptr, qmat);
-        block_ptr += 64;
-        if (blocks_per_mb > 2) {
-            ctx->dsp.idct_put(out_ptr + 8,            linesize, block_ptr, qmat);
+    if (!is_chroma) {
+        for (mb_num = 0; mb_num < mbs_per_slice; mb_num++, out_ptr += blocks_per_mb * 4) {
+            ctx->dsp.idct_put(out_ptr,                    linesize, block_ptr, qmat);
             block_ptr += 64;
+            if (blocks_per_mb > 2) {
+                ctx->dsp.idct_put(out_ptr + 8,            linesize, block_ptr, qmat);
+                block_ptr += 64;
+            }
+            ctx->dsp.idct_put(out_ptr + linesize * 4,     linesize, block_ptr, qmat);
+            block_ptr += 64;
+            if (blocks_per_mb > 2) {
+                ctx->dsp.idct_put(out_ptr + linesize * 4 + 8, linesize, block_ptr, qmat);
+                block_ptr += 64;
+            }
         }
-        ctx->dsp.idct_put(out_ptr + linesize * 4,     linesize, block_ptr, qmat);
-        block_ptr += 64;
-        if (blocks_per_mb > 2) {
-            ctx->dsp.idct_put(out_ptr + linesize * 4 + 8, linesize, block_ptr, qmat);
+    } else {
+        for (mb_num = 0; mb_num < mbs_per_slice; mb_num++, out_ptr += blocks_per_mb * 4) {
+            ctx->dsp.idct_put(out_ptr,                    linesize, block_ptr, qmat);
             block_ptr += 64;
+            ctx->dsp.idct_put(out_ptr + linesize * 4,     linesize, block_ptr, qmat);
+            block_ptr += 64;
+            if (blocks_per_mb > 2) {
+                ctx->dsp.idct_put(out_ptr + 8,            linesize, block_ptr, qmat);
+                block_ptr += 64;
+                ctx->dsp.idct_put(out_ptr + linesize * 4 + 8, linesize, block_ptr, qmat);
+                block_ptr += 64;
+            }
         }
     }
+    return 0;
 }
 
+
+static void unpack_alpha(GetBitContext *gb, uint16_t *dst, int num_coeffs,
+                         const int num_bits)
+{
+    const int mask = (1 << num_bits) - 1;
+    int i, idx, val, alpha_val;
+
+    idx       = 0;
+    alpha_val = mask;
+    do {
+        do {
+            if (get_bits1(gb))
+                val = get_bits(gb, num_bits);
+            else {
+                int sign;
+                val  = get_bits(gb, num_bits == 16 ? 7 : 4);
+                sign = val & 1;
+                val  = (val + 2) >> 1;
+                if (sign)
+                    val = -val;
+            }
+            alpha_val = (alpha_val + val) & mask;
+            if (num_bits == 16)
+                dst[idx++] = alpha_val >> 6;
+            else
+                dst[idx++] = (alpha_val << 2) | (alpha_val >> 6);
+            if (idx >= num_coeffs) {
+                break;
+            }
+        } while (get_bits1(gb));
+        val = get_bits(gb, 4);
+        if (!val)
+            val = get_bits(gb, 11);
+        if (idx + val > num_coeffs)
+            val = num_coeffs - idx;
+        if (num_bits == 16)
+            for (i = 0; i < val; i++)
+                dst[idx++] = alpha_val >> 6;
+        else
+            for (i = 0; i < val; i++)
+                dst[idx++] = (alpha_val << 2) | (alpha_val >> 6);
+    } while (idx < num_coeffs);
+}
+
+/**
+ * Decode alpha slice plane.
+ */
+static void decode_alpha_plane(ProresContext *ctx, ProresThreadData *td,
+                               const uint8_t *buf, int data_size,
+                               uint16_t *out_ptr, int linesize,
+                               int mbs_per_slice)
+{
+    GetBitContext gb;
+    int i;
+    uint16_t *block_ptr;
+
+    memset(td->blocks, 0, 8 * 4 * 64 * sizeof(*td->blocks));
+
+    init_get_bits(&gb, buf, data_size << 3);
+
+    if (ctx->alpha_info == 2)
+        unpack_alpha(&gb, td->blocks, mbs_per_slice * 4 * 64, 16);
+    else
+        unpack_alpha(&gb, td->blocks, mbs_per_slice * 4 * 64, 8);
+
+    block_ptr = td->blocks;
+
+    for (i = 0; i < 16; i++) {
+        memcpy(out_ptr, block_ptr, 16 * mbs_per_slice * sizeof(*out_ptr));
+        out_ptr   += linesize >> 1;
+        block_ptr += 16 * mbs_per_slice;
+    }
+}
 
 static int decode_slice(AVCodecContext *avctx, void *tdata)
 {
@@ -511,11 +565,14 @@ static int decode_slice(AVCodecContext *avctx, void *tdata)
     int slice_num = td->slice_num;
     int mbs_per_slice = td->slice_width;
     const uint8_t *buf;
-    uint8_t *y_data, *u_data, *v_data;
-    AVFrame *pic = avctx->coded_frame;
+    uint8_t *y_data, *u_data, *v_data, *a_data;
+    AVFrame *pic = ctx->frame;
     int i, sf, slice_width_factor;
-    int slice_data_size, hdr_size, y_data_size, u_data_size, v_data_size;
-    int y_linesize, u_linesize, v_linesize;
+    int slice_data_size, hdr_size;
+    int y_data_size, u_data_size, v_data_size, a_data_size;
+    int y_linesize, u_linesize, v_linesize, a_linesize;
+    int coff[4];
+    int ret;
 
     buf             = ctx->slice_data[slice_num].index;
     slice_data_size = ctx->slice_data[slice_num + 1].index - buf;
@@ -525,20 +582,30 @@ static int decode_slice(AVCodecContext *avctx, void *tdata)
     y_data     = pic->data[0];
     u_data     = pic->data[1];
     v_data     = pic->data[2];
+    a_data     = pic->data[3];
     y_linesize = pic->linesize[0];
     u_linesize = pic->linesize[1];
     v_linesize = pic->linesize[2];
+    a_linesize = pic->linesize[3];
 
     if (pic->interlaced_frame) {
         if (!(pic_num ^ pic->top_field_first)) {
             y_data += y_linesize;
             u_data += u_linesize;
             v_data += v_linesize;
+            if (a_data)
+                a_data += a_linesize;
         }
         y_linesize <<= 1;
         u_linesize <<= 1;
         v_linesize <<= 1;
+        a_linesize <<= 1;
     }
+    y_data += (mb_y_pos << 4) * y_linesize + (mb_x_pos << 5);
+    u_data += (mb_y_pos << 4) * u_linesize + (mb_x_pos << ctx->mb_chroma_factor);
+    v_data += (mb_y_pos << 4) * v_linesize + (mb_x_pos << ctx->mb_chroma_factor);
+    if (a_data)
+        a_data += (mb_y_pos << 4) * a_linesize + (mb_x_pos << 5);
 
     if (slice_data_size < 6) {
         av_log(avctx, AV_LOG_ERROR, "slice data too small\n");
@@ -547,13 +614,18 @@ static int decode_slice(AVCodecContext *avctx, void *tdata)
 
     /* parse slice header */
     hdr_size    = buf[0] >> 3;
+    coff[0]     = hdr_size;
     y_data_size = AV_RB16(buf + 2);
+    coff[1]     = coff[0] + y_data_size;
     u_data_size = AV_RB16(buf + 4);
-    v_data_size = hdr_size > 7 ? AV_RB16(buf + 6) :
-        slice_data_size - y_data_size - u_data_size - hdr_size;
+    coff[2]     = coff[1] + u_data_size;
+    v_data_size = hdr_size > 7 ? AV_RB16(buf + 6) : slice_data_size - coff[2];
+    coff[3]     = coff[2] + v_data_size;
+    a_data_size = ctx->alpha_info ? slice_data_size - coff[3] : 0;
 
-    if (hdr_size + y_data_size + u_data_size + v_data_size > slice_data_size ||
-        v_data_size < 0 || hdr_size < 6) {
+    /* if V or alpha component size is negative that means that previous
+       component sizes are too large */
+    if (v_data_size < 0 || a_data_size < 0 || hdr_size < 6) {
         av_log(avctx, AV_LOG_ERROR, "invalid data size\n");
         return AVERROR_INVALIDDATA;
     }
@@ -563,37 +635,46 @@ static int decode_slice(AVCodecContext *avctx, void *tdata)
 
     /* scale quantization matrixes according with slice's scale factor */
     /* TODO: this can be SIMD-optimized a lot */
-    if (ctx->qmat_changed || sf != ctx->prev_slice_sf) {
-        ctx->prev_slice_sf = sf;
+    if (ctx->qmat_changed || sf != td->prev_slice_sf) {
+        td->prev_slice_sf = sf;
         for (i = 0; i < 64; i++) {
-            ctx->qmat_luma_scaled[ctx->dsp.idct_permutation[i]]   = ctx->qmat_luma[i]   * sf;
-            ctx->qmat_chroma_scaled[ctx->dsp.idct_permutation[i]] = ctx->qmat_chroma[i] * sf;
+            td->qmat_luma_scaled[ctx->dsp.idct_permutation[i]]   = ctx->qmat_luma[i]   * sf;
+            td->qmat_chroma_scaled[ctx->dsp.idct_permutation[i]] = ctx->qmat_chroma[i] * sf;
         }
     }
 
     /* decode luma plane */
-    decode_slice_plane(ctx, td, buf + hdr_size, y_data_size,
-                       (uint16_t*) (y_data + (mb_y_pos << 4) * y_linesize +
-                                    (mb_x_pos << 5)), y_linesize,
-                       mbs_per_slice, 4, slice_width_factor + 2,
-                       ctx->qmat_luma_scaled);
+    ret = decode_slice_plane(ctx, td, buf + coff[0], y_data_size,
+                             (uint16_t*) y_data, y_linesize,
+                             mbs_per_slice, 4, slice_width_factor + 2,
+                             td->qmat_luma_scaled, 0);
+
+    if (ret < 0)
+        return ret;
 
     /* decode U chroma plane */
-    decode_slice_plane(ctx, td, buf + hdr_size + y_data_size, u_data_size,
-                       (uint16_t*) (u_data + (mb_y_pos << 4) * u_linesize +
-                                    (mb_x_pos << ctx->mb_chroma_factor)),
-                       u_linesize, mbs_per_slice, ctx->num_chroma_blocks,
-                       slice_width_factor + ctx->chroma_factor - 1,
-                       ctx->qmat_chroma_scaled);
+    ret = decode_slice_plane(ctx, td, buf + coff[1], u_data_size,
+                             (uint16_t*) u_data, u_linesize,
+                             mbs_per_slice, ctx->num_chroma_blocks,
+                             slice_width_factor + ctx->chroma_factor - 1,
+                             td->qmat_chroma_scaled, 1);
+    if (ret < 0)
+        return ret;
 
     /* decode V chroma plane */
-    decode_slice_plane(ctx, td, buf + hdr_size + y_data_size + u_data_size,
-                       v_data_size,
-                       (uint16_t*) (v_data + (mb_y_pos << 4) * v_linesize +
-                                    (mb_x_pos << ctx->mb_chroma_factor)),
-                       v_linesize, mbs_per_slice, ctx->num_chroma_blocks,
-                       slice_width_factor + ctx->chroma_factor - 1,
-                       ctx->qmat_chroma_scaled);
+    ret = decode_slice_plane(ctx, td, buf + coff[2], v_data_size,
+                             (uint16_t*) v_data, v_linesize,
+                             mbs_per_slice, ctx->num_chroma_blocks,
+                             slice_width_factor + ctx->chroma_factor - 1,
+                             td->qmat_chroma_scaled, 1);
+    if (ret < 0)
+        return ret;
+
+    /* decode alpha plane if available */
+    if (a_data && a_data_size)
+        decode_alpha_plane(ctx, td, buf + coff[3], a_data_size,
+                           (uint16_t*) a_data, a_linesize,
+                           mbs_per_slice);
 
     return 0;
 }
@@ -630,17 +711,19 @@ static int decode_picture(ProresContext *ctx, int pic_num,
 }
 
 
-#define FRAME_ID MKBETAG('i', 'c', 'p', 'f')
 #define MOVE_DATA_PTR(nbytes) buf += (nbytes); buf_size -= (nbytes)
 
-static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
+static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
                         AVPacket *avpkt)
 {
     ProresContext *ctx = avctx->priv_data;
-    AVFrame *picture   = avctx->coded_frame;
     const uint8_t *buf = avpkt->data;
     int buf_size       = avpkt->size;
     int frame_hdr_size, pic_num, pic_data_size;
+
+    ctx->frame            = data;
+    ctx->frame->pict_type = AV_PICTURE_TYPE_I;
+    ctx->frame->key_frame = 1;
 
     /* check frame atom container */
     if (buf_size < 28 || buf_size < AV_RB32(buf) ||
@@ -657,14 +740,10 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
 
     MOVE_DATA_PTR(frame_hdr_size);
 
-    if (picture->data[0])
-        avctx->release_buffer(avctx, picture);
-
-    picture->reference = 0;
-    if (avctx->get_buffer(avctx, picture) < 0)
+    if (ff_get_buffer(avctx, ctx->frame, 0) < 0)
         return -1;
 
-    for (pic_num = 0; ctx->picture.interlaced_frame - pic_num + 1; pic_num++) {
+    for (pic_num = 0; ctx->frame->interlaced_frame - pic_num + 1; pic_num++) {
         pic_data_size = decode_picture_header(ctx, buf, buf_size, avctx);
         if (pic_data_size < 0)
             return AVERROR_INVALIDDATA;
@@ -675,8 +754,8 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
         MOVE_DATA_PTR(pic_data_size);
     }
 
-    *data_size       = sizeof(AVPicture);
-    *(AVFrame*) data = *avctx->coded_frame;
+    ctx->frame = NULL;
+    *got_frame = 1;
 
     return avpkt->size;
 }
@@ -686,9 +765,6 @@ static av_cold int decode_close(AVCodecContext *avctx)
 {
     ProresContext *ctx = avctx->priv_data;
 
-    if (ctx->picture.data[0])
-        avctx->release_buffer(avctx, &ctx->picture);
-
     av_freep(&ctx->slice_data);
 
     return 0;
@@ -697,12 +773,12 @@ static av_cold int decode_close(AVCodecContext *avctx)
 
 AVCodec ff_prores_lgpl_decoder = {
     .name           = "prores_lgpl",
+    .long_name      = NULL_IF_CONFIG_SMALL("Apple ProRes (iCodec Pro)"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_PRORES,
+    .id             = AV_CODEC_ID_PRORES,
     .priv_data_size = sizeof(ProresContext),
     .init           = decode_init,
     .close          = decode_close,
     .decode         = decode_frame,
-    .capabilities   = CODEC_CAP_DR1 | CODEC_CAP_SLICE_THREADS,
-    .long_name      = NULL_IF_CONFIG_SMALL("Apple ProRes (iCodec Pro)")
+    .capabilities   = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_SLICE_THREADS,
 };

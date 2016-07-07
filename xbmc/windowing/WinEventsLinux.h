@@ -22,20 +22,29 @@
 #define WINDOW_EVENTS_LINUX_H
 
 #pragma once
+#include <memory>
 #include "windowing/WinEvents.h"
 #include "input/linux/LinuxInputDevices.h"
 
-class CWinEventsLinux : public CWinEventsBase
+class CWinEventsLinux : public IWinEvents
 {
 public:
   CWinEventsLinux();
-  static bool MessagePump();
-  static void RefreshDevices();
+  bool MessagePump();
+  size_t GetQueueSize();
+  void MessagePush(XBMC_Event *ev);
+  void RefreshDevices();
+  void Notify(const Observable &obs, const ObservableMessage msg)
+  {
+    if (msg == ObservableMessagePeripheralsChanged)
+      RefreshDevices();
+  }
   static bool IsRemoteLowBattery();
 
 private:
   static bool m_initialized;
   static CLinuxInputDevices m_devices;
+  std::unique_ptr<CLinuxInputDevicesCheckHotplugged> m_checkHotplug;
 };
 
 #endif

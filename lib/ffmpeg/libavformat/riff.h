@@ -1,5 +1,5 @@
 /*
- * RIFF codec tags
+ * RIFF common functions and data
  * copyright (c) 2000 Fabrice Bellard
  *
  * This file is part of FFmpeg.
@@ -34,7 +34,6 @@
 #include "metadata.h"
 
 extern const AVMetadataConv ff_riff_info_conv[];
-extern const char ff_riff_tags[][5];
 
 int64_t ff_start_tag(AVIOContext *pb, const char *tag);
 void ff_end_tag(AVIOContext *pb, int64_t start);
@@ -44,46 +43,75 @@ void ff_end_tag(AVIOContext *pb, int64_t start);
  * bits_per_encoded_sample fields. Does not read extradata.
  * @return codec tag
  */
-int ff_get_bmp_header(AVIOContext *pb, AVStream *st);
+int ff_get_bmp_header(AVIOContext *pb, AVStream *st, unsigned *esize);
 
-void ff_put_bmp_header(AVIOContext *pb, AVCodecContext *enc, const AVCodecTag *tags, int for_asf);
-int ff_put_wav_header(AVIOContext *pb, AVCodecContext *enc);
-enum CodecID ff_wav_codec_get_id(unsigned int tag, int bps);
-int ff_get_wav_header(AVIOContext *pb, AVCodecContext *codec, int size);
+void ff_put_bmp_header(AVIOContext *pb, AVCodecContext *enc, const AVCodecTag *tags, int for_asf, int ignore_extradata);
 
-extern const AVCodecTag ff_codec_bmp_tags[];
+/**
+ * Tell ff_put_wav_header() to use WAVEFORMATEX even for PCM codecs.
+ */
+#define FF_PUT_WAV_HEADER_FORCE_WAVEFORMATEX    0x00000001
+
+/**
+ * Write WAVEFORMAT header structure.
+ *
+ * @param flags a combination of FF_PUT_WAV_HEADER_* constants
+ *
+ * @return the size or -1 on error
+ */
+int ff_put_wav_header(AVIOContext *pb, AVCodecContext *enc, int flags);
+
+enum AVCodecID ff_wav_codec_get_id(unsigned int tag, int bps);
+int ff_get_wav_header(AVFormatContext *s, AVIOContext *pb, AVCodecContext *codec, int size, int big_endian);
+
+extern const AVCodecTag ff_codec_bmp_tags[]; // exposed through avformat_get_riff_video_tags()
 extern const AVCodecTag ff_codec_wav_tags[];
 
-unsigned int ff_codec_get_tag(const AVCodecTag *tags, enum CodecID id);
-enum CodecID ff_codec_get_id(const AVCodecTag *tags, unsigned int tag);
-void ff_parse_specific_params(AVCodecContext *stream, int *au_rate, int *au_ssize, int *au_scale);
-
-typedef uint8_t ff_asf_guid[16];
+void ff_parse_specific_params(AVStream *st, int *au_rate, int *au_ssize, int *au_scale);
 
 int ff_read_riff_info(AVFormatContext *s, int64_t size);
 
+/**
+ * Write all recognized RIFF tags from s->metadata
+ */
+void ff_riff_write_info(AVFormatContext *s);
+
+/**
+ * Write a single RIFF info tag
+ */
+void ff_riff_write_info_tag(AVIOContext *pb, const char *tag, const char *str);
+
+typedef uint8_t ff_asf_guid[16];
+
+typedef struct AVCodecGuid {
+    enum AVCodecID id;
+    ff_asf_guid guid;
+} AVCodecGuid;
+
+extern const AVCodecGuid ff_codec_wav_guids[];
+
 #define FF_PRI_GUID \
-    "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
+    "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x " \
+    "{%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x}"
+
 #define FF_ARG_GUID(g) \
-    g[0],g[1],g[2],g[3],g[4],g[5],g[6],g[7],g[8],g[9],g[10],g[11],g[12],g[13],g[14],g[15]
+    g[0], g[1], g[2],  g[3],  g[4],  g[5],  g[6],  g[7], \
+    g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15],\
+    g[3], g[2], g[1],  g[0],  g[5],  g[4],  g[7],  g[6], \
+    g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15]
+
+#define FF_MEDIASUBTYPE_BASE_GUID \
+    0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71
 
 static av_always_inline int ff_guidcmp(const void *g1, const void *g2)
 {
     return memcmp(g1, g2, sizeof(ff_asf_guid));
 }
 
-void ff_get_guid(AVIOContext *s, ff_asf_guid *g);
+int ff_get_guid(AVIOContext *s, ff_asf_guid *g);
+void ff_put_guid(AVIOContext *s, const ff_asf_guid *g);
+const ff_asf_guid *ff_get_codec_guid(enum AVCodecID id, const AVCodecGuid *av_guid);
 
-typedef struct {
-    enum CodecID id;
-    ff_asf_guid guid;
-} AVCodecGuid;
-
-enum CodecID ff_codec_guid_get_id(const AVCodecGuid *guids, ff_asf_guid guid);
-
-extern const AVCodecGuid ff_codec_wav_guids[];
-
-#define FF_MEDIASUBTYPE_BASE_GUID \
-    0x00,0x00,0x10,0x00,0x80,0x00,0x00,0xAA,0x00,0x38,0x9B,0x71
+enum AVCodecID ff_codec_guid_get_id(const AVCodecGuid *guids, ff_asf_guid guid);
 
 #endif /* AVFORMAT_RIFF_H */

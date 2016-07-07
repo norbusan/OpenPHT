@@ -237,7 +237,7 @@ bool CDirectory::Create(const CStdString& strPath)
   try
   {
     CStdString realPath = URIUtils::SubstitutePath(strPath);
-    auto_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realPath));
+    unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realPath));
     if (pDirectory.get())
       if(pDirectory->Create(realPath.c_str()))
         return true;
@@ -256,7 +256,7 @@ bool CDirectory::Exists(const CStdString& strPath)
   try
   {
     CStdString realPath = URIUtils::SubstitutePath(strPath);
-    auto_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realPath));
+    unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realPath));
     if (pDirectory.get())
       return pDirectory->Exists(realPath.c_str());
   }
@@ -274,7 +274,7 @@ bool CDirectory::Remove(const CStdString& strPath)
   try
   {
     CStdString realPath = URIUtils::SubstitutePath(strPath);
-    auto_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realPath));
+    unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realPath));
     if (pDirectory.get())
       if(pDirectory->Remove(realPath.c_str()))
         return true;
@@ -295,7 +295,7 @@ void CDirectory::FilterFileDirectories(CFileItemList &items, const CStdString &m
     CFileItemPtr pItem=items[i];
     if ((!pItem->m_bIsFolder) && (!pItem->IsInternetStream()))
     {
-      auto_ptr<IFileDirectory> pDirectory(CFileDirectoryFactory::Create(pItem->GetPath(),pItem.get(),mask));
+      unique_ptr<IFileDirectory> pDirectory(CFileDirectoryFactory::Create(pItem->GetPath(), pItem.get(), mask));
       if (pDirectory.get())
         pItem->m_bIsFolder = true;
       else

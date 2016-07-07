@@ -20,7 +20,6 @@
 
 #include "DVDStreamInfo.h"
 
-#include "DVDCodecs/DVDCodecs.h"
 #include "DVDDemuxers/DVDDemux.h"
 
 CDVDStreamInfo::CDVDStreamInfo()                                                     { extradata = NULL; Clear(); }
@@ -38,11 +37,12 @@ CDVDStreamInfo::~CDVDStreamInfo()
 
 void CDVDStreamInfo::Clear()
 {
-  codec = CODEC_ID_NONE;
+  codec = AV_CODEC_ID_NONE;
   type = STREAM_NONE;
   software = false;
   codec_tag  = 0;
-  isAudioOnly = false;
+  flags = 0;
+  filename.clear();
 
   if( extradata && extrasize ) free(extradata);
 
@@ -51,6 +51,8 @@ void CDVDStreamInfo::Clear()
 
   fpsscale = 0;
   fpsrate  = 0;
+  rfpsscale= 0;
+  rfpsrate = 0;
   height   = 0;
   width    = 0;
   aspect   = 0.0;
@@ -61,6 +63,8 @@ void CDVDStreamInfo::Clear()
   ptsinvalid = false;
   forced_aspect = false;
   bitsperpixel = 0;
+  pid = 0;
+  stereo_mode.clear();
 
   channels   = 0;
   samplerate = 0;
@@ -68,15 +72,17 @@ void CDVDStreamInfo::Clear()
   bitrate    = 0;
   bitspersample = 0;
 
-  identifier = 0;
   orientation = 0;
+  workaround_bugs = 0;
 }
 
 bool CDVDStreamInfo::Equal(const CDVDStreamInfo& right, bool withextradata)
 {
   if( codec     != right.codec
   ||  type      != right.type
-  ||  codec_tag != right.codec_tag)
+  ||  codec_tag != right.codec_tag
+  ||  flags     != right.flags
+  ||  filename  != right.filename)
     return false;
 
   if( withextradata )
@@ -91,6 +97,8 @@ bool CDVDStreamInfo::Equal(const CDVDStreamInfo& right, bool withextradata)
   // VIDEO
   if( fpsscale != right.fpsscale
   ||  fpsrate  != right.fpsrate
+  ||  rfpsscale!= right.rfpsscale
+  ||  rfpsrate != right.rfpsrate
   ||  height   != right.height
   ||  width    != right.width
   ||  stills   != right.stills
@@ -99,7 +107,9 @@ bool CDVDStreamInfo::Equal(const CDVDStreamInfo& right, bool withextradata)
   ||  ptsinvalid != right.ptsinvalid
   ||  forced_aspect != right.forced_aspect
   ||  bitsperpixel != right.bitsperpixel
-  ||  vfr      != right.vfr) return false;
+  ||  pid != right.pid
+  ||  vfr      != right.vfr
+  ||  stereo_mode != right.stereo_mode ) return false;
 
   // AUDIO
   if( channels      != right.channels
@@ -109,7 +119,6 @@ bool CDVDStreamInfo::Equal(const CDVDStreamInfo& right, bool withextradata)
   ||  bitspersample != right.bitspersample ) return false;
 
   // SUBTITLE
-  if( identifier != right.identifier ) return false;
 
   return true;
 }
@@ -128,6 +137,8 @@ void CDVDStreamInfo::Assign(const CDVDStreamInfo& right, bool withextradata)
   codec = right.codec;
   type = right.type;
   codec_tag = right.codec_tag;
+  flags = right.flags;
+  filename = right.filename;
 
   if( extradata && extrasize ) free(extradata);
 
@@ -148,6 +159,8 @@ void CDVDStreamInfo::Assign(const CDVDStreamInfo& right, bool withextradata)
   // VIDEO
   fpsscale = right.fpsscale;
   fpsrate  = right.fpsrate;
+  rfpsscale= right.rfpsscale;
+  rfpsrate = right.rfpsrate;
   height   = right.height;
   width    = right.width;
   aspect   = right.aspect;
@@ -158,6 +171,11 @@ void CDVDStreamInfo::Assign(const CDVDStreamInfo& right, bool withextradata)
   forced_aspect = right.forced_aspect;
   orientation = right.orientation;
   bitsperpixel = right.bitsperpixel;
+  pid = right.pid;
+  vfr = right.vfr;
+  software = right.software;
+  stereo_mode = right.stereo_mode;
+  workaround_bugs = right.workaround_bugs;
 
   // AUDIO
   channels      = right.channels;
@@ -167,7 +185,6 @@ void CDVDStreamInfo::Assign(const CDVDStreamInfo& right, bool withextradata)
   bitspersample = right.bitspersample;
 
   // SUBTITLE
-  identifier = right.identifier;
 }
 
 void CDVDStreamInfo::Assign(const CDemuxStream& right, bool withextradata)
@@ -179,6 +196,7 @@ void CDVDStreamInfo::Assign(const CDemuxStream& right, bool withextradata)
   codec_tag = right.codec_fourcc;
   profile   = right.profile;
   level     = right.level;
+  flags     = right.flags;
 
   if( withextradata && right.ExtraSize )
   {
@@ -203,6 +221,8 @@ void CDVDStreamInfo::Assign(const CDemuxStream& right, bool withextradata)
     const CDemuxStreamVideo *stream = static_cast<const CDemuxStreamVideo*>(&right);
     fpsscale  = stream->iFpsScale;
     fpsrate   = stream->iFpsRate;
+    rfpsscale = stream->irFpsScale;
+    rfpsrate  = stream->irFpsRate;
     height    = stream->iHeight;
     width     = stream->iWidth;
     aspect    = stream->fAspect;
@@ -211,10 +231,11 @@ void CDVDStreamInfo::Assign(const CDemuxStream& right, bool withextradata)
     forced_aspect = stream->bForcedAspect;
     orientation = stream->iOrientation;
     bitsperpixel = stream->iBitsPerPixel;
+    pid = stream->iPhysicalId;
+    stereo_mode = stream->stereo_mode;
+    workaround_bugs = stream->workaround_bugs;
   }
   else if(  right.type == STREAM_SUBTITLE )
   {
-    const CDemuxStreamSubtitle *stream = static_cast<const CDemuxStreamSubtitle*>(&right);
-    identifier = stream->identifier;
   }
 }

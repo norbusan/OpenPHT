@@ -25,8 +25,11 @@
  * @author Michael Niedermayer <michaelni@gmx.at>
  */
 
+#include "libavutil/avassert.h"
 #include "avcodec.h"
-#include "dsputil.h"
+#include "libavutil/common.h"
+
+#if FF_API_AVCODEC_RESAMPLE
 
 #ifndef CONFIG_RESAMPLE_HP
 #define FILTER_SHIFT 15
@@ -99,7 +102,7 @@ static double bessel(double x){
 static int build_filter(FELEM *filter, double factor, int tap_count, int phase_count, int scale, int type){
     int ph, i;
     double x, y, w;
-    double *tab = av_malloc(tap_count * sizeof(*tab));
+    double *tab = av_malloc_array(tap_count, sizeof(*tab));
     const int center= (tap_count-1)/2;
 
     if (!tab)
@@ -199,7 +202,7 @@ AVResampleContext *av_resample_init(int out_rate, int in_rate, int filter_size, 
     c->linear= linear;
 
     c->filter_length= FFMAX((int)ceil(filter_size/factor), 1);
-    c->filter_bank= av_mallocz(c->filter_length*(phase_count+1)*sizeof(FELEM));
+    c->filter_bank= av_mallocz_array(c->filter_length, (phase_count+1)*sizeof(FELEM));
     if (!c->filter_bank)
         goto error;
     if (build_filter(c->filter_bank, factor, c->filter_length, phase_count, 1<<FILTER_SHIFT, WINDOW_TYPE))
@@ -301,7 +304,7 @@ int av_resample(AVResampleContext *c, short *dst, short *src, int *consumed, int
 
     if(compensation_distance){
         compensation_distance -= dst_index;
-        assert(compensation_distance > 0);
+        av_assert2(compensation_distance > 0);
     }
     if(update_ctx){
         c->frac= frac;
@@ -309,13 +312,8 @@ int av_resample(AVResampleContext *c, short *dst, short *src, int *consumed, int
         c->dst_incr= dst_incr_frac + c->src_incr*dst_incr;
         c->compensation_distance= compensation_distance;
     }
-#if 0
-    if(update_ctx && !c->compensation_distance){
-#undef rand
-        av_resample_compensate(c, rand() % (8000*2) - 8000, 8000*2);
-av_log(NULL, AV_LOG_DEBUG, "%d %d %d\n", c->dst_incr, c->ideal_dst_incr, c->compensation_distance);
-    }
-#endif
 
     return dst_index;
 }
+
+#endif

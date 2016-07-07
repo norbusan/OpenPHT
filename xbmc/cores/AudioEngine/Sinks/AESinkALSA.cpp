@@ -1,6 +1,6 @@
 /*
- *      Copyright (C) 2010-2012 Team XBMC
- *      http://www.xbmc.org
+ *      Copyright (C) 2010-2013 Team XBMC
+ *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,32 +22,46 @@
 
 #include <stdint.h>
 #include <limits.h>
+#include <sys/utsname.h>
 #include <set>
 #include <sstream>
+#include <string>
+#include <algorithm>
 
 #include "AESinkALSA.h"
-#include "Utils/AEUtil.h"
-#include "Utils/AEELDParser.h"
-#include "utils/StdString.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
+#include "cores/AudioEngine/Utils/AEELDParser.h"
 #include "utils/log.h"
 #include "utils/MathUtils.h"
+#include "utils/SystemInfo.h"
 #include "threads/SingleLock.h"
-#include "settings/GUISettings.h"
-#if defined(HAS_AMLPLAYER)
-#include "cores/amlplayer/AMLUtils.h"
+#include "settings/AdvancedSettings.h"
+#if defined(HAS_LIBAMCODEC)
+#include "utils/AMLUtils.h"
+#include "utils/SysfsUtils.h"
 #endif
+
+
+#define AE_MIN_PERIODSIZE 256
+#define ALSA_CHMAP_KERNEL_BLACKLIST
 
 #define ALSA_OPTIONS (SND_PCM_NO_AUTO_FORMAT | SND_PCM_NO_AUTO_CHANNELS | SND_PCM_NO_AUTO_RESAMPLE)
 
 #define ALSA_MAX_CHANNELS 16
-static enum AEChannel ALSAChannelMap[ALSA_MAX_CHANNELS + 1] = {
+static enum AEChannel LegacyALSAChannelMap[ALSA_MAX_CHANNELS + 1] = {
   AE_CH_FL      , AE_CH_FR      , AE_CH_BL      , AE_CH_BR      , AE_CH_FC      , AE_CH_LFE     , AE_CH_SL      , AE_CH_SR      ,
   AE_CH_UNKNOWN1, AE_CH_UNKNOWN2, AE_CH_UNKNOWN3, AE_CH_UNKNOWN4, AE_CH_UNKNOWN5, AE_CH_UNKNOWN6, AE_CH_UNKNOWN7, AE_CH_UNKNOWN8, /* for p16v devices */
   AE_CH_NULL
 };
 
-static enum AEChannel ALSAChannelMapWide[ALSA_MAX_CHANNELS + 1] = {
+static enum AEChannel LegacyALSAChannelMap51Wide[ALSA_MAX_CHANNELS + 1] = {
   AE_CH_FL      , AE_CH_FR      , AE_CH_SL      , AE_CH_SR      , AE_CH_FC      , AE_CH_LFE     , AE_CH_BL      , AE_CH_BR      ,
+  AE_CH_UNKNOWN1, AE_CH_UNKNOWN2, AE_CH_UNKNOWN3, AE_CH_UNKNOWN4, AE_CH_UNKNOWN5, AE_CH_UNKNOWN6, AE_CH_UNKNOWN7, AE_CH_UNKNOWN8, /* for p16v devices */
+  AE_CH_NULL
+};
+
+static enum AEChannel ALSAChannelMapPassthrough[ALSA_MAX_CHANNELS + 1] = {
+  AE_CH_RAW     , AE_CH_RAW     , AE_CH_RAW     , AE_CH_RAW     , AE_CH_RAW     , AE_CH_RAW     , AE_CH_RAW      , AE_CH_RAW      ,
   AE_CH_UNKNOWN1, AE_CH_UNKNOWN2, AE_CH_UNKNOWN3, AE_CH_UNKNOWN4, AE_CH_UNKNOWN5, AE_CH_UNKNOWN6, AE_CH_UNKNOWN7, AE_CH_UNKNOWN8, /* for p16v devices */
   AE_CH_NULL
 };
@@ -72,7 +86,13 @@ static unsigned int ALSASampleRateList[] =
 };
 
 CAESinkALSA::CAESinkALSA() :
-  m_pcm(NULL)
+  m_bufferSize(0),
+  m_formatSampleRateMul(0.0),
+  m_passthrough(false),
+  m_pcm(NULL),
+  m_timeout(0),
+  m_fragmented(false),
+  m_originalPeriodSize(AE_MIN_PERIODSIZE)
 {
   /* ensure that ALSA has been initialized */
   if (!snd_config)
@@ -84,42 +104,381 @@ CAESinkALSA::~CAESinkALSA()
   Deinitialize();
 }
 
-inline CAEChannelInfo CAESinkALSA::GetChannelLayout(AEAudioFormat format)
+inline CAEChannelInfo CAESinkALSA::GetChannelLayoutRaw(AEDataFormat dataFormat)
 {
   unsigned int count = 0;
 
-       if (format.m_dataFormat == AE_FMT_AC3 ||
-           format.m_dataFormat == AE_FMT_DTS ||
-           format.m_dataFormat == AE_FMT_EAC3)
-           count = 2;
-  else if (format.m_dataFormat == AE_FMT_TRUEHD ||
-           format.m_dataFormat == AE_FMT_DTSHD)
-           count = 8;
-  else
+  if (dataFormat == AE_FMT_AC3 ||
+      dataFormat == AE_FMT_DTS ||
+      dataFormat == AE_FMT_EAC3)
   {
-    // According to CEA-861-D only RL and RR are known. In case of a format having SL and SR channels
-    // but no BR BL channels, we use the wide map in order to open only the num of channels really
-    // needed.
-    enum AEChannel* channelMap = ALSAChannelMap;
-    if (format.m_channelLayout.HasChannel(AE_CH_SL) && !format.m_channelLayout.HasChannel(AE_CH_BL))
-      channelMap = ALSAChannelMapWide;
-    for (unsigned int c = 0; c < 8; ++c)
-      for (unsigned int i = 0; i < format.m_channelLayout.Count(); ++i)
-        if (format.m_channelLayout[i] == channelMap[c])
-        {
-          count = c + 1;
-          break;
-        }
+    count = 2;
+  }
+  else if (dataFormat == AE_FMT_TRUEHD ||
+           dataFormat == AE_FMT_DTSHD)
+  {
+    count = 8;
   }
 
   CAEChannelInfo info;
   for (unsigned int i = 0; i < count; ++i)
-    info += ALSAChannelMap[i];
+    info += ALSAChannelMapPassthrough[i];
 
   return info;
 }
 
-void CAESinkALSA::GetAESParams(AEAudioFormat format, std::string& params)
+inline CAEChannelInfo CAESinkALSA::GetChannelLayoutLegacy(const AEAudioFormat& format, unsigned int minChannels, unsigned int maxChannels)
+{
+  enum AEChannel* channelMap = LegacyALSAChannelMap;
+  unsigned int count = 0;
+
+  if (AE_IS_RAW(format.m_dataFormat))
+    return GetChannelLayoutRaw(format.m_dataFormat);
+
+  // According to CEA-861-D only RL and RR are known. In case of a format having SL and SR channels
+  // but no BR BL channels, we use the wide map in order to open only the num of channels really
+  // needed.
+  if (format.m_channelLayout.HasChannel(AE_CH_SL) && !format.m_channelLayout.HasChannel(AE_CH_BL))
+  {
+    channelMap = LegacyALSAChannelMap51Wide;
+  }
+  for (unsigned int c = 0; c < 8; ++c)
+  {
+    for (unsigned int i = 0; i < format.m_channelLayout.Count(); ++i)
+    {
+      if (format.m_channelLayout[i] == channelMap[c])
+      {
+        count = c + 1;
+        break;
+      }
+    }
+  }
+  count = std::max(count, minChannels);
+  count = std::min(count, maxChannels);
+
+  CAEChannelInfo info;
+  for (unsigned int i = 0; i < count; ++i)
+    info += channelMap[i];
+
+  return info;
+}
+
+inline CAEChannelInfo CAESinkALSA::GetChannelLayout(const AEAudioFormat& format, unsigned int channels)
+{
+  CAEChannelInfo info;
+  std::string alsaMapStr("none");
+
+  if (AE_IS_RAW(format.m_dataFormat))
+  {
+    info = GetChannelLayoutRaw(format.m_dataFormat);
+  }
+  else
+  {
+#ifdef SND_CHMAP_API_VERSION
+    /* ask for the actual map */
+    snd_pcm_chmap_t* actualMap = NULL;
+    if (AllowALSAMaps())
+      actualMap = snd_pcm_get_chmap(m_pcm);
+    if (actualMap)
+    {
+      alsaMapStr = ALSAchmapToString(actualMap);
+
+      info = ALSAchmapToAEChannelMap(actualMap);
+
+      /* "fake" a compatible map if it is more suitable for AE */
+      if (!info.ContainsChannels(format.m_channelLayout))
+      {
+        CAEChannelInfo infoAlternate = GetAlternateLayoutForm(info);
+        if (infoAlternate.Count())
+        {
+          std::vector<CAEChannelInfo> alts;
+          alts.push_back(info);
+          alts.push_back(infoAlternate);
+          if (format.m_channelLayout.BestMatch(alts) == 1)
+            info = infoAlternate;
+        }
+      }
+
+      /* add empty channels as needed (with e.g. FL,FR,LFE in 4ch) */
+      while (info.Count() < channels)
+        info += AE_CH_UNKNOWN1;
+
+      free(actualMap);
+    }
+    else
+#endif
+    {
+      info = GetChannelLayoutLegacy(format, channels, channels);
+    }
+  }
+
+  CLog::Log(LOGDEBUG, "CAESinkALSA::GetChannelLayout - Input Channel Count: %d Output Channel Count: %d", format.m_channelLayout.Count(), info.Count());
+  CLog::Log(LOGDEBUG, "CAESinkALSA::GetChannelLayout - Requested Layout: %s", std::string(format.m_channelLayout).c_str());
+  CLog::Log(LOGDEBUG, "CAESinkALSA::GetChannelLayout - Got Layout: %s (ALSA: %s)", std::string(info).c_str(), alsaMapStr.c_str());
+
+  return info;
+}
+
+#ifdef SND_CHMAP_API_VERSION
+
+bool CAESinkALSA::AllowALSAMaps()
+{
+  /*
+   * Some older kernels had various bugs in the HDA HDMI channel mapping, so just
+   * blanket blacklist them for now to avoid any breakage.
+   * Should be reasonably safe but still blacklisted:
+   * 3.10.20+, 3.11.9+, 3.12.1+
+   * Safe:
+   * 3.12.15+, 3.13+
+   */
+#ifdef ALSA_CHMAP_KERNEL_BLACKLIST
+  static bool checked = false;
+  static bool allowed;
+
+  if (!checked)
+    allowed = strverscmp(g_sysinfo.GetKernelVersionFull().c_str(), "3.12.15") >= 0;
+  checked = true;
+
+  return allowed;
+#else
+  return true;
+#endif
+}
+
+AEChannel CAESinkALSA::ALSAChannelToAEChannel(unsigned int alsaChannel)
+{
+  AEChannel aeChannel;
+  switch (alsaChannel)
+  {
+    case SND_CHMAP_FL:   aeChannel = AE_CH_FL; break;
+    case SND_CHMAP_FR:   aeChannel = AE_CH_FR; break;
+    case SND_CHMAP_FC:   aeChannel = AE_CH_FC; break;
+    case SND_CHMAP_LFE:  aeChannel = AE_CH_LFE; break;
+    case SND_CHMAP_RL:   aeChannel = AE_CH_BL; break;
+    case SND_CHMAP_RR:   aeChannel = AE_CH_BR; break;
+    case SND_CHMAP_FLC:  aeChannel = AE_CH_FLOC; break;
+    case SND_CHMAP_FRC:  aeChannel = AE_CH_FROC; break;
+    case SND_CHMAP_RC:   aeChannel = AE_CH_BC; break;
+    case SND_CHMAP_SL:   aeChannel = AE_CH_SL; break;
+    case SND_CHMAP_SR:   aeChannel = AE_CH_SR; break;
+    case SND_CHMAP_TFL:  aeChannel = AE_CH_TFL; break;
+    case SND_CHMAP_TFR:  aeChannel = AE_CH_TFR; break;
+    case SND_CHMAP_TFC:  aeChannel = AE_CH_TFC; break;
+    case SND_CHMAP_TC:   aeChannel = AE_CH_TC; break;
+    case SND_CHMAP_TRL:  aeChannel = AE_CH_TBL; break;
+    case SND_CHMAP_TRR:  aeChannel = AE_CH_TBR; break;
+    case SND_CHMAP_TRC:  aeChannel = AE_CH_TBC; break;
+    case SND_CHMAP_RLC:  aeChannel = AE_CH_BLOC; break;
+    case SND_CHMAP_RRC:  aeChannel = AE_CH_BROC; break;
+    default:             aeChannel = AE_CH_UNKNOWN1; break;
+  }
+  return aeChannel;
+}
+
+unsigned int CAESinkALSA::AEChannelToALSAChannel(AEChannel aeChannel)
+{
+  unsigned int alsaChannel;
+  switch (aeChannel)
+  {
+    case AE_CH_FL:    alsaChannel = SND_CHMAP_FL; break;
+    case AE_CH_FR:    alsaChannel = SND_CHMAP_FR; break;
+    case AE_CH_FC:    alsaChannel = SND_CHMAP_FC; break;
+    case AE_CH_LFE:   alsaChannel = SND_CHMAP_LFE; break;
+    case AE_CH_BL:    alsaChannel = SND_CHMAP_RL; break;
+    case AE_CH_BR:    alsaChannel = SND_CHMAP_RR; break;
+    case AE_CH_FLOC:  alsaChannel = SND_CHMAP_FLC; break;
+    case AE_CH_FROC:  alsaChannel = SND_CHMAP_FRC; break;
+    case AE_CH_BC:    alsaChannel = SND_CHMAP_RC; break;
+    case AE_CH_SL:    alsaChannel = SND_CHMAP_SL; break;
+    case AE_CH_SR:    alsaChannel = SND_CHMAP_SR; break;
+    case AE_CH_TFL:   alsaChannel = SND_CHMAP_TFL; break;
+    case AE_CH_TFR:   alsaChannel = SND_CHMAP_TFR; break;
+    case AE_CH_TFC:   alsaChannel = SND_CHMAP_TFC; break;
+    case AE_CH_TC:    alsaChannel = SND_CHMAP_TC; break;
+    case AE_CH_TBL:   alsaChannel = SND_CHMAP_TRL; break;
+    case AE_CH_TBR:   alsaChannel = SND_CHMAP_TRR; break;
+    case AE_CH_TBC:   alsaChannel = SND_CHMAP_TRC; break;
+    case AE_CH_BLOC:  alsaChannel = SND_CHMAP_RLC; break;
+    case AE_CH_BROC:  alsaChannel = SND_CHMAP_RRC; break;
+    default:          alsaChannel = SND_CHMAP_UNKNOWN; break;
+  }
+  return alsaChannel;
+}
+
+CAEChannelInfo CAESinkALSA::ALSAchmapToAEChannelMap(snd_pcm_chmap_t* alsaMap)
+{
+  CAEChannelInfo info;
+
+  for (unsigned int i = 0; i < alsaMap->channels; i++)
+    info += ALSAChannelToAEChannel(alsaMap->pos[i]);
+
+  return info;
+}
+
+snd_pcm_chmap_t* CAESinkALSA::AEChannelMapToALSAchmap(const CAEChannelInfo& info)
+{
+  int AECount = info.Count();
+  snd_pcm_chmap_t* alsaMap = (snd_pcm_chmap_t*)malloc(sizeof(snd_pcm_chmap_t) + AECount * sizeof(int));
+
+  alsaMap->channels = AECount;
+
+  for (int i = 0; i < AECount; i++)
+    alsaMap->pos[i] = AEChannelToALSAChannel(info[i]);
+
+  return alsaMap;
+}
+
+snd_pcm_chmap_t* CAESinkALSA::CopyALSAchmap(snd_pcm_chmap_t* alsaMap)
+{
+  snd_pcm_chmap_t* copyMap = (snd_pcm_chmap_t*)malloc(sizeof(snd_pcm_chmap_t) + alsaMap->channels * sizeof(int));
+
+  copyMap->channels = alsaMap->channels;
+  memcpy(copyMap->pos, alsaMap->pos, alsaMap->channels * sizeof(int));
+
+  return copyMap;
+}
+
+std::string CAESinkALSA::ALSAchmapToString(snd_pcm_chmap_t* alsaMap)
+{
+  char buf[128] = { 0 };
+  // ALSA bug - buffer overflow by a factor of 2 is possible
+  // http://mailman.alsa-project.org/pipermail/alsa-devel/2014-December/085815.html
+  int err = snd_pcm_chmap_print(alsaMap, sizeof(buf) / 2, buf);
+  if (err < 0)
+    return "Error";
+  return std::string(buf);
+}
+
+CAEChannelInfo CAESinkALSA::GetAlternateLayoutForm(const CAEChannelInfo& info)
+{
+  CAEChannelInfo altLayout;
+
+  /* only handle symmetrical layouts */
+  if (info.HasChannel(AE_CH_BL) == info.HasChannel(AE_CH_BR) &&
+      info.HasChannel(AE_CH_SL) == info.HasChannel(AE_CH_SR) &&
+      info.HasChannel(AE_CH_BLOC) == info.HasChannel(AE_CH_BROC))
+  {
+    /* CEA-861-D used by HDMI 1.x has 7.1 as back+back-x-of-center, not
+     * side+back. Mangle it here. */
+    if (info.HasChannel(AE_CH_SL) && info.HasChannel(AE_CH_BL) && !info.HasChannel(AE_CH_BLOC))
+    {
+      altLayout = info;
+      altLayout.ReplaceChannel(AE_CH_BL, AE_CH_BLOC);
+      altLayout.ReplaceChannel(AE_CH_BR, AE_CH_BROC);
+      altLayout.ReplaceChannel(AE_CH_SL, AE_CH_BL);
+      altLayout.ReplaceChannel(AE_CH_SR, AE_CH_BR);
+    }
+    /* same in reverse */
+    else if (!info.HasChannel(AE_CH_SL) && info.HasChannel(AE_CH_BL) && info.HasChannel(AE_CH_BLOC))
+    {
+      altLayout = info;
+      altLayout.ReplaceChannel(AE_CH_BL, AE_CH_SL);
+      altLayout.ReplaceChannel(AE_CH_BR, AE_CH_SR);
+      altLayout.ReplaceChannel(AE_CH_BLOC, AE_CH_BL);
+      altLayout.ReplaceChannel(AE_CH_BROC, AE_CH_BR);
+    }
+    /* We have side speakers but no back speakers, allow map to back
+     * speakers. */
+    else if (info.HasChannel(AE_CH_SL) && !info.HasChannel(AE_CH_BL))
+    {
+      altLayout = info;
+      altLayout.ReplaceChannel(AE_CH_SL, AE_CH_BL);
+      altLayout.ReplaceChannel(AE_CH_SR, AE_CH_BR);
+    }
+    /* reverse */
+    else if (!info.HasChannel(AE_CH_SL) && info.HasChannel(AE_CH_BL))
+    {
+      altLayout = info;
+      altLayout.ReplaceChannel(AE_CH_BL, AE_CH_SL);
+      altLayout.ReplaceChannel(AE_CH_BR, AE_CH_SR);
+    }
+  }
+  return altLayout;
+}
+
+snd_pcm_chmap_t* CAESinkALSA::SelectALSAChannelMap(const CAEChannelInfo& info)
+{
+  snd_pcm_chmap_t* chmap = NULL;
+  snd_pcm_chmap_query_t** supportedMaps;
+
+  supportedMaps = snd_pcm_query_chmaps(m_pcm);
+
+  if (!supportedMaps)
+    return NULL;
+
+  CAEChannelInfo infoAlternate = GetAlternateLayoutForm(info);
+
+  /* for efficiency, first try to find an exact match, and only then fallback
+   * to searching for less perfect matches */
+  int i = 0;
+  for (snd_pcm_chmap_query_t* supportedMap = supportedMaps[i++];
+       supportedMap; supportedMap = supportedMaps[i++])
+  {
+    if (supportedMap->map.channels == info.Count())
+    {
+      CAEChannelInfo candidate = ALSAchmapToAEChannelMap(&supportedMap->map);
+      const CAEChannelInfo* selectedInfo = &info;
+
+      if (!candidate.ContainsChannels(info) || !info.ContainsChannels(candidate))
+      {
+        selectedInfo = &infoAlternate;
+        if (!candidate.ContainsChannels(infoAlternate) || !infoAlternate.ContainsChannels(candidate))
+          continue;
+      }
+
+      if (supportedMap->type == SND_CHMAP_TYPE_VAR)
+      {
+        /* device supports the AE map directly */
+        chmap = AEChannelMapToALSAchmap(*selectedInfo);
+        break;
+      }
+      else
+      {
+        /* device needs 1:1 remapping */
+        chmap = CopyALSAchmap(&supportedMap->map);
+        break;
+      }
+    }
+  }
+
+  /* if no exact chmap was found, fallback to best-effort */
+  if (!chmap)
+  {
+    CAEChannelInfo allChannels;
+    std::vector<CAEChannelInfo> supportedMapsAE;
+
+    /* Convert the ALSA maps to AE maps. */
+    int i = 0;
+    for (snd_pcm_chmap_query_t* supportedMap = supportedMaps[i++];
+        supportedMap; supportedMap = supportedMaps[i++])
+      supportedMapsAE.push_back(ALSAchmapToAEChannelMap(&supportedMap->map));
+
+    int score = 0;
+    int best = info.BestMatch(supportedMapsAE, &score);
+
+    /* see if we find a better result with the alternate form */
+    if (infoAlternate.Count() && score < 0)
+    {
+      int scoreAlt = 0;
+      int bestAlt = infoAlternate.BestMatch(supportedMapsAE, &scoreAlt);
+      if (scoreAlt > score)
+        best = bestAlt;
+    }
+
+    if (best > 0)
+      chmap = CopyALSAchmap(&supportedMaps[best]->map);
+  }
+
+  if (chmap && g_advancedSettings.CanLogComponent(LOGAUDIO))
+    CLog::Log(LOGDEBUG, "CAESinkALSA::SelectALSAChannelMap - Selected ALSA map \"%s\"", ALSAchmapToString(chmap).c_str());
+
+  snd_pcm_free_chmaps(supportedMaps);
+  return chmap;
+}
+
+#endif // SND_CHMAP_API_VERSION
+
+void CAESinkALSA::GetAESParams(const AEAudioFormat& format, std::string& params)
 {
   if (m_passthrough)
     params = "AES0=0x06";
@@ -128,7 +487,8 @@ void CAESinkALSA::GetAESParams(AEAudioFormat format, std::string& params)
 
   params += ",AES1=0x82,AES2=0x00";
 
-       if (format.m_sampleRate == 192000) params += ",AES3=0x0e";
+  if (m_passthrough && format.m_channelLayout.Count() == 8) params += ",AES3=0x09";
+  else if (format.m_sampleRate == 192000) params += ",AES3=0x0e";
   else if (format.m_sampleRate == 176400) params += ",AES3=0x0c";
   else if (format.m_sampleRate ==  96000) params += ",AES3=0x0a";
   else if (format.m_sampleRate ==  88200) params += ",AES3=0x08";
@@ -142,34 +502,74 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
 {
   m_initDevice = device;
   m_initFormat = format;
+  ALSAConfig inconfig, outconfig;
+  inconfig.format = format.m_dataFormat;
+  inconfig.sampleRate = format.m_sampleRate;
+
+  /*
+   * We can't use the better GetChannelLayout() at this point as the device
+   * is not opened yet, and we need inconfig.channels to select the correct
+   * device... Legacy layouts should be accurate enough for device selection
+   * in all cases, though.
+   */
+  inconfig.channels = GetChannelLayoutLegacy(format, 2, 8).Count();
 
   /* if we are raw, correct the data format */
   if (AE_IS_RAW(format.m_dataFormat))
   {
-    m_channelLayout     = GetChannelLayout(format);
-    format.m_dataFormat = AE_FMT_S16NE;
-    m_passthrough       = true;
+    inconfig.format   = AE_FMT_S16NE;
+    m_passthrough     = true;
   }
   else
   {
-    m_channelLayout = GetChannelLayout(format);
     m_passthrough   = false;
   }
-#if defined(HAS_AMLPLAYER)
+#if defined(HAS_LIBAMCODEC)
   if (aml_present())
   {
     aml_set_audio_passthrough(m_passthrough);
-    device = "default";
+
+    int aml_digital_codec = 0;
+    if (m_passthrough)
+    {
+        switch(format.m_dataFormat)
+        {
+          case AE_FMT_AC3:
+            aml_digital_codec = 2;
+            break;
+
+          case AE_FMT_DTS:
+            aml_digital_codec = 3;
+            break;
+
+          case AE_FMT_EAC3:
+            aml_digital_codec = 4;
+            break;
+
+          case AE_FMT_DTSHD:
+            aml_digital_codec = 5;
+            break;
+
+          case AE_FMT_TRUEHD:
+            aml_digital_codec = 7;
+            break;
+
+          default:
+            if (inconfig.channels > 2)
+              aml_digital_codec = 6;
+            else
+              aml_digital_codec = 0;
+        }
+    }
+    SysfsUtils::SetInt("/sys/class/audiodsp/digital_codec", aml_digital_codec);
   }
 #endif
 
-  if (m_channelLayout.Count() == 0)
+  if (inconfig.channels == 0)
   {
     CLog::Log(LOGERROR, "CAESinkALSA::Initialize - Unable to open the requested channel layout");
     return false;
   }
-
-  format.m_channelLayout = m_channelLayout;
 
   AEDeviceType devType = AEDeviceTypeFromName(device);
 
@@ -185,7 +585,7 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
   snd_config_t *config;
   snd_config_copy(&config, snd_config);
 
-  if (!OpenPCMDevice(device, AESParams, m_channelLayout.Count(), &m_pcm, config))
+  if (!OpenPCMDevice(device, AESParams, inconfig.channels, &m_pcm, config))
   {
     CLog::Log(LOGERROR, "CAESinkALSA::Initialize - failed to initialize device \"%s\"", device.c_str());
     snd_config_delete(config);
@@ -201,28 +601,57 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
   /* free the sound config */
   snd_config_delete(config);
 
-  if (!InitializeHW(format) || !InitializeSW(format))
+#ifdef SND_CHMAP_API_VERSION
+  snd_pcm_chmap_t* selectedChmap = NULL;
+  if (!m_passthrough && AllowALSAMaps())
+  {
+    selectedChmap = SelectALSAChannelMap(format.m_channelLayout);
+    if (selectedChmap)
+    {
+      /* update wanted channel count according to the selected map */
+      inconfig.channels = selectedChmap->channels;
+    }
+  }
+#endif
+
+  if (!InitializeHW(inconfig, outconfig) || !InitializeSW(outconfig))
+  {
+#ifdef SND_CHMAP_API_VERSION
+    free(selectedChmap);
+#endif
     return false;
+  }
+
+#ifdef SND_CHMAP_API_VERSION
+  if (selectedChmap)
+  {
+    /* failure is OK, that likely just means the selected chmap is fixed already */
+    snd_pcm_set_chmap(m_pcm, selectedChmap);
+    free(selectedChmap);
+  }
+#endif
 
   // we want it blocking
   snd_pcm_nonblock(m_pcm, 0);
   snd_pcm_prepare (m_pcm);
 
+  if (m_passthrough && inconfig.channels != outconfig.channels)
+  {
+    CLog::Log(LOGINFO, "CAESinkALSA::Initialize - could not open required number of channels");
+    return false;
+  }
+  // adjust format to the configuration we got
+  format.m_channelLayout = GetChannelLayout(format, outconfig.channels);
+  format.m_sampleRate = outconfig.sampleRate;
+  format.m_frames = outconfig.periodSize;
+  format.m_frameSize = outconfig.frameSize;
+  format.m_frameSamples = outconfig.periodSize * outconfig.channels;
+  format.m_dataFormat = outconfig.format;
+
   m_format              = format;
   m_formatSampleRateMul = 1.0 / (double)m_format.m_sampleRate;
 
   return true;
-}
-
-bool CAESinkALSA::IsCompatible(const AEAudioFormat format, const std::string device)
-{
-  return (
-      /* compare against the requested format and the real format */
-      (m_initFormat.m_sampleRate    == format.m_sampleRate    || m_format.m_sampleRate    == format.m_sampleRate   ) &&
-      (m_initFormat.m_dataFormat    == format.m_dataFormat    || m_format.m_dataFormat    == format.m_dataFormat   ) &&
-      (m_initFormat.m_channelLayout == format.m_channelLayout || m_format.m_channelLayout == format.m_channelLayout) &&
-      (m_initDevice == device)
-  );
 }
 
 snd_pcm_format_t CAESinkALSA::AEFormatToALSAFormat(const enum AEDataFormat format)
@@ -232,7 +661,6 @@ snd_pcm_format_t CAESinkALSA::AEFormatToALSAFormat(const enum AEDataFormat forma
 
   switch (format)
   {
-    case AE_FMT_S8    : return SND_PCM_FORMAT_S8;
     case AE_FMT_U8    : return SND_PCM_FORMAT_U8;
     case AE_FMT_S16NE : return SND_PCM_FORMAT_S16;
     case AE_FMT_S16LE : return SND_PCM_FORMAT_S16_LE;
@@ -251,7 +679,7 @@ snd_pcm_format_t CAESinkALSA::AEFormatToALSAFormat(const enum AEDataFormat forma
   }
 }
 
-bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
+bool CAESinkALSA::InitializeHW(const ALSAConfig &inconfig, ALSAConfig &outconfig)
 {
   snd_pcm_hw_params_t *hw_params;
 
@@ -261,35 +689,40 @@ bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
   snd_pcm_hw_params_any(m_pcm, hw_params);
   snd_pcm_hw_params_set_access(m_pcm, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED);
 
-  unsigned int sampleRate   = format.m_sampleRate;
-  unsigned int channelCount = format.m_channelLayout.Count();
+  unsigned int sampleRate   = inconfig.sampleRate;
   snd_pcm_hw_params_set_rate_near    (m_pcm, hw_params, &sampleRate, NULL);
-  snd_pcm_hw_params_set_channels_near(m_pcm, hw_params, &channelCount);
+
+  unsigned int channelCount = inconfig.channels;
+  /* select a channel count >=wanted, or otherwise the highest available */
+  if (snd_pcm_hw_params_set_channels_min(m_pcm, hw_params, &channelCount) == 0)
+    snd_pcm_hw_params_set_channels_first(m_pcm, hw_params, &channelCount);
+  else
+    snd_pcm_hw_params_set_channels_last(m_pcm, hw_params, &channelCount);
 
   /* ensure we opened X channels or more */
-  if (format.m_channelLayout.Count() > channelCount)
+  if (inconfig.channels > channelCount)
   {
     CLog::Log(LOGINFO, "CAESinkALSA::InitializeHW - Unable to open the required number of channels");
   }
 
-  /* update the channelLayout to what we managed to open */
-  format.m_channelLayout.Reset();
-  for (unsigned int i = 0; i < channelCount; ++i)
-    format.m_channelLayout += ALSAChannelMap[i];
+  /* update outconfig */
+  outconfig.channels = channelCount;
 
-  snd_pcm_format_t fmt = AEFormatToALSAFormat(format.m_dataFormat);
+  snd_pcm_format_t fmt = AEFormatToALSAFormat(inconfig.format);
+  outconfig.format = inconfig.format;
+
   if (fmt == SND_PCM_FORMAT_UNKNOWN)
   {
     /* if we dont support the requested format, fallback to float */
-    format.m_dataFormat = AE_FMT_FLOAT;
-    fmt                 = SND_PCM_FORMAT_FLOAT;
+    fmt = SND_PCM_FORMAT_FLOAT;
+    outconfig.format = AE_FMT_FLOAT;
   }
 
   /* try the data format */
   if (snd_pcm_hw_params_set_format(m_pcm, hw_params, fmt) < 0)
   {
     /* if the chosen format is not supported, try each one in decending order */
-    CLog::Log(LOGINFO, "CAESinkALSA::InitializeHW - Your hardware does not support %s, trying other formats", CAEUtil::DataFormatToStr(format.m_dataFormat));
+    CLog::Log(LOGINFO, "CAESinkALSA::InitializeHW - Your hardware does not support %s, trying other formats", CAEUtil::DataFormatToStr(outconfig.format));
     for (enum AEDataFormat i = AE_FMT_MAX; i > AE_FMT_INVALID; i = (enum AEDataFormat)((int)i - 1))
     {
       if (AE_IS_RAW(i) || i == AE_FMT_MAX)
@@ -318,8 +751,8 @@ bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
       }
 
       /* record that the format fell back to X */
-      format.m_dataFormat = i;
-      CLog::Log(LOGINFO, "CAESinkALSA::InitializeHW - Using data format %s", CAEUtil::DataFormatToStr(format.m_dataFormat));
+      outconfig.format = i;
+      CLog::Log(LOGINFO, "CAESinkALSA::InitializeHW - Using data format %s", CAEUtil::DataFormatToStr(outconfig.format));
       break;
     }
 
@@ -414,10 +847,21 @@ bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
   CLog::Log(LOGDEBUG, "CAESinkALSA::InitializeHW - Got: periodSize %lu, bufferSize %lu", periodSize, bufferSize);
 
   /* set the format parameters */
-  format.m_sampleRate   = sampleRate;
-  format.m_frames       = periodSize;
-  format.m_frameSamples = periodSize * format.m_channelLayout.Count();
-  format.m_frameSize    = snd_pcm_frames_to_bytes(m_pcm, 1);
+  outconfig.sampleRate   = sampleRate;
+
+  /* if periodSize is too small Audio Engine might starve */
+  m_fragmented = false;
+  unsigned int fragments = 1;
+  if (periodSize < AE_MIN_PERIODSIZE)
+  {
+    fragments = std::ceil((double) AE_MIN_PERIODSIZE / periodSize);
+    CLog::Log(LOGDEBUG, "Audio Driver reports too low periodSize %d - will use %d fragments", (int) periodSize, (int) fragments);
+    m_fragmented = true;
+  }
+
+  m_originalPeriodSize   = periodSize;
+  outconfig.periodSize   = fragments * periodSize;
+  outconfig.frameSize    = snd_pcm_frames_to_bytes(m_pcm, 1);
 
   m_bufferSize = (unsigned int)bufferSize;
   m_timeout    = std::ceil((double)(bufferSize * 1000) / (double)sampleRate);
@@ -427,7 +871,7 @@ bool CAESinkALSA::InitializeHW(AEAudioFormat &format)
   return true;
 }
 
-bool CAESinkALSA::InitializeSW(AEAudioFormat &format)
+bool CAESinkALSA::InitializeSW(const ALSAConfig &inconfig)
 {
   snd_pcm_sw_params_t *sw_params;
   snd_pcm_uframes_t boundary;
@@ -440,7 +884,7 @@ bool CAESinkALSA::InitializeSW(AEAudioFormat &format)
   snd_pcm_sw_params_set_silence_threshold(m_pcm, sw_params, 0);
   snd_pcm_sw_params_get_boundary         (sw_params, &boundary);
   snd_pcm_sw_params_set_silence_size     (m_pcm, sw_params, boundary);
-  snd_pcm_sw_params_set_avail_min        (m_pcm, sw_params, format.m_frames);
+  snd_pcm_sw_params_set_avail_min        (m_pcm, sw_params, inconfig.periodSize);
 
   if (snd_pcm_sw_params(m_pcm, sw_params) < 0)
   {
@@ -468,10 +912,13 @@ void CAESinkALSA::Stop()
   snd_pcm_drop(m_pcm);
 }
 
-double CAESinkALSA::GetDelay()
+void CAESinkALSA::GetDelay(AEDelayStatus& status)
 {
   if (!m_pcm)
-    return 0;
+  {
+    status.SetDelay(0);
+    return;
+  }
   snd_pcm_sframes_t frames = 0;
   snd_pcm_delay(m_pcm, &frames);
 
@@ -483,29 +930,7 @@ double CAESinkALSA::GetDelay()
     frames = 0;
   }
 
-  return (double)frames * m_formatSampleRateMul;
-}
-
-double CAESinkALSA::GetCacheTime()
-{
-  if (!m_pcm)
-    return 0.0;
-
-  int space = snd_pcm_avail_update(m_pcm);
-  if (space == 0)
-  {
-    snd_pcm_state_t state = snd_pcm_state(m_pcm);
-    if (state < 0)
-    {
-      HandleError("snd_pcm_state", state);
-      space = m_bufferSize;
-    }
-
-    if (state != SND_PCM_STATE_RUNNING && state != SND_PCM_STATE_PREPARED)
-      space = m_bufferSize;
-  }
-
-  return (double)(m_bufferSize - space) * m_formatSampleRateMul;
+  status.SetDelay((double)frames * m_formatSampleRateMul);
 }
 
 double CAESinkALSA::GetCacheTotal()
@@ -513,33 +938,54 @@ double CAESinkALSA::GetCacheTotal()
   return (double)m_bufferSize * m_formatSampleRateMul;
 }
 
-unsigned int CAESinkALSA::AddPackets(uint8_t *data, unsigned int frames, bool hasAudio)
+unsigned int CAESinkALSA::AddPackets(uint8_t **data, unsigned int frames, unsigned int offset)
 {
   if (!m_pcm)
   {
-    SoftResume();
-    if(!m_pcm)
-      return 0;
-
-    CLog::Log(LOGDEBUG, "CAESinkALSA - the grAEken is hunger, feed it (I am the downmost fallback - fix your code)");
+    CLog::Log(LOGERROR, "CAESinkALSA - Tried to add packets without a sink");
+    return INT_MAX;
   }
 
-  int ret = snd_pcm_writei(m_pcm, (void*)data, frames);
-  if (ret < 0)
+  void *buffer = data[0]+offset*m_format.m_frameSize;
+  unsigned int amount = 0;
+  int64_t data_left = (int64_t) frames;
+  int frames_written = 0;
+
+  while (data_left > 0)
   {
-    HandleError("snd_pcm_writei(1)", ret);
-    ret = snd_pcm_writei(m_pcm, (void*)data, frames);
+    if (m_fragmented)
+      amount = std::min((unsigned int) data_left, m_originalPeriodSize);
+    else // take care as we can come here a second time if the sink does not eat all data
+      amount = (unsigned int) data_left;
+
+    int ret = snd_pcm_writei(m_pcm, buffer, amount);
     if (ret < 0)
     {
-      HandleError("snd_pcm_writei(2)", ret);
-      ret = 0;
+      CLog::Log(LOGERROR, "CAESinkALSA - snd_pcm_writei(%d) %s - trying to recover", ret, snd_strerror(ret));
+      ret = snd_pcm_recover(m_pcm, ret, 1);
+      if(ret < 0)
+      {
+        HandleError("snd_pcm_writei(1)", ret);
+        ret = snd_pcm_writei(m_pcm, buffer, amount);
+        if (ret < 0)
+        {
+          HandleError("snd_pcm_writei(2)", ret);
+          ret = 0;
+        }
+      }
     }
+
+    if ( ret > 0 && snd_pcm_state(m_pcm) == SND_PCM_STATE_PREPARED)
+      snd_pcm_start(m_pcm);
+
+    if (ret <= 0)
+      break;
+
+    frames_written += ret;
+    data_left -= ret;
+    buffer = data[0]+offset*m_format.m_frameSize + frames_written*m_format.m_frameSize;
   }
-
-  if ( ret > 0 && snd_pcm_state(m_pcm) == SND_PCM_STATE_PREPARED)
-    snd_pcm_start(m_pcm);
-
-  return ret;
+  return frames_written;
 }
 
 void CAESinkALSA::HandleError(const char* name, int err)
@@ -692,6 +1138,10 @@ bool CAESinkALSA::OpenPCMDevice(const std::string &name, const std::string &para
 
 void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
 {
+#if HAVE_LIBUDEV
+  m_deviceMonitor.Start();
+#endif
+
   /* ensure that ALSA has been initialized */
   snd_lib_error_set_handler(sndLibErrorHandler);
   if(!snd_config || force)
@@ -704,6 +1154,8 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
 
   snd_config_t *config;
   snd_config_copy(&config, snd_config);
+
+  m_controlMonitor.Clear();
 
   /* Always enumerate the default device.
    * Note: If "default" is a stereo device, EnumerateDevice()
@@ -781,6 +1233,8 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
     free(desc);
   }
   snd_device_name_free_hint(hints);
+
+  m_controlMonitor.Start();
 
   /* set the displayname for default device */
   if (!list.empty() && list[0].m_deviceName == "default")
@@ -966,6 +1420,10 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
           {
             snd_hctl_load(hctl);
             bool badHDMI = false;
+
+            /* add ELD to monitoring */
+            m_controlMonitor.Add(strHwName, SND_CTL_ELEM_IFACE_PCM, dev, "ELD");
+
             if (!GetELD(hctl, dev, info, badHDMI))
               CLog::Log(LOGDEBUG, "CAESinkALSA - Unable to obtain ELD information for device \"%s\" (not supported by device, or kernel older than 3.2)",
                         device.c_str());
@@ -997,6 +1455,9 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
       if (!info.m_displayNameExtra.empty())
         info.m_displayNameExtra += ' ';
       info.m_displayNameExtra += "S/PDIF";
+
+      info.m_dataFormats.push_back(AE_FMT_AC3);
+      info.m_dataFormats.push_back(AE_FMT_DTS);
     }
     else if (info.m_displayNameExtra.empty())
     {
@@ -1068,11 +1529,33 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
   }
 
   CAEChannelInfo alsaChannels;
-  for (int i = 0; i < channels; ++i)
+#ifdef SND_CHMAP_API_VERSION
+  snd_pcm_chmap_query_t** alsaMaps = NULL;
+  if (AllowALSAMaps())
+    alsaMaps = snd_pcm_query_chmaps(pcmhandle);
+  bool useEldChannels = (info.m_channels.Count() > 0);
+  if (alsaMaps)
   {
-    if (!info.m_channels.HasChannel(ALSAChannelMap[i]))
-      info.m_channels += ALSAChannelMap[i];
-    alsaChannels += ALSAChannelMap[i];
+    int i = 0;
+    for (snd_pcm_chmap_query_t* alsaMap = alsaMaps[i++];
+        alsaMap; alsaMap = alsaMaps[i++])
+    {
+      CAEChannelInfo AEmap = ALSAchmapToAEChannelMap(&alsaMap->map);
+      alsaChannels.AddMissingChannels(AEmap);
+      if (!useEldChannels)
+        info.m_channels.AddMissingChannels(AEmap);
+    }
+    snd_pcm_free_chmaps(alsaMaps);
+  }
+  else
+#endif
+  {
+    for (int i = 0; i < channels; ++i)
+    {
+      if (!info.m_channels.HasChannel(LegacyALSAChannelMap[i]))
+        info.m_channels += LegacyALSAChannelMap[i];
+      alsaChannels += LegacyALSAChannelMap[i];
+    }
   }
 
   /* remove the channels from m_channels that we cant use */
@@ -1089,6 +1572,23 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
 
     if (snd_pcm_hw_params_test_format(pcmhandle, hwparams, fmt) >= 0)
       info.m_dataFormats.push_back(i);
+  }
+
+  if (info.m_deviceType == AE_DEVTYPE_HDMI)
+  {
+    // regarding data formats we don't trust ELD
+    // push all passthrough formats to the list
+    AEDataFormatList::iterator it;
+    for (enum AEDataFormat i = AE_FMT_MAX; i > AE_FMT_INVALID; i = (enum AEDataFormat)((int)i - 1))
+    {
+      if (!AE_IS_RAW(i))
+        continue;
+      it = find(info.m_dataFormats.begin(), info.m_dataFormats.end(), i);
+      if (it == info.m_dataFormats.end())
+      {
+        info.m_dataFormats.push_back(i);
+      }
+    }
   }
 
   snd_pcm_close(pcmhandle);
@@ -1148,30 +1648,11 @@ bool CAESinkALSA::GetELD(snd_hctl_t *hctl, int device, CAEDeviceInfo& info, bool
   return true;
 }
 
-bool CAESinkALSA::SoftSuspend()
-{
-  if(m_pcm) // it is still there
-   Deinitialize();
-
-  return true;
-}
-bool CAESinkALSA::SoftResume()
-{
-    // reinit all the clibber
-    bool ret = true; // all fine
-    if(!m_pcm)
-    {
-      if (!snd_config)
-        snd_config_update();
-
-      ret = Initialize(m_initFormat, m_initDevice);
-    }
-   //we want that AE loves us again - reinit when initialize failed
-   return ret; // force reinit if false
-}
-
 void CAESinkALSA::sndLibErrorHandler(const char *file, int line, const char *function, int err, const char *fmt, ...)
 {
+  if(!g_advancedSettings.CanLogComponent(LOGAUDIO))
+    return;
+
   va_list arg;
   va_start(arg, fmt);
   char *errorStr;
@@ -1183,5 +1664,10 @@ void CAESinkALSA::sndLibErrorHandler(const char *file, int line, const char *fun
   }
   va_end(arg);
 }
+
+#if HAVE_LIBUDEV
+CALSADeviceMonitor CAESinkALSA::m_deviceMonitor; // ARGH
+#endif
+CALSAHControlMonitor CAESinkALSA::m_controlMonitor; // ARGH
 
 #endif

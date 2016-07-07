@@ -1,4 +1,4 @@
-/**
+/*
  * RTP Depacketization of QCELP/PureVoice, RFC 2658
  * Copyright (c) 2010 Martin Storsjo
  *
@@ -25,7 +25,7 @@ static const uint8_t frame_sizes[] = {
     1, 4, 8, 17, 35
 };
 
-typedef struct {
+typedef struct InterleavePacket {
     int pos;
     int size;
     /* The largest frame is 35 bytes, only 10 frames are allowed per
@@ -46,16 +46,6 @@ struct PayloadContext {
     int      next_size;
     uint32_t next_timestamp;
 };
-
-static PayloadContext *qcelp_new_context(void)
-{
-    return av_mallocz(sizeof(PayloadContext));
-}
-
-static void qcelp_free_context(PayloadContext *data)
-{
-    av_free(data);
-}
 
 static int return_stored_frame(AVFormatContext *ctx, PayloadContext *data,
                                AVStream *st, AVPacket *pkt, uint32_t *timestamp,
@@ -210,7 +200,8 @@ static int return_stored_frame(AVFormatContext *ctx, PayloadContext *data,
 
 static int qcelp_parse_packet(AVFormatContext *ctx, PayloadContext *data,
                               AVStream *st, AVPacket *pkt, uint32_t *timestamp,
-                              const uint8_t *buf, int len, int flags)
+                              const uint8_t *buf, int len, uint16_t seq,
+                              int flags)
 {
     if (buf)
         return store_packet(ctx, data, st, pkt, timestamp, buf, len);
@@ -221,9 +212,8 @@ static int qcelp_parse_packet(AVFormatContext *ctx, PayloadContext *data,
 RTPDynamicProtocolHandler ff_qcelp_dynamic_handler = {
     .enc_name           = "x-Purevoice",
     .codec_type         = AVMEDIA_TYPE_AUDIO,
-    .codec_id           = CODEC_ID_QCELP,
+    .codec_id           = AV_CODEC_ID_QCELP,
+    .priv_data_size     = sizeof(PayloadContext),
     .static_payload_id  = 12,
-    .alloc              = qcelp_new_context,
-    .free               = qcelp_free_context,
-    .parse_packet       = qcelp_parse_packet
+    .parse_packet       = qcelp_parse_packet,
 };

@@ -28,13 +28,22 @@
 
 #include "cores/omxplayer/OMXImage.h"
 
-CRBP::CRBP()
+#include "utils/TimeUtils.h"
+
+CRBP::CRBP() : m_vsync(true)
 {
   m_initialized     = false;
   m_omx_initialized = false;
+  m_omx_image_init  = false;
   m_DllBcmHost      = new DllBcmHost();
   m_OMX             = new COMXCore();
   m_display = DISPMANX_NO_HANDLE;
+  m_arm_mem = 0;
+  m_gpu_mem = 0;
+  m_gui_resolution_limit = 0;
+  m_codec_mpg2_enabled = false;
+  m_codec_wvc1_enabled = false;
+  m_last_pll_adjust = 1.0;
 }
 
 CRBP::~CRBP()
@@ -52,7 +61,7 @@ void CRBP::InitializeSettings()
 
 bool CRBP::Initialize()
 {
-  CSingleLock lock (m_critSection);
+  CSingleLock lock(m_critSection);
   if (m_initialized)
     return true;
 
@@ -91,9 +100,6 @@ bool CRBP::Initialize()
 
   InitializeSettings();
 
-  // in case xbcm was restarted when suspended
-  ResumeVideoOutput();
-
   g_OMXImage.Initialize();
   m_omx_image_init = true;
   return true;
@@ -117,22 +123,28 @@ void CRBP::LogFirmwareVerison()
 
 DISPMANX_DISPLAY_HANDLE_T CRBP::OpenDisplay(uint32_t device)
 {
+  CSingleLock lock(m_critSection);
   if (m_display == DISPMANX_NO_HANDLE)
+  {
     m_display = vc_dispmanx_display_open( 0 /*screen*/ );
+  }
   return m_display;
 }
 
 void CRBP::CloseDisplay(DISPMANX_DISPLAY_HANDLE_T display)
 {
+  CSingleLock lock(m_critSection);
   assert(display == m_display);
   vc_dispmanx_display_close(m_display);
   m_display = DISPMANX_NO_HANDLE;
+  m_last_pll_adjust = 1.0;
 }
 
 void CRBP::GetDisplaySize(int &width, int &height)
 {
+  CSingleLock lock(m_critSection);
   DISPMANX_MODEINFO_T info;
-  if (vc_dispmanx_display_get_info(m_display, &info) == 0)
+  if (m_display != DISPMANX_NO_HANDLE && vc_dispmanx_display_get_info(m_display, &info) == 0)
   {
     width = info.width;
     height = info.height;
@@ -161,13 +173,13 @@ unsigned char *CRBP::CaptureDisplay(int width, int height, int *pstride, bool sw
     flags |= DISPMANX_SNAPSHOT_PACK;
 
   stride = ((width + 15) & ~15) * 4;
-  image = new unsigned char [height * stride];
 
-  if (image)
+  CSingleLock lock(m_critSection);
+  if (m_display != DISPMANX_NO_HANDLE)
   {
+    image = new unsigned char [height * stride];
     resource = vc_dispmanx_resource_create( VC_IMAGE_RGBA32, width, height, &vc_image_ptr );
 
-    assert(m_display != DISPMANX_NO_HANDLE);
     vc_dispmanx_snapshot(m_display, resource, (DISPMANX_TRANSFORM_T)flags);
 
     vc_dispmanx_rect_set(&rect, 0, 0, width, height);
@@ -189,24 +201,23 @@ static void vsync_callback(DISPMANX_UPDATE_HANDLE_T u, void *arg)
 void CRBP::WaitVsync()
 {
   int s;
-  DISPMANX_DISPLAY_HANDLE_T m_display = vc_dispmanx_display_open( 0 /*screen*/ );
-  if (m_display == DISPMANX_NO_HANDLE)
+  DISPMANX_DISPLAY_HANDLE_T display = vc_dispmanx_display_open( 0 /*screen*/ );
+  if (display == DISPMANX_NO_HANDLE)
   {
     CLog::Log(LOGDEBUG, "CRBP::%s skipping while display closed", __func__);
     return;
   }
   m_vsync.Reset();
-  s = vc_dispmanx_vsync_callback(m_display, vsync_callback, (void *)&m_vsync);
+  s = vc_dispmanx_vsync_callback(display, vsync_callback, (void *)&m_vsync);
   if (s == 0)
   {
     m_vsync.WaitMSec(1000);
   }
   else assert(0);
-  s = vc_dispmanx_vsync_callback(m_display, NULL, NULL);
+  s = vc_dispmanx_vsync_callback(display, NULL, NULL);
   assert(s == 0);
-  vc_dispmanx_display_close( m_display );
+  vc_dispmanx_display_close( display );
 }
-
 
 void CRBP::Deinitialize()
 {
@@ -233,26 +244,11 @@ double CRBP::AdjustHDMIClock(double adjust)
 {
   char response[80];
   vc_gencmd(response, sizeof response, "hdmi_adjust_clock %f", adjust);
-  float new_adjust = 1.0f;
   char *p = strchr(response, '=');
   if (p)
-    new_adjust = atof(p+1);
-  CLog::Log(LOGDEBUG, "CRBP::%s(%.4f) = %.4f", __func__, adjust, new_adjust);
-  return new_adjust;
-}
-
-void CRBP::SuspendVideoOutput()
-{
-  CLog::Log(LOGDEBUG, "Raspberry PI suspending video output\n");
-  char response[80];
-  m_DllBcmHost->vc_gencmd(response, sizeof response, "display_power 0");
-}
-
-void CRBP::ResumeVideoOutput()
-{
-  char response[80];
-  m_DllBcmHost->vc_gencmd(response, sizeof response, "display_power 1");
-  CLog::Log(LOGDEBUG, "Raspberry PI resuming video output\n");
+    m_last_pll_adjust = atof(p+1);
+  CLog::Log(LOGDEBUG, "CRBP::%s(%.4f) = %.4f", __func__, adjust, m_last_pll_adjust);
+  return m_last_pll_adjust;
 }
 
 #endif

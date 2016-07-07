@@ -6,20 +6,14 @@ if "%WORKSPACE%"=="" (
   set WORKSPACE="%~dp0..\.."
 )
 
-if not exist %WORKSPACE%\plex\Dependencies\windows-i386-xbmc-vc110.tar.gz (
+if not exist %WORKSPACE%\plex\Dependencies\windows-i386-xbmc-vc120.tar.gz (
   echo Downloading deps...
-  %WORKSPACE%\project\BuildDependencies\bin\wget.exe -nv --no-check-certificate -O %WORKSPACE%\plex\Dependencies\windows-i386-xbmc-vc110.tar.gz http://sources.openpht.tv/plex-dependencies/windows-i386-xbmc-vc110.tar.gz || exit /b 1
+  %WORKSPACE%\project\BuildDependencies\bin\wget.exe -nv --no-check-certificate -O %WORKSPACE%\plex\Dependencies\windows-i386-xbmc-vc120.tar.gz http://sources.openpht.tv/plex-dependencies/windows-i386-xbmc-vc120.tar.gz || exit /b 1
 )
 echo Unpacking deps...
-%WORKSPACE%\plex\scripts\tar.exe -C %WORKSPACE% -xzf %WORKSPACE%\plex\Dependencies\windows-i386-xbmc-vc110.tar.gz || exit /b 2
+%WORKSPACE%\plex\scripts\tar.exe -C %WORKSPACE% -xzf %WORKSPACE%\plex\Dependencies\windows-i386-xbmc-vc120.tar.gz || exit /b 2
 
 set DEPENDDIR="%WORKSPACE%\plex\build\dependencies"
-
-if not exist %DEPENDDIR%\vcredist\2012 mkdir %DEPENDDIR%\vcredist\2012
-if not exist %DEPENDDIR%\vcredist\2012\vcredist_x86.exe (
-  echo Downloading vc110 redist...
-  %WORKSPACE%\Project\BuildDependencies\bin\wget -nv --no-check-certificate -O %DEPENDDIR%\vcredist\2012\vcredist_x86.exe http://sources.openpht.tv/plex-dependencies/vcredist/2012/vcredist_x86.exe || exit /b 1
-)
 
 if not exist %DEPENDDIR%\vcredist\2013 mkdir %DEPENDDIR%\vcredist\2013
 if not exist %DEPENDDIR%\vcredist\2013\vcredist_x86.exe (

@@ -1,24 +1,24 @@
 /*
  * Copyright (c) 2011 Mans Rullgard <mans@mansr.com>
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "asm.S"
+#include "libavutil/arm/asm.S"
 
 function ff_ac3_bit_alloc_calc_bap_armv6, export=1
         ldr             r12, [sp]
@@ -32,7 +32,7 @@ function ff_ac3_bit_alloc_calc_bap_armv6, export=1
         ldrb            r4,  [r4, r2]
         add             r1,  r1,  r2,  lsl #1           @ psd + start
         add             r0,  r0,  r4,  lsl #1           @ mask + band
-        add             r4,  lr,  r4
+        add             r4,  r4,  lr
         add             r7,  r7,  r2                    @ bap + start
 1:
         ldrsh           r9,  [r0], #2                   @ mask[band]

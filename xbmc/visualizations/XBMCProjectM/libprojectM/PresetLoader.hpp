@@ -29,14 +29,14 @@ class PresetLoader {
 		static const std::string MILKDROP_FILE_EXTENSION;
 		
 		/** Initializes the preset loader with the target directory specified */
-		PresetLoader(std::string dirname);
+		PresetLoader(std::string dirname = std::string());
 		
 		/** Destructor will remove all alllocated presets */
 		~PresetLoader();
 	
 		/** Load a preset by specifying a filename of the directory (that is, NOT full path) */
 		/** Autopointers: when you take it, I leave it */		
-		std::auto_ptr<Preset> loadPreset(unsigned int index, PresetInputs & presetInputs, 
+		std::unique_ptr<Preset> loadPreset(unsigned int index, PresetInputs & presetInputs, 
 			PresetOutputs & presetOutputs) const;
 		
 		/// Add a preset to the loader's collection.

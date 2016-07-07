@@ -34,6 +34,7 @@
 #include "filesystem/SpecialProtocol.h"
 #include "utils/EndianSwap.h"
 #include "utils/URIUtils.h"
+#include "utils/StringUtils.h"
 
 #ifdef _WIN32
 #pragma comment(lib,"liblzo2.lib")
@@ -58,10 +59,14 @@ public:
   CAutoBuffer() { p = 0; }
   explicit CAutoBuffer(size_t s) { p = (BYTE*)malloc(s); }
   ~CAutoBuffer() { free(p); }
-operator BYTE*() { return p; }
+operator BYTE*() const { return p; }
   void Set(BYTE* buf) { free(p); p = buf; }
   bool Resize(size_t s);
 void Release() { p = 0; }
+
+private:
+  CAutoBuffer(const CAutoBuffer&);
+  CAutoBuffer& operator=(const CAutoBuffer&);
 };
 
 bool CAutoBuffer::Resize(size_t s)
@@ -91,7 +96,7 @@ public:
   CAutoTexBuffer() { p = 0; }
   explicit CAutoTexBuffer(size_t s) { p = (BYTE*)XPhysicalAlloc(s, MAXULONG_PTR, 128, PAGE_READWRITE); }
   ~CAutoTexBuffer() { if (p) XPhysicalFree(p); }
-operator BYTE*() { return p; }
+operator BYTE*() const { return p; }
   BYTE* Set(BYTE* buf) { if (p) XPhysicalFree(p); return p = buf; }
 void Release() { p = 0; }
 };
@@ -282,7 +287,7 @@ bool CTextureBundleXPR::LoadFile(const CStdString& Filename, CAutoTexBuffer& Unp
     MEMORYSTATUSEX stat;
     stat.dwLength = sizeof(MEMORYSTATUSEX);
     GlobalMemoryStatusEx(&stat);
-    CLog::Log(LOGERROR, "Out of memory loading texture: %s (need %lu bytes, have %"PRIu64" bytes)", name.c_str(),
+    CLog::Log(LOGERROR, "Out of memory loading texture: %s (need %lu bytes, have %" PRIu64" bytes)", name.c_str(),
               file->second.UnpackedSize + file->second.PackedSize, stat.ullAvailPhys);
 #elif defined(TARGET_DARWIN) || defined(__FreeBSD__)
     CLog::Log(LOGERROR, "Out of memory loading texture: %s (need %d bytes)", name.c_str(),

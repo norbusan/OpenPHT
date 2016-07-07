@@ -22,16 +22,23 @@
 #include "DVDClock.h"
 #include "DVDCodecs/DVDCodecUtils.h"
 #include "utils/log.h"
-
+#include "utils/StringUtils.h"
 #include <cmath>
 
 #define MAXERR DVD_MSEC_TO_TIME(2.5)
 
-using namespace std;
-
 CPullupCorrection::CPullupCorrection()
 {
+  ResetVFRDetection();
   Flush();
+}
+
+void CPullupCorrection::ResetVFRDetection(void)
+{
+  m_minframeduration = DVD_NOPTS_VALUE;
+  m_maxframeduration = DVD_NOPTS_VALUE;
+  m_VFRCounter = 0;
+  m_patternCounter = 0;
 }
 
 void CPullupCorrection::Flush()
@@ -73,7 +80,7 @@ void CPullupCorrection::Add(double pts)
     return;
 
   //get the current pattern in the ringbuffer
-  vector<double> pattern;
+  std::vector<double> pattern;
   GetPattern(pattern);
 
   //check if the pattern is the same as the saved pattern
@@ -82,7 +89,9 @@ void CPullupCorrection::Add(double pts)
   {
     if (m_haspattern)
     {
-      CLog::Log(LOGDEBUG, "CPullupCorrection: pattern lost on diff %f", GetDiff(0));
+      m_VFRCounter++;
+      m_lastPattern = m_pattern;
+      CLog::Log(LOGDEBUG, "CPullupCorrection: pattern lost on diff %f, number of losses %i", GetDiff(0), m_VFRCounter);
       Flush();
     }
 
@@ -105,6 +114,11 @@ void CPullupCorrection::Add(double pts)
     {
       m_haspattern = true;
       m_patternlength = m_pattern.size();
+
+      if (!CheckPattern(m_lastPattern))
+      {
+        m_patternCounter++;
+      }
 
       double frameduration = CalcFrameDuration();
       CLog::Log(LOGDEBUG, "CPullupCorrection: detected pattern of length %i: %s, frameduration: %f",
@@ -160,7 +174,7 @@ void CPullupCorrection::GetPattern(std::vector<double>& pattern)
                                    //difftypesbuff[1] the one added before that etc
 
   //get the difftypes
-  vector<double> difftypes;
+  std::vector<double> difftypes;
   GetDifftypes(difftypes);
 
   //mark each diff with what difftype it is
@@ -176,7 +190,7 @@ void CPullupCorrection::GetPattern(std::vector<double>& pattern)
     }
   }
 
-  bool checkexisting = m_pattern.size() > 0;
+  bool checkexisting = !m_pattern.empty();
 
   //we check for patterns to the length of DIFFRINGSIZE / 2
   for (int i = 1; i <= m_ringfill / 2; i++)
@@ -218,7 +232,7 @@ void CPullupCorrection::GetPattern(std::vector<double>& pattern)
 }
 
 //calculate the different types of diffs we have
-void CPullupCorrection::GetDifftypes(vector<double>& difftypes)
+void CPullupCorrection::GetDifftypes(std::vector<double>& difftypes)
 {
   for (int i = 0; i < m_ringfill; i++)
   {
@@ -272,7 +286,7 @@ inline bool CPullupCorrection::MatchDifftype(int* diffs1, int* diffs2, int nrdif
 bool CPullupCorrection::CheckPattern(std::vector<double>& pattern)
 {
   //if no pattern was detected or if the size of the patterns differ we don't have a match
-  if (pattern.size() != m_pattern.size() || pattern.size() < 1)
+  if (pattern.empty() || pattern.size() != m_pattern.size())
     return false;
 
   if (pattern.size() == 1)
@@ -297,16 +311,54 @@ bool CPullupCorrection::CheckPattern(std::vector<double>& pattern)
 }
 
 //calculate how long each frame should last from the saved pattern
+//Retreive also information of max and min frame rate duration, for VFR files case
 double CPullupCorrection::CalcFrameDuration()
 {
-  if (m_pattern.size() > 0)
+  if (!m_pattern.empty())
   {
     //take the average of all diffs in the pattern
-    double frameduration = 0.0;
-    for (unsigned int i = 0; i < m_pattern.size(); i++)
-      frameduration += m_pattern[i];
+    double frameduration;
+    double current, currentmin, currentmax;
 
+    currentmin = m_pattern[0];
+    currentmax = currentmin;
+    frameduration = currentmin;
+    for (unsigned int i = 1; i < m_pattern.size(); i++)
+    {
+      current = m_pattern[i];
+      if (current>currentmax)
+        currentmax = current;
+      if (current<currentmin)
+        currentmin = current;
+      frameduration += current;
+    }
     frameduration /= m_pattern.size();
+
+    // Update min and max frame duration, only if data is valid
+    bool standard = false;
+    double tempduration = CDVDCodecUtils::NormalizeFrameduration(currentmin, &standard);
+    if (m_minframeduration == DVD_NOPTS_VALUE)
+    {
+      if (standard)
+        m_minframeduration = tempduration;
+    }
+    else
+    {
+      if (standard && (tempduration < m_minframeduration))
+        m_minframeduration = tempduration;
+    }
+
+    tempduration = CDVDCodecUtils::NormalizeFrameduration(currentmax, &standard);
+    if (m_maxframeduration == DVD_NOPTS_VALUE)
+    {
+      if (standard)
+        m_maxframeduration = tempduration;
+    }
+    else
+    {
+      if (standard && (tempduration > m_maxframeduration))
+        m_maxframeduration = tempduration;
+    }
 
     //frameduration is not completely correct, use a common one if it's close
     return CDVDCodecUtils::NormalizeFrameduration(frameduration);

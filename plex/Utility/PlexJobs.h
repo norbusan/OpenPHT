@@ -20,18 +20,6 @@
 #include "TextureCacheJob.h"
 #include "filesystem/File.h"
 
-#ifdef TARGET_RASPBERRY_PI
-#pragma GCC diagnostic ignored "-Wwrite-strings"
-#include "dialogs/GUIDialogKaiToast.h"
-#include "dialogs/GUIDialogProgress.h"
-#include "AutoUpdate/PlexAutoUpdate.h"
-#include "filesystem/SpecialProtocol.h"
-#include "xbmc/Util.h"
-#include "guilib/GUIWindowManager.h"
-#include <stdlib.h>
-#include <errno.h>
-#endif
-
 class CPlexPlayQueue;
 typedef boost::shared_ptr<CPlexPlayQueue> CPlexPlayQueuePtr;
 
@@ -233,31 +221,5 @@ public:
   }
   virtual bool CacheTexture(CBaseTexture** texture = NULL);
 };
-
-#ifdef TARGET_RASPBERRY_PI
-class CPlexAutoUpdate; 
-class CPlexUpdaterJob : public CJob
-{
-  public:
-    CPlexUpdaterJob(CPlexAutoUpdate *autoupdater, const CStdString& localbinary) : 
-      m_localBinary(localbinary)
-    {
-      m_autoupdater = autoupdater;
-      m_updating = false;
-    };
-
-    bool DoWork();
-    CStdString StreamExec(CStdString command);
-    void SetProgress(char* message, int step, int steps);
-    void CancelUpdate(char* message);
-
-    CPlexAutoUpdate *m_autoupdater;
-    CStdString m_localBinary;
-    CGUIDialogProgress* m_dlgProgress;
-    bool m_continue;
-    bool m_cancelled;
-    bool m_updating;
-};
-#endif
 
 #endif /* defined(__Plex_Home_Theater__PlexJobs__) */

@@ -5,25 +5,24 @@
 ;*
 ;* Authors: Daniel Kang <daniel.d.kang@gmail.com>
 ;*
-;* This file is part of Libav.
+;* This file is part of FFmpeg.
 ;*
-;* Libav is free software; you can redistribute it and/or
+;* FFmpeg is free software; you can redistribute it and/or
 ;* modify it under the terms of the GNU Lesser General Public
 ;* License as published by the Free Software Foundation; either
 ;* version 2.1 of the License, or (at your option) any later version.
 ;*
-;* Libav is distributed in the hope that it will be useful,
+;* FFmpeg is distributed in the hope that it will be useful,
 ;* but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;* Lesser General Public License for more details.
 ;*
 ;* You should have received a copy of the GNU Lesser General Public
-;* License along with Libav; if not, write to the Free Software
+;* License along with FFmpeg; if not, write to the Free Software
 ;* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ;******************************************************************************
 
-%include "x86inc.asm"
-%include "x86util.asm"
+%include "libavutil/x86/x86util.asm"
 
 SECTION_RODATA
 
@@ -38,7 +37,7 @@ SECTION .text
 %macro MV0_PIXELS_MC8 0
     lea           r4, [r2*3   ]
     lea           r5, [r2*4   ]
-.next4rows
+.next4rows:
     movu          m0, [r1     ]
     movu          m1, [r1+r2  ]
     CHROMAMC_AVG  m0, [r0     ]
@@ -58,12 +57,11 @@ SECTION .text
 %endmacro
 
 ;-----------------------------------------------------------------------------
-; void put/avg_h264_chroma_mc8(pixel *dst, pixel *src, int stride, int h, int mx, int my)
+; void ff_put/avg_h264_chroma_mc8(pixel *dst, pixel *src, int stride, int h,
+;                                 int mx, int my)
 ;-----------------------------------------------------------------------------
-%macro CHROMA_MC8 2
-; put/avg_h264_chroma_mc8_*(uint8_t *dst /*align 8*/, uint8_t *src /*align 1*/,
-;                              int stride, int h, int mx, int my)
-cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
+%macro CHROMA_MC8 1
+cglobal %1_h264_chroma_mc8_10, 6,7,8
     movsxdifnidn  r2, r2d
     mov          r6d, r5d
     or           r6d, r4d
@@ -72,14 +70,14 @@ cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
     MV0_PIXELS_MC8
     REP_RET
 
-.at_least_one_non_zero
+.at_least_one_non_zero:
     mov          r6d, 2
     test         r5d, r5d
     je .x_interpolation
     mov           r6, r2        ; dxy = x ? 1 : stride
     test         r4d, r4d
     jne .xy_interpolation
-.x_interpolation
+.x_interpolation:
     ; mx == 0 XOR my == 0 - 1 dimensional filter only
     or           r4d, r5d       ; x + y
     movd          m5, r4d
@@ -88,7 +86,7 @@ cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
     SPLATW        m5, m5        ; mm5 = B = x
     psubw         m4, m5        ; mm4 = A = 8-x
 
-.next1drow
+.next1drow:
     movu          m0, [r1   ]   ; mm0 = src[0..7]
     movu          m2, [r1+r6]   ; mm2 = src[1..8]
 
@@ -107,7 +105,7 @@ cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
     jne .next1drow
     REP_RET
 
-.xy_interpolation ; general case, bilinear
+.xy_interpolation: ; general case, bilinear
     movd          m4, r4m         ; x
     movd          m6, r5m         ; y
 
@@ -125,7 +123,7 @@ cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
 
     movu          m0, [r1  ]      ; mm0 = src[0..7]
     movu          m1, [r1+2]      ; mm1 = src[1..8]
-.next2drow
+.next2drow:
     add           r1, r2
 
     pmullw        m2, m0, m4
@@ -151,7 +149,8 @@ cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
 %endmacro
 
 ;-----------------------------------------------------------------------------
-; void put/avg_h264_chroma_mc4(pixel *dst, pixel *src, int stride, int h, int mx, int my)
+; void ff_put/avg_h264_chroma_mc4(pixel *dst, pixel *src, int stride, int h,
+;                                 int mx, int my)
 ;-----------------------------------------------------------------------------
 ;TODO: xmm mc4
 %macro MC4_OP 2
@@ -173,8 +172,8 @@ cglobal %1_h264_chroma_mc8_10_%2, 6,7,8
     add           r0, r2
 %endmacro
 
-%macro CHROMA_MC4 2
-cglobal %1_h264_chroma_mc4_10_%2, 6,6,7
+%macro CHROMA_MC4 1
+cglobal %1_h264_chroma_mc4_10, 6,6,7
     movsxdifnidn  r2, r2d
     movd          m2, r4m         ; x
     movd          m3, r5m         ; y
@@ -192,7 +191,7 @@ cglobal %1_h264_chroma_mc4_10_%2, 6,6,7
     pmullw        m6, m2
     paddw         m6, m0
 
-.next2rows
+.next2rows:
     MC4_OP m0, m6
     MC4_OP m6, m0
     sub   r3d, 2
@@ -201,10 +200,11 @@ cglobal %1_h264_chroma_mc4_10_%2, 6,6,7
 %endmacro
 
 ;-----------------------------------------------------------------------------
-; void put/avg_h264_chroma_mc2(pixel *dst, pixel *src, int stride, int h, int mx, int my)
+; void ff_put/avg_h264_chroma_mc2(pixel *dst, pixel *src, int stride, int h,
+;                                 int mx, int my)
 ;-----------------------------------------------------------------------------
-%macro CHROMA_MC2 2
-cglobal %1_h264_chroma_mc2_10_%2, 6,7
+%macro CHROMA_MC2 1
+cglobal %1_h264_chroma_mc2_10, 6,7
     movsxdifnidn  r2, r2d
     mov          r6d, r4d
     shl          r4d, 16
@@ -221,7 +221,7 @@ cglobal %1_h264_chroma_mc2_10_%2, 6,7
     pxor          m7, m7
     pshufw        m2, [r1], 0x94    ; mm0 = src[0,1,1,2]
 
-.nextrow
+.nextrow:
     add           r1, r2
     movq          m1, m2
     pmaddwd       m1, m5          ; mm1 = A * src[0,1] + B * src[1,2]
@@ -246,28 +246,27 @@ cglobal %1_h264_chroma_mc2_10_%2, 6,7
 %if %0==3
     movq          %2, %3
 %endif
-    PAVG          %1, %2
+    pavgw         %1, %2
 %endmacro
 
 %define CHROMAMC_AVG  NOTHING
-INIT_XMM
-CHROMA_MC8 put, sse2
-%ifdef HAVE_AVX
-INIT_AVX
-CHROMA_MC8 put, avx
+INIT_XMM sse2
+CHROMA_MC8 put
+%if HAVE_AVX_EXTERNAL
+INIT_XMM avx
+CHROMA_MC8 put
 %endif
-INIT_MMX
-CHROMA_MC4 put, mmxext
-CHROMA_MC2 put, mmxext
+INIT_MMX mmxext
+CHROMA_MC4 put
+CHROMA_MC2 put
 
 %define CHROMAMC_AVG  AVG
-%define PAVG          pavgw
-INIT_XMM
-CHROMA_MC8 avg, sse2
-%ifdef HAVE_AVX
-INIT_AVX
-CHROMA_MC8 avg, avx
+INIT_XMM sse2
+CHROMA_MC8 avg
+%if HAVE_AVX_EXTERNAL
+INIT_XMM avx
+CHROMA_MC8 avg
 %endif
-INIT_MMX
-CHROMA_MC4 avg, mmxext
-CHROMA_MC2 avg, mmxext
+INIT_MMX mmxext
+CHROMA_MC4 avg
+CHROMA_MC2 avg

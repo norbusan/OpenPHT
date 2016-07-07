@@ -20,25 +20,15 @@
  *
  */
 
-#if !defined(_LINUX) && !defined(HAS_GL)
+#if !defined(TARGET_POSIX) && !defined(HAS_GL)
 
-#include "guilib/GraphicContext.h"
-#include "RenderFlags.h"
+#include "RenderFormats.h"
 #include "BaseRenderer.h"
 #include "guilib/D3DResource.h"
 #include "RenderCapture.h"
 #include "settings/VideoSettings.h"
-#include "cores/dvdplayer/DVDCodecs/Video/DXVA.h"
-#include "cores/VideoRenderers/RenderFlags.h"
-#include "cores/VideoRenderers/RenderFormats.h"
-
-//#define MP_DIRECTRENDERING
-
-#ifdef MP_DIRECTRENDERING
-#define NUM_BUFFERS 3
-#else
-#define NUM_BUFFERS 2
-#endif
+#include "DXVA.h"
+#include "DXVAHD.h"
 
 #define ALIGN(value, alignment) (((value)+((alignment)-1))&~((alignment)-1))
 #define CLAMP(a, min, max) ((a) > (max) ? (max) : ( (a) < (min) ? (min) : a ))
@@ -55,10 +45,6 @@
 class CBaseTexture;
 class CYUV2RGBShader;
 class CConvolutionShader;
-
-class DllAvUtil;
-class DllAvCodec;
-class DllSwScale;
 
 struct DVDVideoPicture;
 
@@ -83,8 +69,6 @@ enum RenderMethod
   RENDER_PS      = 0x01,
   RENDER_SW      = 0x02,
   RENDER_DXVA    = 0x03,
-  /* PLEX */
-  RENDER_RGB     = 0x04,
 };
 
 #define PLANE_Y 0
@@ -139,13 +123,11 @@ struct DXVABuffer : SVideoBuffer
 {
   DXVABuffer()
   {
-    id   = 0;
+    pic = NULL;
   }
-  ~DXVABuffer();
-  virtual void Release();
-  virtual void StartDecode();
-
-  int64_t           id;
+  ~DXVABuffer() { SAFE_RELEASE(pic); }
+  DXVA::CRenderPicture *pic;
+  unsigned int frameIdx;
 };
 
 class CWinRenderer : public CBaseRenderer
@@ -154,7 +136,7 @@ public:
   CWinRenderer();
   ~CWinRenderer();
 
-  virtual void Update(bool bPauseDrawing);
+  virtual void Update();
   virtual void SetupScreenshot() {};
 
   bool RenderCapture(CRenderCapture* capture);
@@ -163,7 +145,7 @@ public:
   virtual bool         Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation);
   virtual int          GetImage(YV12Image *image, int source = AUTOSOURCE, bool readonly = false);
   virtual void         ReleaseImage(int source, bool preserve = false);
-  virtual bool         AddVideoPicture(DVDVideoPicture* picture);
+  virtual bool         AddVideoPicture(DVDVideoPicture* picture, int index);
   virtual void         FlipPage(int source);
   virtual unsigned int PreInit();
   virtual void         UnInit();
@@ -171,7 +153,7 @@ public:
   virtual bool         IsConfigured() { return m_bConfigured; }
   virtual void         Flush();
 
-  virtual std::vector<ERenderFormat> SupportedFormats() { return m_formats; }
+  virtual CRenderInfo GetRenderInfo();
 
   virtual bool         Supports(ERENDERFEATURE feature);
   virtual bool         Supports(EDEINTERLACEMODE mode);
@@ -182,12 +164,9 @@ public:
 
   void                 RenderUpdate(bool clear, DWORD flags = 0, DWORD alpha = 255);
 
-  virtual unsigned int GetProcessorSize() { return m_processor.Size(); }
-  
-  /* PLEX */
-  virtual void SetRGB32Image(const char *image, int nHeight, int nWidth, int nPitch);
-  /* END PLEX */
-  
+  virtual void         SetBufferSize(int numBuffers) { m_neededBuffers = numBuffers; }
+  virtual void         ReleaseBuffer(int idx);
+  virtual bool         NeedBufferForRef(int idx);
 
 protected:
   virtual void Render(DWORD flags);
@@ -202,10 +181,6 @@ protected:
   bool         CreateYV12Texture(int index);
   void         CopyYV12Texture(int dest);
   int          NextYV12Texture();
-  
-  /* PLEX */
-  void         RenderRGB();
-  /* END PLEX */
 
   void SelectRenderMethod();
   bool UpdateRenderMethod();
@@ -214,7 +189,7 @@ protected:
   void SelectSWVideoFilter();
   void SelectPSVideoFilter();
   void UpdatePSVideoFilter();
-  bool CreateIntermediateRenderTarget();
+  bool CreateIntermediateRenderTarget(unsigned int width, unsigned int height);
 
   void RenderProcessor(DWORD flags);
   int  m_iYV12RenderBuffer;
@@ -223,13 +198,10 @@ protected:
   bool                 m_bConfigured;
   SVideoBuffer        *m_VideoBuffers[NUM_BUFFERS];
   RenderMethod         m_renderMethod;
-  DXVA::CProcessor     m_processor;
+  DXVA::CProcessor    *m_processor;
   std::vector<ERenderFormat> m_formats;
 
   // software scale libraries (fallback if required pixel shaders version is not available)
-  DllAvUtil           *m_dllAvUtil;
-  DllAvCodec          *m_dllAvCodec;
-  DllSwScale          *m_dllSwScale;
   struct SwsContext   *m_sw_scale_ctx;
 
   // Software rendering
@@ -246,7 +218,7 @@ protected:
   ESCALINGMETHOD       m_scalingMethod;
   ESCALINGMETHOD       m_scalingMethodGui;
 
-  D3DCAPS9 m_deviceCaps;
+  D3DCAPS9             m_deviceCaps;
 
   bool                 m_bFilterInitialized;
 
@@ -254,7 +226,6 @@ protected:
 
   // clear colour for "black" bars
   DWORD                m_clearColour;
-  ERenderFormat        m_format;
   unsigned int         m_extended_format;
 
   // Width and height of the render target
@@ -262,12 +233,8 @@ protected:
   unsigned int         m_destWidth;
   unsigned int         m_destHeight;
 
-  /* PLEX - RGB rendering */
-  BYTE                *m_rgbBuffer;
-  int                  m_rgbBufferSize;
-  bool                 m_bRGBImageSet;
-  LPDIRECT3DTEXTURE9   m_rgbTexture;
-  /* END PLEX */
+  int                  m_neededBuffers;
+  unsigned int         m_frameIdx;
 };
 
 #else

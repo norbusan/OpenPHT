@@ -1,4 +1,5 @@
 include ../Makefile.include
+DEPS= Makefile
 
 # lib name, version
 LIBNAME=libjpeg-turbo
@@ -10,16 +11,18 @@ ARCHIVE=$(LIBNAME)-$(VERSION).tar.gz
 CONFIGURE=./configure --prefix=$(PREFIX) \
   --with-jpeg8
 
-LIBDYLIB=$(SOURCE)/.libs/lib$(LIBNAME).dylib
+export CFLAGS=-O3
+
+LIBDYLIB=$(SOURCE)/.libs/libjpeg.a
 
 CLEAN_FILES=$(ARCHIVE) $(SOURCE)
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
@@ -29,7 +32,7 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 $(LIBDYLIB): $(SOURCE)
 	make -j 1 -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

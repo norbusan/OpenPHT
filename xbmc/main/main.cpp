@@ -22,7 +22,6 @@
 #include "settings/AppParamParser.h"
 #include "settings/AdvancedSettings.h"
 #include "FileItem.h"
-#include "Application.h"
 #include "PlayListPlayer.h"
 #include "utils/log.h"
 #include "xbmc.h"
@@ -36,12 +35,16 @@
   #ifdef HAS_SDL
     #include <SDL/SDL.h>
   #endif
+#include <locale.h>
 #endif
 #ifdef HAS_LIRC
 #include "input/linux/LIRC.h"
 #endif
 #include "XbmcContext.h"
 
+#ifdef __cplusplus
+extern "C"
+#endif
 int main(int argc, char* argv[])
 {
   int result = 0;

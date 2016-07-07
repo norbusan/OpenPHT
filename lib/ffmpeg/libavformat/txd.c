@@ -21,6 +21,7 @@
 
 #include "libavutil/intreadwrite.h"
 #include "avformat.h"
+#include "internal.h"
 
 #define TXD_FILE            0x16
 #define TXD_INFO            0x01
@@ -37,16 +38,16 @@ static int txd_probe(AVProbeData * pd) {
     return 0;
 }
 
-static int txd_read_header(AVFormatContext *s, AVFormatParameters *ap) {
+static int txd_read_header(AVFormatContext *s) {
     AVStream *st;
 
     st = avformat_new_stream(s, NULL);
     if (!st)
         return AVERROR(ENOMEM);
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id = CODEC_ID_TXD;
-    st->codec->time_base.den = 5;
-    st->codec->time_base.num = 1;
+    st->codec->codec_id = AV_CODEC_ID_TXD;
+    avpriv_set_pts_info(st, 64, 1, 5);
+    st->avg_frame_rate = av_inv_q(st->time_base);
     /* the parameters will be extracted from the compressed bitstream */
 
     return 0;
@@ -62,7 +63,7 @@ next_chunk:
     chunk_size = avio_rl32(pb);
     marker     = avio_rl32(pb);
 
-    if (url_feof(s->pb))
+    if (avio_feof(s->pb))
         return AVERROR_EOF;
     if (marker != TXD_MARKER && marker != TXD_MARKER2) {
         av_log(s, AV_LOG_ERROR, "marker does not match\n");
@@ -70,17 +71,17 @@ next_chunk:
     }
 
     switch (id) {
-        case TXD_INFO:
-            if (chunk_size > 100)
-                break;
-        case TXD_EXTRA:
-            avio_skip(s->pb, chunk_size);
-        case TXD_FILE:
-        case TXD_TEXTURE:
-            goto next_chunk;
-        default:
-            av_log(s, AV_LOG_ERROR, "unknown chunk id %i\n", id);
-            return AVERROR_INVALIDDATA;
+    case TXD_INFO:
+        if (chunk_size > 100)
+            break;
+    case TXD_EXTRA:
+        avio_skip(s->pb, chunk_size);
+    case TXD_FILE:
+    case TXD_TEXTURE:
+        goto next_chunk;
+    default:
+        av_log(s, AV_LOG_ERROR, "unknown chunk id %i\n", id);
+        return AVERROR_INVALIDDATA;
     }
 
     ret = av_get_packet(s->pb, pkt, chunk_size);

@@ -26,41 +26,56 @@
 
 #include "avcodec.h"
 #include "raw.h"
+#include "internal.h"
 #include "libavutil/pixdesc.h"
 #include "libavutil/intreadwrite.h"
+#include "libavutil/internal.h"
 
-static av_cold int raw_init_encoder(AVCodecContext *avctx)
+static av_cold int raw_encode_init(AVCodecContext *avctx)
 {
-    avctx->coded_frame = (AVFrame *)avctx->priv_data;
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(avctx->pix_fmt);
+
+#if FF_API_CODED_FRAME
+FF_DISABLE_DEPRECATION_WARNINGS
     avctx->coded_frame->pict_type = AV_PICTURE_TYPE_I;
-    avctx->coded_frame->key_frame = 1;
-    avctx->bits_per_coded_sample = av_get_bits_per_pixel(&av_pix_fmt_descriptors[avctx->pix_fmt]);
+FF_ENABLE_DEPRECATION_WARNINGS
+#endif
+    avctx->bits_per_coded_sample = av_get_bits_per_pixel(desc);
     if(!avctx->codec_tag)
         avctx->codec_tag = avcodec_pix_fmt_to_codec_tag(avctx->pix_fmt);
     return 0;
 }
 
-static int raw_encode(AVCodecContext *avctx,
-                            unsigned char *frame, int buf_size, void *data)
+static int raw_encode(AVCodecContext *avctx, AVPacket *pkt,
+                      const AVFrame *frame, int *got_packet)
 {
-    int ret = avpicture_layout((AVPicture *)data, avctx->pix_fmt, avctx->width,
-                                               avctx->height, frame, buf_size);
+    int ret = avpicture_get_size(frame->format, frame->width, frame->height);
+
+    if (ret < 0)
+        return ret;
+
+    if ((ret = ff_alloc_packet2(avctx, pkt, ret, ret)) < 0)
+        return ret;
+    if ((ret = avpicture_layout((const AVPicture *)frame, frame->format, frame->width,
+                                frame->height, pkt->data, pkt->size)) < 0)
+        return ret;
 
     if(avctx->codec_tag == AV_RL32("yuv2") && ret > 0 &&
-       avctx->pix_fmt   == PIX_FMT_YUYV422) {
+       frame->format   == AV_PIX_FMT_YUYV422) {
         int x;
-        for(x = 1; x < avctx->height*avctx->width*2; x += 2)
-            frame[x] ^= 0x80;
+        for(x = 1; x < frame->height*frame->width*2; x += 2)
+            pkt->data[x] ^= 0x80;
     }
-    return ret;
+    pkt->flags |= AV_PKT_FLAG_KEY;
+    *got_packet = 1;
+    return 0;
 }
 
 AVCodec ff_rawvideo_encoder = {
     .name           = "rawvideo",
+    .long_name      = NULL_IF_CONFIG_SMALL("raw video"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_RAWVIDEO,
-    .priv_data_size = sizeof(AVFrame),
-    .init           = raw_init_encoder,
-    .encode         = raw_encode,
-    .long_name = NULL_IF_CONFIG_SMALL("raw video"),
+    .id             = AV_CODEC_ID_RAWVIDEO,
+    .init           = raw_encode_init,
+    .encode2        = raw_encode,
 };

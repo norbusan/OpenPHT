@@ -33,15 +33,9 @@ FARPROC WINAPI delayHookNotifyFunc (unsigned dliNotify, PDelayLoadInfo pdli)
   switch (dliNotify)
   {
     case dliNotePreLoadLibrary:
-      if (stricmp(pdli->szDll, "libmicrohttpd-5.dll") == 0)
+      if (stricmp(pdli->szDll, "libmicrohttpd-dll.dll") == 0)
       {
         CStdString strDll = CSpecialProtocol::TranslatePath(DLL_PATH_LIBMICROHTTP);
-        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
-        return (FARPROC)hMod;
-      }
-      if (stricmp(pdli->szDll, "ssh.dll") == 0)
-      {
-        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/ssh.dll");
         HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
         return (FARPROC)hMod;
       }
@@ -51,15 +45,51 @@ FARPROC WINAPI delayHookNotifyFunc (unsigned dliNotify, PDelayLoadInfo pdli)
         HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
         return (FARPROC)hMod;
       }
-      if (stricmp(pdli->szDll, "libsamplerate-0.dll") == 0)
-      {
-        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/libsamplerate-0.dll");
-        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
-        return (FARPROC)hMod;
-      }
       if (stricmp(pdli->szDll, "dnssd.dll") == 0)
       {
         CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/dnssd.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "avcodec-56.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/avcodec-56.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "avfilter-5.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/avfilter-5.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "avformat-56.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/avformat-56.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "avutil-54.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/avutil-54.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "postproc-53.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/postproc-53.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "swresample-1.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/swresample-1.dll");
+        HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+        return (FARPROC)hMod;
+      }
+      if (stricmp(pdli->szDll, "swscale-3.dll") == 0)
+      {
+        CStdString strDll = CSpecialProtocol::TranslatePath("special://xbmcbin/system/players/dvdplayer/swscale-3.dll");
         HMODULE hMod = LoadLibraryEx(strDll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
         return (FARPROC)hMod;
       }

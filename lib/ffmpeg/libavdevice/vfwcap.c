@@ -19,19 +19,25 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavformat/internal.h"
+#include "libavutil/internal.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
 #include "libavutil/parseutils.h"
+
+#include "libavformat/internal.h"
+
+// windows.h must no be included before winsock2.h, and libavformat internal
+// headers may include winsock2.h
 #include <windows.h>
+// windows.h needs to be included before vfw.h
 #include <vfw.h>
+
 #include "avdevice.h"
 
-/* Defines for VFW missing from MinGW.
- * Remove this when MinGW incorporates them. */
-#define HWND_MESSAGE                ((HWND)-3)
-
-/* End of missing MinGW defines */
+/* Some obsolete versions of MinGW32 before 4.0.0 lack this. */
+#ifndef HWND_MESSAGE
+#define HWND_MESSAGE ((HWND) -3)
+#endif
 
 struct vfw_ctx {
     const AVClass *class;
@@ -45,44 +51,44 @@ struct vfw_ctx {
     char *framerate;        /**< Set by a private option. */
 };
 
-static enum PixelFormat vfw_pixfmt(DWORD biCompression, WORD biBitCount)
+static enum AVPixelFormat vfw_pixfmt(DWORD biCompression, WORD biBitCount)
 {
     switch(biCompression) {
     case MKTAG('U', 'Y', 'V', 'Y'):
-        return PIX_FMT_UYVY422;
+        return AV_PIX_FMT_UYVY422;
     case MKTAG('Y', 'U', 'Y', '2'):
-        return PIX_FMT_YUYV422;
+        return AV_PIX_FMT_YUYV422;
     case MKTAG('I', '4', '2', '0'):
-        return PIX_FMT_YUV420P;
+        return AV_PIX_FMT_YUV420P;
     case BI_RGB:
         switch(biBitCount) { /* 1-8 are untested */
             case 1:
-                return PIX_FMT_MONOWHITE;
+                return AV_PIX_FMT_MONOWHITE;
             case 4:
-                return PIX_FMT_RGB4;
+                return AV_PIX_FMT_RGB4;
             case 8:
-                return PIX_FMT_RGB8;
+                return AV_PIX_FMT_RGB8;
             case 16:
-                return PIX_FMT_RGB555;
+                return AV_PIX_FMT_RGB555;
             case 24:
-                return PIX_FMT_BGR24;
+                return AV_PIX_FMT_BGR24;
             case 32:
-                return PIX_FMT_RGB32;
+                return AV_PIX_FMT_RGB32;
         }
     }
-    return PIX_FMT_NONE;
+    return AV_PIX_FMT_NONE;
 }
 
-static enum CodecID vfw_codecid(DWORD biCompression)
+static enum AVCodecID vfw_codecid(DWORD biCompression)
 {
     switch(biCompression) {
     case MKTAG('d', 'v', 's', 'd'):
-        return CODEC_ID_DVVIDEO;
+        return AV_CODEC_ID_DVVIDEO;
     case MKTAG('M', 'J', 'P', 'G'):
     case MKTAG('m', 'j', 'p', 'g'):
-        return CODEC_ID_MJPEG;
+        return AV_CODEC_ID_MJPEG;
     }
-    return CODEC_ID_NONE;
+    return AV_CODEC_ID_NONE;
 }
 
 #define dstruct(pctx, sname, var, type) \
@@ -155,7 +161,7 @@ static void dump_bih(AVFormatContext *s, BITMAPINFOHEADER *bih)
 static int shall_we_drop(AVFormatContext *s)
 {
     struct vfw_ctx *ctx = s->priv_data;
-    const uint8_t dropscore[] = {62, 75, 87, 100};
+    static const uint8_t dropscore[] = {62, 75, 87, 100};
     const int ndropscores = FF_ARRAY_ELEMS(dropscore);
     unsigned int buffer_fullness = (ctx->curbufsize*100)/s->max_picture_buffer;
 
@@ -228,7 +234,7 @@ static int vfw_read_close(AVFormatContext *s)
     pktl = ctx->pktl;
     while (pktl) {
         AVPacketList *next = pktl->next;
-        av_destruct_packet(&pktl->pkt);
+        av_free_packet(&pktl->pkt);
         av_free(pktl);
         pktl = next;
     }
@@ -236,7 +242,7 @@ static int vfw_read_close(AVFormatContext *s)
     return 0;
 }
 
-static int vfw_read_header(AVFormatContext *s, AVFormatParameters *ap)
+static int vfw_read_header(AVFormatContext *s)
 {
     struct vfw_ctx *ctx = s->priv_data;
     AVCodecContext *codec;
@@ -372,14 +378,14 @@ static int vfw_read_header(AVFormatContext *s, AVFormatParameters *ap)
         goto fail;
 
     codec = st->codec;
-    codec->time_base = (AVRational){framerate_q.den, framerate_q.num};
+    codec->time_base = av_inv_q(framerate_q);
     codec->codec_type = AVMEDIA_TYPE_VIDEO;
     codec->width  = bi->bmiHeader.biWidth;
     codec->height = bi->bmiHeader.biHeight;
     codec->pix_fmt = vfw_pixfmt(biCompression, biBitCount);
-    if(codec->pix_fmt == PIX_FMT_NONE) {
+    if(codec->pix_fmt == AV_PIX_FMT_NONE) {
         codec->codec_id = vfw_codecid(biCompression);
-        if(codec->codec_id == CODEC_ID_NONE) {
+        if(codec->codec_id == AV_CODEC_ID_NONE) {
             av_log(s, AV_LOG_ERROR, "Unknown compression type. "
                              "Please report verbose (-v 9) debug information.\n");
             vfw_read_close(s);
@@ -387,10 +393,10 @@ static int vfw_read_header(AVFormatContext *s, AVFormatParameters *ap)
         }
         codec->bits_per_coded_sample = biBitCount;
     } else {
-        codec->codec_id = CODEC_ID_RAWVIDEO;
+        codec->codec_id = AV_CODEC_ID_RAWVIDEO;
         if(biCompression == BI_RGB) {
             codec->bits_per_coded_sample = biBitCount;
-            codec->extradata = av_malloc(9 + FF_INPUT_BUFFER_PADDING_SIZE);
+            codec->extradata = av_malloc(9 + AV_INPUT_BUFFER_PADDING_SIZE);
             if (codec->extradata) {
                 codec->extradata_size = 9;
                 memcpy(codec->extradata, "BottomUp", 9);
@@ -469,6 +475,7 @@ static const AVClass vfw_class = {
     .item_name  = av_default_item_name,
     .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,
+    .category   = AV_CLASS_CATEGORY_DEVICE_VIDEO_INPUT
 };
 
 AVInputFormat ff_vfwcap_demuxer = {

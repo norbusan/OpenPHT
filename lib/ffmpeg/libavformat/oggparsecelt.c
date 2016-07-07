@@ -42,15 +42,13 @@ static int celt_header(AVFormatContext *s, int idx)
         !memcmp(p, ff_celt_codec.magic, ff_celt_codec.magicsize)) {
         /* Main header */
 
-        uint32_t version, sample_rate, nb_channels, frame_size;
+        uint32_t version, sample_rate, nb_channels;
         uint32_t overlap, extra_headers;
-        uint8_t *extradata;
 
-        extradata = av_malloc(2 * sizeof(uint32_t) +
-                              FF_INPUT_BUFFER_PADDING_SIZE);
         priv = av_malloc(sizeof(struct oggcelt_private));
-        if (!extradata || !priv) {
-            av_free(extradata);
+        if (!priv)
+            return AVERROR(ENOMEM);
+        if (ff_alloc_extradata(st->codec, 2 * sizeof(uint32_t)) < 0) {
             av_free(priv);
             return AVERROR(ENOMEM);
         }
@@ -58,30 +56,25 @@ static int celt_header(AVFormatContext *s, int idx)
         /* unused header size field skipped */
         sample_rate      = AV_RL32(p + 36);
         nb_channels      = AV_RL32(p + 40);
-        frame_size       = AV_RL32(p + 44);
         overlap          = AV_RL32(p + 48);
         /* unused bytes per packet field skipped */
         extra_headers    = AV_RL32(p + 56);
         st->codec->codec_type     = AVMEDIA_TYPE_AUDIO;
-        st->codec->codec_id       = CODEC_ID_CELT;
+        st->codec->codec_id       = AV_CODEC_ID_CELT;
         st->codec->sample_rate    = sample_rate;
         st->codec->channels       = nb_channels;
-        st->codec->frame_size     = frame_size;
-        av_free(st->codec->extradata);
-        st->codec->extradata      = extradata;
-        st->codec->extradata_size = 2 * sizeof(uint32_t);
         if (sample_rate)
             avpriv_set_pts_info(st, 64, 1, sample_rate);
         priv->extra_headers_left  = 1 + extra_headers;
         av_free(os->private);
         os->private = priv;
-        AV_WL32(extradata + 0, overlap);
-        AV_WL32(extradata + 4, version);
+        AV_WL32(st->codec->extradata + 0, overlap);
+        AV_WL32(st->codec->extradata + 4, version);
         return 1;
     } else if (priv && priv->extra_headers_left) {
         /* Extra headers (vorbiscomment) */
 
-        ff_vorbis_comment(s, &st->metadata, p, os->psize);
+        ff_vorbis_stream_comment(s, st, p, os->psize);
         priv->extra_headers_left--;
         return 1;
     } else {
@@ -93,4 +86,5 @@ const struct ogg_codec ff_celt_codec = {
     .magic     = "CELT    ",
     .magicsize = 8,
     .header    = celt_header,
+    .nb_header = 2,
 };

@@ -34,7 +34,9 @@
 
 #if defined(__ppc__) || \
     defined(__powerpc__) || \
-    defined(__arm__)
+    defined(__mips__) || \
+    defined(__arm__) || \
+    defined(__aarch64__)
   #define DISABLE_MATHUTILS_ASM_ROUND_INT
 #endif
 
@@ -61,8 +63,8 @@ namespace MathUtils
   */
   inline int round_int(double x)
   {
-    assert(x > static_cast<double>(INT_MIN / 2) - 1.0);
-    assert(x < static_cast<double>(INT_MAX / 2) + 1.0);
+    assert(x > static_cast<double>((int) (INT_MIN / 2)) - 1.0);
+    assert(x < static_cast<double>((int) (INT_MAX / 2)) + 1.0);
 
 #if defined(DISABLE_MATHUTILS_ASM_ROUND_INT)
     /* This implementation warrants some further explanation.
@@ -123,7 +125,7 @@ namespace MathUtils
     const float round_dn_to_nearest = 0.4999999f;
     i = (x > 0) ? _mm_cvttsd_si32(_mm_set_sd(x + round_to_nearest)) : _mm_cvttsd_si32(_mm_set_sd(x - round_dn_to_nearest));
 
-#elif defined(_WIN32)
+#elif defined(TARGET_WINDOWS)
     __asm
     {
       fld x
@@ -158,7 +160,7 @@ namespace MathUtils
   {
     assert(x > static_cast<double>(INT_MIN / 2) - 1.0);
     assert(x < static_cast<double>(INT_MAX / 2) + 1.0);
-    return x;
+    return static_cast<int>(x);
   }
 
   inline int64_t abs(int64_t a)

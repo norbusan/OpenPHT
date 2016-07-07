@@ -24,7 +24,7 @@
 #include "powermanagement/IPowerSyscall.h"
 #include "DBusUtil.h"
 
-class CLogindUPowerSyscall : public IPowerSyscall
+class CLogindUPowerSyscall : public CAbstractPowerSyscall
 {
 public:
   CLogindUPowerSyscall();
@@ -40,7 +40,7 @@ public:
   virtual int BatteryLevel();
   virtual bool PumpPowerEvents(IPowerEventsCallback *callback);
   // we don't require UPower because everything except the battery level works fine without it
-  static bool HasLogind();
+  static bool HasLogind();  
 private:
   DBusConnection *m_connection;
   bool m_canPowerdown;

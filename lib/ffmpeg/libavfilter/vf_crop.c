@@ -23,16 +23,21 @@
  * video crop filter
  */
 
-/* #define DEBUG */
+#include <stdio.h>
 
 #include "avfilter.h"
+#include "formats.h"
+#include "internal.h"
+#include "video.h"
 #include "libavutil/eval.h"
 #include "libavutil/avstring.h"
+#include "libavutil/internal.h"
 #include "libavutil/libm.h"
 #include "libavutil/imgutils.h"
 #include "libavutil/mathematics.h"
+#include "libavutil/opt.h"
 
-static const char * const var_names[] = {
+static const char *const var_names[] = {
     "in_w", "iw",   ///< width  of the input video
     "in_h", "ih",   ///< height of the input video
     "out_w", "ow",  ///< width  of the cropped video
@@ -68,73 +73,46 @@ enum var_name {
     VAR_VARS_NB
 };
 
-typedef struct {
+typedef struct CropContext {
+    const AVClass *class;
     int  x;             ///< x offset of the non-cropped area with respect to the input area
     int  y;             ///< y offset of the non-cropped area with respect to the input area
     int  w;             ///< width of the cropped area
     int  h;             ///< height of the cropped area
 
+    AVRational out_sar; ///< output sample aspect ratio
+    int keep_aspect;    ///< keep display aspect ratio when cropping
+
     int max_step[4];    ///< max pixel step for each plane, expressed as a number of bytes
     int hsub, vsub;     ///< chroma subsampling
-    char x_expr[256], y_expr[256], ow_expr[256], oh_expr[256];
+    char *x_expr, *y_expr, *w_expr, *h_expr;
     AVExpr *x_pexpr, *y_pexpr;  /* parsed expressions for x and y */
     double var_values[VAR_VARS_NB];
 } CropContext;
 
 static int query_formats(AVFilterContext *ctx)
 {
-    static const enum PixelFormat pix_fmts[] = {
-        PIX_FMT_RGB48BE,      PIX_FMT_RGB48LE,
-        PIX_FMT_BGR48BE,      PIX_FMT_BGR48LE,
-        PIX_FMT_ARGB,         PIX_FMT_RGBA,
-        PIX_FMT_ABGR,         PIX_FMT_BGRA,
-        PIX_FMT_RGB24,        PIX_FMT_BGR24,
-        PIX_FMT_RGB565BE,     PIX_FMT_RGB565LE,
-        PIX_FMT_RGB555BE,     PIX_FMT_RGB555LE,
-        PIX_FMT_BGR565BE,     PIX_FMT_BGR565LE,
-        PIX_FMT_BGR555BE,     PIX_FMT_BGR555LE,
-        PIX_FMT_GRAY16BE,     PIX_FMT_GRAY16LE,
-        PIX_FMT_YUV420P16LE,  PIX_FMT_YUV420P16BE,
-        PIX_FMT_YUV422P16LE,  PIX_FMT_YUV422P16BE,
-        PIX_FMT_YUV444P16LE,  PIX_FMT_YUV444P16BE,
-        PIX_FMT_YUV444P,      PIX_FMT_YUV422P,
-        PIX_FMT_YUV420P,      PIX_FMT_YUV411P,
-        PIX_FMT_YUV410P,      PIX_FMT_YUV440P,
-        PIX_FMT_YUVJ444P,     PIX_FMT_YUVJ422P,
-        PIX_FMT_YUVJ420P,     PIX_FMT_YUVJ440P,
-        PIX_FMT_YUVA420P,
-        PIX_FMT_RGB8,         PIX_FMT_BGR8,
-        PIX_FMT_RGB4_BYTE,    PIX_FMT_BGR4_BYTE,
-        PIX_FMT_PAL8,         PIX_FMT_GRAY8,
-        PIX_FMT_NONE
-    };
+    AVFilterFormats *formats = NULL;
+    int fmt;
 
-    avfilter_set_common_pixel_formats(ctx, avfilter_make_format_list(pix_fmts));
+    for (fmt = 0; av_pix_fmt_desc_get(fmt); fmt++) {
+        const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(fmt);
+        if (!(desc->flags & (AV_PIX_FMT_FLAG_HWACCEL | AV_PIX_FMT_FLAG_BITSTREAM)) &&
+            !((desc->log2_chroma_w || desc->log2_chroma_h) && !(desc->flags & AV_PIX_FMT_FLAG_PLANAR)))
+            ff_add_format(&formats, fmt);
+    }
 
-    return 0;
-}
-
-static av_cold int init(AVFilterContext *ctx, const char *args, void *opaque)
-{
-    CropContext *crop = ctx->priv;
-
-    av_strlcpy(crop->ow_expr, "iw", sizeof(crop->ow_expr));
-    av_strlcpy(crop->oh_expr, "ih", sizeof(crop->oh_expr));
-    av_strlcpy(crop->x_expr, "(in_w-out_w)/2", sizeof(crop->x_expr));
-    av_strlcpy(crop->y_expr, "(in_h-out_h)/2", sizeof(crop->y_expr));
-
-    if (args)
-        sscanf(args, "%255[^:]:%255[^:]:%255[^:]:%255[^:]", crop->ow_expr, crop->oh_expr, crop->x_expr, crop->y_expr);
-
-    return 0;
+    return ff_set_common_formats(ctx, formats);
 }
 
 static av_cold void uninit(AVFilterContext *ctx)
 {
-    CropContext *crop = ctx->priv;
+    CropContext *s = ctx->priv;
 
-    av_expr_free(crop->x_pexpr); crop->x_pexpr = NULL;
-    av_expr_free(crop->y_pexpr); crop->y_pexpr = NULL;
+    av_expr_free(s->x_pexpr);
+    s->x_pexpr = NULL;
+    av_expr_free(s->y_pexpr);
+    s->y_pexpr = NULL;
 }
 
 static inline int normalize_double(int *n, double d)
@@ -155,77 +133,93 @@ static inline int normalize_double(int *n, double d)
 static int config_input(AVFilterLink *link)
 {
     AVFilterContext *ctx = link->dst;
-    CropContext *crop = ctx->priv;
-    const AVPixFmtDescriptor *pix_desc = &av_pix_fmt_descriptors[link->format];
+    CropContext *s = ctx->priv;
+    const AVPixFmtDescriptor *pix_desc = av_pix_fmt_desc_get(link->format);
     int ret;
     const char *expr;
     double res;
 
-    crop->var_values[VAR_IN_W]  = crop->var_values[VAR_IW] = ctx->inputs[0]->w;
-    crop->var_values[VAR_IN_H]  = crop->var_values[VAR_IH] = ctx->inputs[0]->h;
-    crop->var_values[VAR_A]     = (float) link->w / link->h;
-    crop->var_values[VAR_SAR]   = link->sample_aspect_ratio.num ? av_q2d(link->sample_aspect_ratio) : 1;
-    crop->var_values[VAR_DAR]   = crop->var_values[VAR_A] * crop->var_values[VAR_SAR];
-    crop->var_values[VAR_HSUB]  = 1<<pix_desc->log2_chroma_w;
-    crop->var_values[VAR_VSUB]  = 1<<pix_desc->log2_chroma_h;
-    crop->var_values[VAR_X]     = NAN;
-    crop->var_values[VAR_Y]     = NAN;
-    crop->var_values[VAR_OUT_W] = crop->var_values[VAR_OW] = NAN;
-    crop->var_values[VAR_OUT_H] = crop->var_values[VAR_OH] = NAN;
-    crop->var_values[VAR_N]     = 0;
-    crop->var_values[VAR_T]     = NAN;
-    crop->var_values[VAR_POS]   = NAN;
+    s->var_values[VAR_IN_W]  = s->var_values[VAR_IW] = ctx->inputs[0]->w;
+    s->var_values[VAR_IN_H]  = s->var_values[VAR_IH] = ctx->inputs[0]->h;
+    s->var_values[VAR_A]     = (float) link->w / link->h;
+    s->var_values[VAR_SAR]   = link->sample_aspect_ratio.num ? av_q2d(link->sample_aspect_ratio) : 1;
+    s->var_values[VAR_DAR]   = s->var_values[VAR_A] * s->var_values[VAR_SAR];
+    s->var_values[VAR_HSUB]  = 1<<pix_desc->log2_chroma_w;
+    s->var_values[VAR_VSUB]  = 1<<pix_desc->log2_chroma_h;
+    s->var_values[VAR_X]     = NAN;
+    s->var_values[VAR_Y]     = NAN;
+    s->var_values[VAR_OUT_W] = s->var_values[VAR_OW] = NAN;
+    s->var_values[VAR_OUT_H] = s->var_values[VAR_OH] = NAN;
+    s->var_values[VAR_N]     = 0;
+    s->var_values[VAR_T]     = NAN;
+    s->var_values[VAR_POS]   = NAN;
 
-    av_image_fill_max_pixsteps(crop->max_step, NULL, pix_desc);
-    crop->hsub = av_pix_fmt_descriptors[link->format].log2_chroma_w;
-    crop->vsub = av_pix_fmt_descriptors[link->format].log2_chroma_h;
+    av_image_fill_max_pixsteps(s->max_step, NULL, pix_desc);
+    s->hsub = pix_desc->log2_chroma_w;
+    s->vsub = pix_desc->log2_chroma_h;
 
-    if ((ret = av_expr_parse_and_eval(&res, (expr = crop->ow_expr),
-                                      var_names, crop->var_values,
-                                      NULL, NULL, NULL, NULL, NULL, 0, ctx)) < 0) goto fail_expr;
-    crop->var_values[VAR_OUT_W] = crop->var_values[VAR_OW] = res;
-    if ((ret = av_expr_parse_and_eval(&res, (expr = crop->oh_expr),
-                                      var_names, crop->var_values,
-                                      NULL, NULL, NULL, NULL, NULL, 0, ctx)) < 0) goto fail_expr;
-    crop->var_values[VAR_OUT_H] = crop->var_values[VAR_OH] = res;
+    if ((ret = av_expr_parse_and_eval(&res, (expr = s->w_expr),
+                                      var_names, s->var_values,
+                                      NULL, NULL, NULL, NULL, NULL, 0, ctx)) < 0)
+        goto fail_expr;
+    s->var_values[VAR_OUT_W] = s->var_values[VAR_OW] = res;
+    if ((ret = av_expr_parse_and_eval(&res, (expr = s->h_expr),
+                                      var_names, s->var_values,
+                                      NULL, NULL, NULL, NULL, NULL, 0, ctx)) < 0)
+        goto fail_expr;
+    s->var_values[VAR_OUT_H] = s->var_values[VAR_OH] = res;
     /* evaluate again ow as it may depend on oh */
-    if ((ret = av_expr_parse_and_eval(&res, (expr = crop->ow_expr),
-                                      var_names, crop->var_values,
-                                      NULL, NULL, NULL, NULL, NULL, 0, ctx)) < 0) goto fail_expr;
-    crop->var_values[VAR_OUT_W] = crop->var_values[VAR_OW] = res;
-    if (normalize_double(&crop->w, crop->var_values[VAR_OUT_W]) < 0 ||
-        normalize_double(&crop->h, crop->var_values[VAR_OUT_H]) < 0) {
+    if ((ret = av_expr_parse_and_eval(&res, (expr = s->w_expr),
+                                      var_names, s->var_values,
+                                      NULL, NULL, NULL, NULL, NULL, 0, ctx)) < 0)
+        goto fail_expr;
+
+    s->var_values[VAR_OUT_W] = s->var_values[VAR_OW] = res;
+    if (normalize_double(&s->w, s->var_values[VAR_OUT_W]) < 0 ||
+        normalize_double(&s->h, s->var_values[VAR_OUT_H]) < 0) {
         av_log(ctx, AV_LOG_ERROR,
                "Too big value or invalid expression for out_w/ow or out_h/oh. "
                "Maybe the expression for out_w:'%s' or for out_h:'%s' is self-referencing.\n",
-               crop->ow_expr, crop->oh_expr);
+               s->w_expr, s->h_expr);
         return AVERROR(EINVAL);
     }
-    crop->w &= ~((1 << crop->hsub) - 1);
-    crop->h &= ~((1 << crop->vsub) - 1);
+    s->w &= ~((1 << s->hsub) - 1);
+    s->h &= ~((1 << s->vsub) - 1);
 
-    if ((ret = av_expr_parse(&crop->x_pexpr, crop->x_expr, var_names,
+    av_expr_free(s->x_pexpr);
+    av_expr_free(s->y_pexpr);
+    s->x_pexpr = s->y_pexpr = NULL;
+    if ((ret = av_expr_parse(&s->x_pexpr, s->x_expr, var_names,
                              NULL, NULL, NULL, NULL, 0, ctx)) < 0 ||
-        (ret = av_expr_parse(&crop->y_pexpr, crop->y_expr, var_names,
+        (ret = av_expr_parse(&s->y_pexpr, s->y_expr, var_names,
                              NULL, NULL, NULL, NULL, 0, ctx)) < 0)
         return AVERROR(EINVAL);
 
-    av_log(ctx, AV_LOG_INFO, "w:%d h:%d -> w:%d h:%d\n",
-           link->w, link->h, crop->w, crop->h);
+    if (s->keep_aspect) {
+        AVRational dar = av_mul_q(link->sample_aspect_ratio,
+                                  (AVRational){ link->w, link->h });
+        av_reduce(&s->out_sar.num, &s->out_sar.den,
+                  dar.num * s->h, dar.den * s->w, INT_MAX);
+    } else
+        s->out_sar = link->sample_aspect_ratio;
 
-    if (crop->w <= 0 || crop->h <= 0 ||
-        crop->w > link->w || crop->h > link->h) {
+    av_log(ctx, AV_LOG_VERBOSE, "w:%d h:%d sar:%d/%d -> w:%d h:%d sar:%d/%d\n",
+           link->w, link->h, link->sample_aspect_ratio.num, link->sample_aspect_ratio.den,
+           s->w, s->h, s->out_sar.num, s->out_sar.den);
+
+    if (s->w <= 0 || s->h <= 0 ||
+        s->w > link->w || s->h > link->h) {
         av_log(ctx, AV_LOG_ERROR,
                "Invalid too big or non positive size for width '%d' or height '%d'\n",
-               crop->w, crop->h);
+               s->w, s->h);
         return AVERROR(EINVAL);
     }
 
     /* set default, required in the case the first computed value for x/y is NAN */
-    crop->x = (link->w - crop->w) / 2;
-    crop->y = (link->h - crop->h) / 2;
-    crop->x &= ~((1 << crop->hsub) - 1);
-    crop->y &= ~((1 << crop->vsub) - 1);
+    s->x = (link->w - s->w) / 2;
+    s->y = (link->h - s->h) / 2;
+    s->x &= ~((1 << s->hsub) - 1);
+    s->y &= ~((1 << s->vsub) - 1);
     return 0;
 
 fail_expr:
@@ -235,114 +229,152 @@ fail_expr:
 
 static int config_output(AVFilterLink *link)
 {
-    CropContext *crop = link->src->priv;
+    CropContext *s = link->src->priv;
 
-    link->w = crop->w;
-    link->h = crop->h;
+    link->w = s->w;
+    link->h = s->h;
+    link->sample_aspect_ratio = s->out_sar;
 
     return 0;
 }
 
-static void start_frame(AVFilterLink *link, AVFilterBufferRef *picref)
+static int filter_frame(AVFilterLink *link, AVFrame *frame)
 {
     AVFilterContext *ctx = link->dst;
-    CropContext *crop = ctx->priv;
-    AVFilterBufferRef *ref2;
+    CropContext *s = ctx->priv;
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(link->format);
     int i;
 
-    ref2 = avfilter_ref_buffer(picref, ~0);
-    ref2->video->w = crop->w;
-    ref2->video->h = crop->h;
+    frame->width  = s->w;
+    frame->height = s->h;
 
-    crop->var_values[VAR_T] = picref->pts == AV_NOPTS_VALUE ?
-        NAN : picref->pts * av_q2d(link->time_base);
-    crop->var_values[VAR_POS] = picref->pos == -1 ? NAN : picref->pos;
-    crop->var_values[VAR_X] = av_expr_eval(crop->x_pexpr, crop->var_values, NULL);
-    crop->var_values[VAR_Y] = av_expr_eval(crop->y_pexpr, crop->var_values, NULL);
-    crop->var_values[VAR_X] = av_expr_eval(crop->x_pexpr, crop->var_values, NULL);
+    s->var_values[VAR_N] = link->frame_count;
+    s->var_values[VAR_T] = frame->pts == AV_NOPTS_VALUE ?
+        NAN : frame->pts * av_q2d(link->time_base);
+    s->var_values[VAR_POS] = av_frame_get_pkt_pos(frame) == -1 ?
+        NAN : av_frame_get_pkt_pos(frame);
+    s->var_values[VAR_X] = av_expr_eval(s->x_pexpr, s->var_values, NULL);
+    s->var_values[VAR_Y] = av_expr_eval(s->y_pexpr, s->var_values, NULL);
+    s->var_values[VAR_X] = av_expr_eval(s->x_pexpr, s->var_values, NULL);
 
-    normalize_double(&crop->x, crop->var_values[VAR_X]);
-    normalize_double(&crop->y, crop->var_values[VAR_Y]);
+    normalize_double(&s->x, s->var_values[VAR_X]);
+    normalize_double(&s->y, s->var_values[VAR_Y]);
 
-    if (crop->x < 0) crop->x = 0;
-    if (crop->y < 0) crop->y = 0;
-    if ((unsigned)crop->x + (unsigned)crop->w > link->w) crop->x = link->w - crop->w;
-    if ((unsigned)crop->y + (unsigned)crop->h > link->h) crop->y = link->h - crop->h;
-    crop->x &= ~((1 << crop->hsub) - 1);
-    crop->y &= ~((1 << crop->vsub) - 1);
+    if (s->x < 0)
+        s->x = 0;
+    if (s->y < 0)
+        s->y = 0;
+    if ((unsigned)s->x + (unsigned)s->w > link->w)
+        s->x = link->w - s->w;
+    if ((unsigned)s->y + (unsigned)s->h > link->h)
+        s->y = link->h - s->h;
+    s->x &= ~((1 << s->hsub) - 1);
+    s->y &= ~((1 << s->vsub) - 1);
 
-    av_dlog(ctx, "n:%d t:%f x:%d y:%d x+w:%d y+h:%d\n",
-            (int)crop->var_values[VAR_N], crop->var_values[VAR_T], crop->x,
-            crop->y, crop->x+crop->w, crop->y+crop->h);
+    av_log(ctx, AV_LOG_TRACE, "n:%d t:%f pos:%f x:%d y:%d x+w:%d y+h:%d\n",
+            (int)s->var_values[VAR_N], s->var_values[VAR_T], s->var_values[VAR_POS],
+            s->x, s->y, s->x+s->w, s->y+s->h);
 
-    ref2->data[0] += crop->y * ref2->linesize[0];
-    ref2->data[0] += crop->x * crop->max_step[0];
+    frame->data[0] += s->y * frame->linesize[0];
+    frame->data[0] += s->x * s->max_step[0];
 
-    if (!(av_pix_fmt_descriptors[link->format].flags & PIX_FMT_PAL)) {
+    if (!(desc->flags & AV_PIX_FMT_FLAG_PAL || desc->flags & AV_PIX_FMT_FLAG_PSEUDOPAL)) {
         for (i = 1; i < 3; i ++) {
-            if (ref2->data[i]) {
-                ref2->data[i] += (crop->y >> crop->vsub) * ref2->linesize[i];
-                ref2->data[i] += (crop->x * crop->max_step[i]) >> crop->hsub;
+            if (frame->data[i]) {
+                frame->data[i] += (s->y >> s->vsub) * frame->linesize[i];
+                frame->data[i] += (s->x * s->max_step[i]) >> s->hsub;
             }
         }
     }
 
     /* alpha plane */
-    if (ref2->data[3]) {
-        ref2->data[3] += crop->y * ref2->linesize[3];
-        ref2->data[3] += crop->x * crop->max_step[3];
+    if (frame->data[3]) {
+        frame->data[3] += s->y * frame->linesize[3];
+        frame->data[3] += s->x * s->max_step[3];
     }
 
-    avfilter_start_frame(link->dst->outputs[0], ref2);
+    return ff_filter_frame(link->dst->outputs[0], frame);
 }
 
-static void draw_slice(AVFilterLink *link, int y, int h, int slice_dir)
+static int process_command(AVFilterContext *ctx, const char *cmd, const char *args,
+                           char *res, int res_len, int flags)
 {
-    AVFilterContext *ctx = link->dst;
-    CropContext *crop = ctx->priv;
+    CropContext *s = ctx->priv;
+    int ret;
 
-    if (y >= crop->y + crop->h || y + h <= crop->y)
-        return;
+    if (   !strcmp(cmd, "out_w")  || !strcmp(cmd, "w")
+        || !strcmp(cmd, "out_h")  || !strcmp(cmd, "h")
+        || !strcmp(cmd, "x")      || !strcmp(cmd, "y")) {
 
-    if (y < crop->y) {
-        h -= crop->y - y;
-        y  = crop->y;
-    }
-    if (y + h > crop->y + crop->h)
-        h = crop->y + crop->h - y;
+        int old_x = s->x;
+        int old_y = s->y;
+        int old_w = s->w;
+        int old_h = s->h;
 
-    avfilter_draw_slice(ctx->outputs[0], y - crop->y, h, slice_dir);
+        AVFilterLink *outlink = ctx->outputs[0];
+        AVFilterLink *inlink  = ctx->inputs[0];
+
+        av_opt_set(s, cmd, args, 0);
+
+        if ((ret = config_input(inlink)) < 0) {
+            s->x = old_x;
+            s->y = old_y;
+            s->w = old_w;
+            s->h = old_h;
+            return ret;
+        }
+
+        ret = config_output(outlink);
+
+    } else
+        ret = AVERROR(ENOSYS);
+
+    return ret;
 }
 
-static void end_frame(AVFilterLink *link)
-{
-    CropContext *crop = link->dst->priv;
+#define OFFSET(x) offsetof(CropContext, x)
+#define FLAGS AV_OPT_FLAG_FILTERING_PARAM|AV_OPT_FLAG_VIDEO_PARAM
 
-    crop->var_values[VAR_N] += 1.0;
-    avfilter_unref_buffer(link->cur_buf);
-    avfilter_end_frame(link->dst->outputs[0]);
-}
+static const AVOption crop_options[] = {
+    { "out_w",       "set the width crop area expression",   OFFSET(w_expr), AV_OPT_TYPE_STRING, {.str = "iw"}, CHAR_MIN, CHAR_MAX, FLAGS },
+    { "w",           "set the width crop area expression",   OFFSET(w_expr), AV_OPT_TYPE_STRING, {.str = "iw"}, CHAR_MIN, CHAR_MAX, FLAGS },
+    { "out_h",       "set the height crop area expression",  OFFSET(h_expr), AV_OPT_TYPE_STRING, {.str = "ih"}, CHAR_MIN, CHAR_MAX, FLAGS },
+    { "h",           "set the height crop area expression",  OFFSET(h_expr), AV_OPT_TYPE_STRING, {.str = "ih"}, CHAR_MIN, CHAR_MAX, FLAGS },
+    { "x",           "set the x crop area expression",       OFFSET(x_expr), AV_OPT_TYPE_STRING, {.str = "(in_w-out_w)/2"}, CHAR_MIN, CHAR_MAX, FLAGS },
+    { "y",           "set the y crop area expression",       OFFSET(y_expr), AV_OPT_TYPE_STRING, {.str = "(in_h-out_h)/2"}, CHAR_MIN, CHAR_MAX, FLAGS },
+    { "keep_aspect", "keep aspect ratio",                    OFFSET(keep_aspect), AV_OPT_TYPE_INT, {.i64=0}, 0, 1, FLAGS },
+    { NULL }
+};
 
-AVFilter avfilter_vf_crop = {
-    .name      = "crop",
-    .description = NULL_IF_CONFIG_SMALL("Crop the input video to width:height:x:y."),
+AVFILTER_DEFINE_CLASS(crop);
 
-    .priv_size = sizeof(CropContext),
+static const AVFilterPad avfilter_vf_crop_inputs[] = {
+    {
+        .name         = "default",
+        .type         = AVMEDIA_TYPE_VIDEO,
+        .filter_frame = filter_frame,
+        .config_props = config_input,
+    },
+    { NULL }
+};
 
-    .query_formats = query_formats,
-    .init          = init,
-    .uninit        = uninit,
+static const AVFilterPad avfilter_vf_crop_outputs[] = {
+    {
+        .name         = "default",
+        .type         = AVMEDIA_TYPE_VIDEO,
+        .config_props = config_output,
+    },
+    { NULL }
+};
 
-    .inputs    = (const AVFilterPad[]) {{ .name       = "default",
-                                    .type             = AVMEDIA_TYPE_VIDEO,
-                                    .start_frame      = start_frame,
-                                    .draw_slice       = draw_slice,
-                                    .end_frame        = end_frame,
-                                    .get_video_buffer = avfilter_null_get_video_buffer,
-                                    .config_props     = config_input, },
-                                  { .name = NULL}},
-    .outputs   = (const AVFilterPad[]) {{ .name       = "default",
-                                    .type             = AVMEDIA_TYPE_VIDEO,
-                                    .config_props     = config_output, },
-                                  { .name = NULL}},
+AVFilter ff_vf_crop = {
+    .name            = "crop",
+    .description     = NULL_IF_CONFIG_SMALL("Crop the input video."),
+    .priv_size       = sizeof(CropContext),
+    .priv_class      = &crop_class,
+    .query_formats   = query_formats,
+    .uninit          = uninit,
+    .inputs          = avfilter_vf_crop_inputs,
+    .outputs         = avfilter_vf_crop_outputs,
+    .process_command = process_command,
 };

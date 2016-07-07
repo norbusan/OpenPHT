@@ -44,7 +44,7 @@
       <!-- hold right -->      <button id="10">Right</button>
 
       <!-- new aluminium remote buttons  -->
-      <!-- play/pause -->      <button id="12">Play</button>
+      <!-- play/pause -->      <button id="12">PlayPause</button>
 
       <!-- Additional buttons via Harmony Apple TV remote profile - these are also the learned buttons on Apple TV 2gen-->
       <!-- pageup     -->      <button id="13">PageUp</button>
@@ -124,8 +124,8 @@
       <button id="9">BigStepBack</button>
       <button id="10">BigStepForward</button>
       <button id="12">Pause</button>
-      <!-- pageup     -->      <button id="13">BigStepForward</button>
-      <!-- pagedown   -->      <button id="14">BigStepBack</button>
+      <!-- pageup     -->      <button id="13">ChapterOrBigStepForward</button>
+      <!-- pagedown   -->      <button id="14">ChapterOrBigStepBack</button>
       <!-- SwipeLeft  -->      <button id="80">StepBack</button>
       <!-- SwipeRight -->      <button id="81">StepForward</button>
       <!-- SwipeUp    -->      <button id="82">BigStepForward</button>

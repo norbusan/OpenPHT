@@ -507,7 +507,7 @@ void CGUIPlexDefaultActionHandler::GetContextButtonsForAction(int actionID, CFil
       break;
       
     case ACTION_PLEX_NOW_PLAYING:
-      if (g_application.IsPlaying())
+      if (g_application.m_pPlayer->IsPlaying())
         buttons.Add(actionID, 13350);
       break;
       
@@ -520,9 +520,7 @@ void CGUIPlexDefaultActionHandler::GetContextButtonsForAction(int actionID, CFil
     {
       if (item->IsVideo() && item->IsPlexMediaServer())
       {
-        CStdString viewOffset = item->GetProperty("viewOffset").asString();
-        
-        if (item->GetVideoInfoTag()->m_playCount == 0)
+        if (item->GetOverlayImageID() != CGUIListItem::ICON_OVERLAY_WATCHED)
           buttons.Add(actionID, 16103);
       }
       break;
@@ -532,9 +530,7 @@ void CGUIPlexDefaultActionHandler::GetContextButtonsForAction(int actionID, CFil
     {
       if (item->IsVideo() && item->IsPlexMediaServer())
       {
-        CStdString viewOffset = item->GetProperty("viewOffset").asString();
-        
-        if (item->GetVideoInfoTag()->m_playCount > 0 || viewOffset.size() != 0)
+        if (item->GetOverlayImageID() != CGUIListItem::ICON_OVERLAY_UNWATCHED)
           buttons.Add(actionID, 16104);
       }
       break;

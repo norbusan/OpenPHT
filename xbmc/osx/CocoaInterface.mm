@@ -23,6 +23,7 @@
 
 #define BOOL XBMC_BOOL 
 #include "utils/log.h"
+#include "windowing/WindowingFactory.h"
 #undef BOOL
 
 #import <Cocoa/Cocoa.h>
@@ -39,9 +40,6 @@
 #import "AutoPool.h"
 
 
-// hack for Cocoa_GL_ResizeWindow
-//extern "C" void SDL_SetWidthHeight(int w, int h);
-
 //#define MAX_DISPLAYS 32
 //static NSWindow* blankingWindows[MAX_DISPLAYS];
 
@@ -50,12 +48,17 @@ static CVDisplayLinkRef displayLink = NULL;
 
 CGDirectDisplayID Cocoa_GetDisplayIDFromScreen(NSScreen *screen);
 
-int Cocoa_GL_GetCurrentDisplayID(void)
+NSOpenGLContext* Cocoa_GL_GetCurrentContext(void)
+{
+  return (NSOpenGLContext *)g_Windowing.GetNSOpenGLContext();
+}
+
+uint32_t Cocoa_GL_GetCurrentDisplayID(void)
 {
   // Find which display we are on from the current context (default to main display)
   CGDirectDisplayID display_id = kCGDirectMainDisplay;
   
-  NSOpenGLContext* context = [NSOpenGLContext currentContext];
+  NSOpenGLContext* context = Cocoa_GL_GetCurrentContext();
   if (context)
   {
     NSView* view;
@@ -74,7 +77,7 @@ int Cocoa_GL_GetCurrentDisplayID(void)
     }
   }
   
-  return((int)display_id);
+  return((uint32_t)display_id);
 }
 
 bool Cocoa_CVDisplayLinkCreate(void *displayLinkcallback, void *displayLinkContext)
@@ -152,7 +155,7 @@ double Cocoa_GetCVDisplayLinkRefreshPeriod(void)
   else
   {
     CGDisplayModeRef display_mode;
-    display_mode = (CGDisplayModeRef)Cocoa_GL_GetCurrentDisplayID();
+    display_mode = CGDisplayCopyDisplayMode((CGDirectDisplayID)Cocoa_GL_GetCurrentDisplayID());
     fps = CGDisplayModeGetRefreshRate(display_mode);
     CGDisplayModeRelease(display_mode);
     if (fps <= 0.0)
@@ -235,7 +238,6 @@ const char* Cocoa_GetIconFromBundle(const char *_bundlePath, const char* _iconNa
     NSBitmapImageRep* rep = [[NSBitmapImageRep alloc] initWithData:[icon TIFFRepresentation]];
     NSData* png = [rep representationUsingType:NSPNGFileType properties:nil];
     [png writeToFile:pngFile atomically:YES];
-    [png release];
     [rep release];
     [icon release];
   }
@@ -267,62 +269,40 @@ char* Cocoa_MountPoint2DeviceName(char *path)
         break;
       }
     }
-    free(strDVDDevice);
   }
+  free(strDVDDevice);
   return path;
 }
 
-bool Cocoa_GetVolumeNameFromMountPoint(const char *mountPoint, CStdString &volumeName)
+bool Cocoa_GetVolumeNameFromMountPoint(const CStdString &mountPoint, CStdString &volumeName)
 {
   CCocoaAutoPool pool;
-  unsigned i, count = 0;
-  struct statfs *buf = NULL;
-  CStdString mountpoint, devicepath;
-
-  count = getmntinfo(&buf, 0);
-  for (i=0; i<count; i++)
+  NSFileManager *fm = [NSFileManager defaultManager];
+  NSArray *mountedVolumeUrls = [fm mountedVolumeURLsIncludingResourceValuesForKeys:@[ NSURLVolumeNameKey, NSURLPathKey ] options:0];
+  bool resolved = false;
+  
+  for (NSURL *volumeURL in mountedVolumeUrls)
   {
-    mountpoint = buf[i].f_mntonname;
-    if (mountpoint == mountPoint)
+    NSString *path;
+    BOOL success = [volumeURL getResourceValue:&path forKey:NSURLPathKey error:nil];
+    
+    if (success && path != nil)
     {
-      devicepath = buf[i].f_mntfromname;
-      break;
+      CStdString mountpoint = [path UTF8String];
+      if (mountpoint == mountPoint)
+      {
+        NSString *name;
+        success = [volumeURL getResourceValue:&name forKey:NSURLVolumeNameKey error:nil];
+        if (success && name != nil)
+        {
+          volumeName = [name UTF8String];
+          resolved = true;
+          break;
+        }
+      }
     }
   }
-  if (devicepath.empty())
-  {
-    return false;
-  }
-
-  DASessionRef session = DASessionCreate(kCFAllocatorDefault);
-  if (!session)
-  {
-      return false;
-  }
-
-  DADiskRef disk = DADiskCreateFromBSDName(kCFAllocatorDefault, session, devicepath.c_str());
-  if (!disk)
-  {
-      CFRelease(session);
-      return false;
-  }
-
-  NSDictionary *dd = (NSDictionary*) DADiskCopyDescription(disk);
-  if (!dd)
-  {
-      CFRelease(session);
-      CFRelease(disk);
-      return false;
-  }
-
-  NSString *volumename = [dd objectForKey:(NSString*)kDADiskDescriptionVolumeNameKey];
-  volumeName = [volumename UTF8String];
-
-  CFRelease(session);		        
-  CFRelease(disk);		        
-  [dd release];
-
-  return true ;
+  return resolved;
 }
 
 /*
@@ -440,40 +420,7 @@ int Cocoa_GetOSVersion()
   return(version);
 }
 
-
-NSWindow* childWindow = nil;
-NSWindow* mainWindow = nil;
-
-
-void Cocoa_MakeChildWindow()
-{
-  NSOpenGLContext* context = [NSOpenGLContext currentContext];
-  NSView* view = [context view];
-  NSWindow* window = [view window];
-
-  // Create a child window.
-  childWindow = [[NSWindow alloc] initWithContentRect:[window frame]
-                                            styleMask:NSBorderlessWindowMask
-                                              backing:NSBackingStoreBuffered
-                                                defer:NO];
-                                          
-  [childWindow setContentSize:[view frame].size];
-  [childWindow setBackgroundColor:[NSColor blackColor]];
-  [window addChildWindow:childWindow ordered:NSWindowAbove];
-  mainWindow = window;
-  //childWindow.alphaValue = 0.5; 
-}
-
-void Cocoa_DestroyChildWindow()
-{
-  if (childWindow != nil)
-  {
-    [mainWindow removeChildWindow:childWindow];
-    [childWindow close];
-    childWindow = nil;
-  }
-}
-const char *Cocoa_Paste() 
+const char *Cocoa_Paste()
 {
   NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
   NSString *type = [pasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]];

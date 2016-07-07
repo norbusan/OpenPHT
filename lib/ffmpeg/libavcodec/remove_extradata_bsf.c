@@ -33,7 +33,8 @@ static int remove_extradata(AVBitStreamFilterContext *bsfc, AVCodecContext *avct
     s= bsfc->parser;
 
     if(s && s->parser->split){
-        if(  (((avctx->flags & CODEC_FLAG_GLOBAL_HEADER) || (avctx->flags2 & CODEC_FLAG2_LOCAL_HEADER)) && cmd=='a')
+        if(  (((avctx->flags & AV_CODEC_FLAG_GLOBAL_HEADER) ||
+               (avctx->flags2 & AV_CODEC_FLAG2_LOCAL_HEADER)) && cmd == 'a')
            ||(!keyframe && cmd=='k')
            ||(cmd=='e' || !cmd)
           ){
@@ -49,7 +50,6 @@ static int remove_extradata(AVBitStreamFilterContext *bsfc, AVCodecContext *avct
 }
 
 AVBitStreamFilter ff_remove_extradata_bsf={
-    "remove_extra",
-    0,
-    remove_extradata,
+    .name   = "remove_extra",
+    .filter = remove_extradata,
 };

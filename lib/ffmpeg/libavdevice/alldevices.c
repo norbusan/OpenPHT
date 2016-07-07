@@ -21,13 +21,21 @@
 #include "config.h"
 #include "avdevice.h"
 
-#define REGISTER_OUTDEV(X,x) { \
-          extern AVOutputFormat ff_##x##_muxer; \
-          if(CONFIG_##X##_OUTDEV)  av_register_output_format(&ff_##x##_muxer); }
-#define REGISTER_INDEV(X,x) { \
-          extern AVInputFormat ff_##x##_demuxer; \
-          if(CONFIG_##X##_INDEV)   av_register_input_format(&ff_##x##_demuxer); }
-#define REGISTER_INOUTDEV(X,x)  REGISTER_OUTDEV(X,x); REGISTER_INDEV(X,x)
+#define REGISTER_OUTDEV(X, x)                                           \
+    {                                                                   \
+        extern AVOutputFormat ff_##x##_muxer;                           \
+        if (CONFIG_##X##_OUTDEV)                                        \
+            av_register_output_format(&ff_##x##_muxer);                 \
+    }
+
+#define REGISTER_INDEV(X, x)                                            \
+    {                                                                   \
+        extern AVInputFormat ff_##x##_demuxer;                          \
+        if (CONFIG_##X##_INDEV)                                         \
+            av_register_input_format(&ff_##x##_demuxer);                \
+    }
+
+#define REGISTER_INOUTDEV(X, x) REGISTER_OUTDEV(X, x); REGISTER_INDEV(X, x)
 
 void avdevice_register_all(void)
 {
@@ -38,24 +46,33 @@ void avdevice_register_all(void)
     initialized = 1;
 
     /* devices */
-    REGISTER_INOUTDEV (ALSA, alsa);
-    REGISTER_INDEV    (BKTR, bktr);
-    REGISTER_INDEV    (DSHOW, dshow);
-    REGISTER_INDEV    (DV1394, dv1394);
-    REGISTER_INDEV    (FBDEV, fbdev);
-    REGISTER_INDEV    (JACK, jack);
-    REGISTER_INDEV    (LAVFI, lavfi);
-    REGISTER_INDEV    (OPENAL, openal);
-    REGISTER_INOUTDEV (OSS, oss);
-    REGISTER_INDEV    (PULSE, pulse);
-    REGISTER_OUTDEV   (SDL, sdl);
-    REGISTER_INOUTDEV (SNDIO, sndio);
-    REGISTER_INDEV    (V4L2, v4l2);
-    REGISTER_INDEV    (V4L, v4l);
-    REGISTER_INDEV    (VFWCAP, vfwcap);
-    REGISTER_INDEV    (X11_GRAB_DEVICE, x11_grab_device);
+    REGISTER_INOUTDEV(ALSA,             alsa);
+    REGISTER_INDEV   (AVFOUNDATION,     avfoundation);
+    REGISTER_INDEV   (BKTR,             bktr);
+    REGISTER_OUTDEV  (CACA,             caca);
+    REGISTER_INOUTDEV(DECKLINK,         decklink);
+    REGISTER_INDEV   (DSHOW,            dshow);
+    REGISTER_INDEV   (DV1394,           dv1394);
+    REGISTER_INOUTDEV(FBDEV,            fbdev);
+    REGISTER_INDEV   (GDIGRAB,          gdigrab);
+    REGISTER_INDEV   (IEC61883,         iec61883);
+    REGISTER_INDEV   (JACK,             jack);
+    REGISTER_INDEV   (LAVFI,            lavfi);
+    REGISTER_INDEV   (OPENAL,           openal);
+    REGISTER_OUTDEV  (OPENGL,           opengl);
+    REGISTER_INOUTDEV(OSS,              oss);
+    REGISTER_INOUTDEV(PULSE,            pulse);
+    REGISTER_INDEV   (QTKIT,            qtkit);
+    REGISTER_OUTDEV  (SDL,              sdl);
+    REGISTER_INOUTDEV(SNDIO,            sndio);
+    REGISTER_INOUTDEV(V4L2,             v4l2);
+//    REGISTER_INDEV   (V4L,              v4l
+    REGISTER_INDEV   (VFWCAP,           vfwcap);
+    REGISTER_INDEV   (X11GRAB,          x11grab);
+    REGISTER_INDEV   (X11GRAB_XCB,      x11grab_xcb);
+    REGISTER_OUTDEV  (XV,               xv);
 
     /* external libraries */
-    REGISTER_INDEV    (LIBCDIO, libcdio);
-    REGISTER_INDEV    (LIBDC1394, libdc1394);
+    REGISTER_INDEV   (LIBCDIO,          libcdio);
+    REGISTER_INDEV   (LIBDC1394,        libdc1394);
 }

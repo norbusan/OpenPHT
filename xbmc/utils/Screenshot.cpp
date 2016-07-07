@@ -45,7 +45,10 @@
 #include "utils/log.h"
 #include "settings/GUISettings.h"
 
-using namespace std;
+#if defined(HAS_LIBAMCODEC)
+#include "utils/ScreenshotAML.h"
+#endif
+
 using namespace XFILE;
 
 CScreenshotSurface::CScreenshotSurface()
@@ -54,6 +57,11 @@ CScreenshotSurface::CScreenshotSurface()
   m_height = 0;
   m_stride = 0;
   m_buffer = NULL;
+}
+
+CScreenshotSurface::~CScreenshotSurface()
+{
+  delete m_buffer;
 }
 
 bool CScreenshotSurface::capture()
@@ -66,7 +74,7 @@ bool CScreenshotSurface::capture()
 #elif defined(HAS_DX)
   LPDIRECT3DSURFACE9 lpSurface = NULL, lpBackbuffer = NULL;
   g_graphicsContext.Lock();
-  if (g_application.IsPlayingVideo())
+  if (g_application.m_pPlayer->IsPlayingVideo())
   {
 #ifdef HAS_VIDEO_PLAYBACK
     g_renderManager.SetupScreenshot();
@@ -112,7 +120,7 @@ bool CScreenshotSurface::capture()
 #elif defined(HAS_GL) || defined(HAS_GLES)
 
   g_graphicsContext.BeginPaint();
-  if (g_application.IsPlayingVideo())
+  if (g_application.m_pPlayer->IsPlayingVideo())
   {
 #ifdef HAS_VIDEO_PLAYBACK
     g_renderManager.SetupScreenshot();
@@ -149,12 +157,17 @@ bool CScreenshotSurface::capture()
     for (int x = 0; x < m_width; x++, swap_pixels+=4)
     {
       std::swap(swap_pixels[0], swap_pixels[2]);
-    }   
+    }
 #endif
     memcpy(m_buffer + y * m_stride, surface + (m_height - y - 1) *m_stride, m_stride);
   }
 
   delete [] surface;
+  
+#if defined(HAS_LIBAMCODEC)
+  // Captures the current visible videobuffer and blend it into m_buffer (captured overlay)
+  CScreenshotAML::CaptureVideoFrame(m_buffer, m_width, m_height);
+#endif
 
 #else
   //nothing to take a screenshot from
@@ -191,6 +204,7 @@ void CScreenShot::TakeScreenshot(const CStdString &filename, bool sync)
       CLog::Log(LOGERROR, "Unable to write screenshot %s", filename.c_str());
 
     delete [] surface.m_buffer;
+    surface.m_buffer = NULL;
   }
   else
   {
@@ -205,15 +219,16 @@ void CScreenShot::TakeScreenshot(const CStdString &filename, bool sync)
     //buffer is deleted from CThumbnailWriter
     CThumbnailWriter* thumbnailwriter = new CThumbnailWriter(surface.m_buffer, surface.m_width, surface.m_height, surface.m_stride, filename);
     CJobManager::GetInstance().AddJob(thumbnailwriter, NULL);
+    surface.m_buffer = NULL;
   }
 }
 
 void CScreenShot::TakeScreenshot()
 {
   static bool savingScreenshots = false;
-  static vector<CStdString> screenShots;
-
+  static std::vector<CStdString> screenShots;
   bool promptUser = false;
+
   // check to see if we have a screenshot folder yet
   CStdString strDir = g_guiSettings.GetString("debug.screenshotpath", false);
   if (strDir.IsEmpty())

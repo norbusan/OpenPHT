@@ -169,7 +169,7 @@ int CSimpleFileCache::ReadFromCache(char *pBuffer, size_t iMaxSize)
 
   DWORD iRead = 0;
   if (!ReadFile(m_hCacheFileRead, pBuffer, iMaxSize, &iRead, NULL)) {
-    CLog::Log(LOGERROR,"CSimpleFileCache::ReadFromCache - failed to read %"PRIdS" bytes.", iMaxSize);
+    CLog::Log(LOGERROR,"CSimpleFileCache::ReadFromCache - failed to read %" PRIdS" bytes.", iMaxSize);
     return CACHE_RC_ERROR;
   }
   m_nReadPosition += iRead;
@@ -201,7 +201,7 @@ int64_t CSimpleFileCache::WaitForData(unsigned int iMinAvail, unsigned int iMill
 int64_t CSimpleFileCache::Seek(int64_t iFilePosition)
 {
 
-  CLog::Log(LOGDEBUG,"CSimpleFileCache::Seek, seeking to %"PRId64, iFilePosition);
+  CLog::Log(LOGDEBUG,"CSimpleFileCache::Seek, seeking to %" PRId64, iFilePosition);
 
   int64_t iTarget = iFilePosition - m_nStartPosition;
 
@@ -213,7 +213,7 @@ int64_t CSimpleFileCache::Seek(int64_t iFilePosition)
 
   int64_t nDiff = iTarget - m_nWritePosition;
   if ( nDiff > 500000 || (nDiff > 0 && WaitForData((unsigned int)(iTarget - m_nReadPosition), 5000) == CACHE_RC_TIMEOUT)  ) {
-    CLog::Log(LOGWARNING,"%s - attempt to seek past read data (seek to %"PRId64". max: %"PRId64". reset read pointer. (%"PRId64")", __FUNCTION__, iTarget, m_nWritePosition, iFilePosition);
+    CLog::Log(LOGWARNING,"%s - attempt to seek past read data (seek to %" PRId64". max: %" PRId64". reset read pointer. (%" PRId64")", __FUNCTION__, iTarget, m_nWritePosition, iFilePosition);
     return  CACHE_RC_ERROR;
   }
 

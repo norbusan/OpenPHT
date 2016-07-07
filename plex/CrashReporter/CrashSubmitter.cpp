@@ -22,7 +22,6 @@
 using namespace std;
 
 #ifdef _WIN32
-#include "config.h"
 #include <process.h>
 #define getpid _getpid
 #endif
@@ -155,7 +154,7 @@ bool CrashSubmitter::UploadFile(const CStdString& p)
   else
   {
     CStdString message;
-    message.Format("Please reference crash id [B][U]%s[/U][/B]\nif you file a bug report at tiny.cc/rasplex-bugs", data.c_str());
+    message.Format("Please reference crash id [B]%s[/B]\nif you file a bug report at tiny.cc/rasplex-bugs", data.c_str());
     CGUIDialogOK::ShowAndGetInput("Crash report submitted", message,  "", "");
     CLog::Log(LOGNOTICE, "CrashSubmitter::UploadFile got result: %s", data.c_str());
   }

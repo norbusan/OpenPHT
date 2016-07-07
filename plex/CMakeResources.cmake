@@ -36,11 +36,7 @@ else()
 endif()
 
 if(NOT DEFINED PLEX_SPLASH)
-  if(TARGET_RPI)
-    set(PLEX_SPLASH Splash-RPI.png)
-  else(TARGET_RPI)
-    set(PLEX_SPLASH Splash.png)
-  endif(TARGET_RPI)
+  set(PLEX_SPLASH Splash.png)
 endif(NOT DEFINED PLEX_SPLASH)
 
 
@@ -85,6 +81,7 @@ if(TARGET_COMMON_DARWIN)
   set_bundle_dir(SOURCES ${plexdir}/addons DEST Resources/XBMC/addons)
   set_bundle_dir(SOURCES ${plexdir}/Resources/system DEST Resources/XBMC/system)
 
+  set_bundle_dir(SOURCES ${root}/addons/repository.openpht.tv DEST Resources/XBMC/addons/repository.openpht.tv)
   set_bundle_dir(SOURCES ${root}/addons
                  DEST Resources/XBMC/addons
                  EXCLUDE .*/skin.confluence.*
@@ -94,6 +91,8 @@ if(TARGET_COMMON_DARWIN)
                          .*/metadata.*
                          .*/weather.*
                          .*/repository.*
+                         .*/visualization.dxspectrum
+                         .*/visualization.milkdrop
                          .*/${EXCLUDE_TEXTURES}
                          .*/.git.*
                          .*/xbmc.python.*
@@ -135,6 +134,7 @@ else(TARGET_COMMON_DARWIN)
         PATTERN playercorefactory.xml EXCLUDE
         PATTERN peripherals.xml EXCLUDE)
 
+  install(DIRECTORY ${root}/addons/repository.openpht.tv DESTINATION ${RESOURCEPATH}/addons COMPONENT RUNTIME)
   install(DIRECTORY ${root}/addons DESTINATION ${RESOURCEPATH} COMPONENT RUNTIME
           PATTERN skin.confluence EXCLUDE
           PATTERN skin.touched EXCLUDE
@@ -143,6 +143,7 @@ else(TARGET_COMMON_DARWIN)
           REGEX metadata.* EXCLUDE
           REGEX weather.* EXCLUDE
           REGEX repository.* EXCLUDE
+          REGEX visualization.* EXCLUDE
           REGEX ${EXCLUDE_TEXTURES} EXCLUDE
           PATTERN .git EXCLUDE
           PATTERN xbmc.python EXCLUDE
@@ -158,7 +159,6 @@ else(TARGET_COMMON_DARWIN)
 
   if(TARGET_WIN32)
     install(FILES ${root}/system/zlib1.dll DESTINATION ${BINPATH} COMPONENT RUNTIME)
-    install(FILES ${plexdir}/build/dependencies/vcredist/2012/vcredist_x86.exe DESTINATION ${BINPATH}/Dependencies COMPONENT VCREDIST RENAME vcredist_2012_x86.exe)
     install(FILES ${plexdir}/build/dependencies/vcredist/2013/vcredist_x86.exe DESTINATION ${BINPATH}/Dependencies COMPONENT VCREDIST RENAME vcredist_2013_x86.exe)
     install(DIRECTORY ${plexdir}/build/dependencies/dxsetup DESTINATION ${BINPATH}/Dependencies COMPONENT QDXSETUP)
     install(FILES ${plexdir}/Resources/Plex.ico ${plexdir}/Resources/PlexBanner.bmp DESTINATION ${RESOURCEPATH}/media COMPONENT RUNTIME)

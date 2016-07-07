@@ -29,7 +29,7 @@ xcodepath=$(xcode-select -print-path)
 xcodebuild=$xcodepath/usr/bin/xcodebuild
 if [ $darwin = "osx" ]; then
   if [ -z $sdkversion ]; then
-    sdkversion=10.9
+    sdkversion=10.10
   fi
 else
   sdkversion=$($xcodebuild -showsdks | grep iphoneos | sort | tail -n 1 | awk '{ print $2}')
@@ -59,22 +59,28 @@ source tools/darwin/depends/config.site
 # ./configure --target-os=darwin --disable-muxers --disable-encoders --disable-devices --disable-doc --disable-ffplay --disable-ffmpeg --disable-ffprobe --disable-ffserver --disable-vda --disable-crystalhd --disable-decoder=mpeg_xvmc --disable-debug --cpu=cortex-a8 --arch=arm --enable-cross-compile --enable-pic --disable-armv5te --disable-armv6t2 --enable-neon --disable-libvorbis --enable-gpl --enable-postproc --enable-static --enable-pthreads --enable-muxer=spdif --enable-muxer=adts --enable-encoder=ac3 --enable-encoder=aac --enable-protocol=http --enable-runtime-cpudetect --prefix=/Users/tru/Documents/Code/Plex/plex-home-theater/plex/Dependencies/xbmc-depends/ffmpeg-iphoneos6.1_armv7 --cc=clang --as=/Users/Shared/xbmc-depends/toolchain/bin/gas-preprocessor.pl /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/llvm-gcc-4.2 --extra-cflags=-mfpu=neon  -std=gnu99 -no-cpp-precomp -miphoneos-version-min=4.2 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS6.1.sdk -arch armv7 -mcpu=cortex-a8 -mfpu=neon -ftree-vectorize -mfloat-abi=softfp -pipe -Wno-trigraphs -fpascal-strings -O3 -Wreturn-type -Wunused-variable -fmessage-length=0 -gdwarf-2 -I/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS6.1.sdk/usr/include -I/Users/tru/Documents/Code/Plex/plex-home-theater/plex/Dependencies/xbmc-depends/iphoneos6.1_armv7/include --extra-ldflags=-arch armv7 -L/Users/tru/Documents/Code/Plex/plex-home-theater/plex/Dependencies/xbmc-depends/iphoneos6.1_armv7/lib
 
 cd $ROOT/lib/ffmpeg
-config="--target-os=darwin --disable-muxers --disable-encoders --disable-devices --disable-doc --disable-ffplay --disable-ffmpeg"
-config="$config --disable-ffprobe --disable-ffserver --disable-vda --disable-crystalhd --disable-decoder=mpeg_xvmc --disable-debug"
-if [ $arch = "armv7" ]; then
-  config="$config --cpu=cortex-a8 --arch=arm --enable-cross-compile --enable-pic --disable-armv5te --disable-armv6t2 --enable-neon"
-  extra_cflags="-mfpu=neon $CFLAGS"
-elif [ $arch = "i386" ]; then
-  config="$config --arch=x86 --enable-cross-compile --disable-amd3dnow"
-else
-  config="$config --disable-amd3dnow"
-fi
 
-#config="$config --enable-libvorbis --enable-muxer=ogg --enable-encoder=libvorbis"
-config="$config --disable-libvorbis"
-config="$config --enable-gpl --enable-postproc --enable-static --enable-pthreads"
-config="$config --enable-muxer=spdif --enable-muxer=adts --enable-encoder=ac3 --enable-encoder=aac"
-config="$config --enable-protocol=http --enable-protocol=https --enable-runtime-cpudetect --enable-gnutls"
+config="--disable-muxers --disable-encoders --enable-static"
+config="$config --disable-devices --disable-doc"
+config="$config --disable-ffplay --disable-ffmpeg --disable-sdl"
+config="$config --disable-ffprobe --disable-ffserver"
+config="$config --enable-gpl --enable-runtime-cpudetect"
+config="$config --enable-postproc --enable-pthreads"
+config="$config --enable-muxer=spdif --enable-muxer=adts"
+config="$config --enable-muxer=asf --enable-muxer=ipod"
+config="$config --enable-encoder=ac3 --enable-encoder=aac"
+config="$config --enable-protocol=http --enable-protocol=https"
+config="$config --enable-gnutls --disable-securetransport"
+config="$config --enable-libdcadec"
+config="$config --disable-outdev=sdl"
+config="$config --disable-decoder=mpeg_xvmc --enable-vda --disable-crystalhd --disable-videotoolbox"
+config="$config --target-os=darwin"
+config="$config --disable-debug"
+if [ $arch = "x86_64" ]; then
+  config="$config --arch=x86_64"
+elif [ $arch = "i386" ]; then
+  config="$config --arch=x86 --enable-cross-compile"
+fi
 config="$config --prefix=$ROOT/plex/Dependencies/xbmc-depends/ffmpeg-$outputdir"
 config="$config --cc=clang"
 

@@ -34,6 +34,7 @@
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
 #include "bytestream.h"
+#include "internal.h"
 
 #define MM_PREAMBLE_SIZE    6
 
@@ -47,8 +48,8 @@
 
 typedef struct MmContext {
     AVCodecContext *avctx;
-    AVFrame frame;
-    int palette[AVPALETTE_COUNT];
+    AVFrame *frame;
+    unsigned int palette[AVPALETTE_COUNT];
     GetByteContext gb;
 } MmContext;
 
@@ -58,7 +59,7 @@ static av_cold int mm_decode_init(AVCodecContext *avctx)
 
     s->avctx = avctx;
 
-    avctx->pix_fmt = PIX_FMT_PAL8;
+    avctx->pix_fmt = AV_PIX_FMT_PAL8;
 
     if (!avctx->width || !avctx->height ||
         (avctx->width & 1) || (avctx->height & 1)) {
@@ -67,23 +68,22 @@ static av_cold int mm_decode_init(AVCodecContext *avctx)
         return AVERROR(EINVAL);
     }
 
-    avcodec_get_frame_defaults(&s->frame);
-    s->frame.reference = 3;
+    s->frame = av_frame_alloc();
+    if (!s->frame)
+        return AVERROR(ENOMEM);
 
     return 0;
 }
 
-static int mm_decode_pal(MmContext *s)
+static void mm_decode_pal(MmContext *s)
 {
     int i;
 
     bytestream2_skip(&s->gb, 4);
     for (i = 0; i < 128; i++) {
-        s->palette[i] = 0xFF << 24 | bytestream2_get_be24(&s->gb);
+        s->palette[i] = 0xFFU << 24 | bytestream2_get_be24(&s->gb);
         s->palette[i+128] = s->palette[i]<<2;
     }
-
-    return 0;
 }
 
 /**
@@ -92,8 +92,7 @@ static int mm_decode_pal(MmContext *s)
  */
 static int mm_decode_intra(MmContext * s, int half_horiz, int half_vert)
 {
-    int i, x, y;
-    i=0; x=0; y=0;
+    int x = 0, y = 0;
 
     while (bytestream2_get_bytes_left(&s->gb) > 0) {
         int run_length, color;
@@ -112,10 +111,13 @@ static int mm_decode_intra(MmContext * s, int half_horiz, int half_vert)
         if (half_horiz)
             run_length *=2;
 
+        if (run_length > s->avctx->width - x)
+            return AVERROR_INVALIDDATA;
+
         if (color) {
-            memset(s->frame.data[0] + y*s->frame.linesize[0] + x, color, run_length);
+            memset(s->frame->data[0] + y*s->frame->linesize[0] + x, color, run_length);
             if (half_vert && y + half_vert < s->avctx->height)
-                memset(s->frame.data[0] + (y+1)*s->frame.linesize[0] + x, color, run_length);
+                memset(s->frame->data[0] + (y+1)*s->frame->linesize[0] + x, color, run_length);
         }
         x+= run_length;
 
@@ -128,13 +130,14 @@ static int mm_decode_intra(MmContext * s, int half_horiz, int half_vert)
     return 0;
 }
 
-/*
+/**
  * @param half_horiz Half horizontal resolution (0 or 1)
  * @param half_vert Half vertical resolution (0 or 1)
  */
 static int mm_decode_inter(MmContext * s, int half_horiz, int half_vert)
 {
-    int data_off = bytestream2_get_le16(&s->gb), y = 0;
+    int data_off = bytestream2_get_le16(&s->gb);
+    int y = 0;
     GetByteContext data_ptr;
 
     if (bytestream2_get_bytes_left(&s->gb) < data_off)
@@ -163,13 +166,13 @@ static int mm_decode_inter(MmContext * s, int half_horiz, int half_vert)
                     return AVERROR_INVALIDDATA;
                 if (replace) {
                     int color = bytestream2_get_byte(&data_ptr);
-                    s->frame.data[0][y*s->frame.linesize[0] + x] = color;
+                    s->frame->data[0][y*s->frame->linesize[0] + x] = color;
                     if (half_horiz)
-                        s->frame.data[0][y*s->frame.linesize[0] + x + 1] = color;
+                        s->frame->data[0][y*s->frame->linesize[0] + x + 1] = color;
                     if (half_vert) {
-                        s->frame.data[0][(y+1)*s->frame.linesize[0] + x] = color;
+                        s->frame->data[0][(y+1)*s->frame->linesize[0] + x] = color;
                         if (half_horiz)
-                            s->frame.data[0][(y+1)*s->frame.linesize[0] + x + 1] = color;
+                            s->frame->data[0][(y+1)*s->frame->linesize[0] + x + 1] = color;
                     }
                 }
                 x += 1 + half_horiz;
@@ -183,7 +186,7 @@ static int mm_decode_inter(MmContext * s, int half_horiz, int half_vert)
 }
 
 static int mm_decode_frame(AVCodecContext *avctx,
-                            void *data, int *data_size,
+                            void *data, int *got_frame,
                             AVPacket *avpkt)
 {
     const uint8_t *buf = avpkt->data;
@@ -198,13 +201,11 @@ static int mm_decode_frame(AVCodecContext *avctx,
     buf_size -= MM_PREAMBLE_SIZE;
     bytestream2_init(&s->gb, buf, buf_size);
 
-    if (avctx->reget_buffer(avctx, &s->frame) < 0) {
-        av_log(avctx, AV_LOG_ERROR, "reget_buffer() failed\n");
-        return -1;
-    }
+    if ((res = ff_reget_buffer(avctx, s->frame)) < 0)
+        return res;
 
     switch(type) {
-    case MM_TYPE_PALETTE   : res = mm_decode_pal(s); return buf_size;
+    case MM_TYPE_PALETTE   : mm_decode_pal(s); return avpkt->size;
     case MM_TYPE_INTRA     : res = mm_decode_intra(s, 0, 0); break;
     case MM_TYPE_INTRA_HH  : res = mm_decode_intra(s, 1, 0); break;
     case MM_TYPE_INTRA_HHV : res = mm_decode_intra(s, 1, 1); break;
@@ -218,32 +219,33 @@ static int mm_decode_frame(AVCodecContext *avctx,
     if (res < 0)
         return res;
 
-    memcpy(s->frame.data[1], s->palette, AVPALETTE_SIZE);
+    memcpy(s->frame->data[1], s->palette, AVPALETTE_SIZE);
 
-    *data_size = sizeof(AVFrame);
-    *(AVFrame*)data = s->frame;
+    if ((res = av_frame_ref(data, s->frame)) < 0)
+        return res;
 
-    return buf_size;
+    *got_frame      = 1;
+
+    return avpkt->size;
 }
 
 static av_cold int mm_decode_end(AVCodecContext *avctx)
 {
     MmContext *s = avctx->priv_data;
 
-    if(s->frame.data[0])
-        avctx->release_buffer(avctx, &s->frame);
+    av_frame_free(&s->frame);
 
     return 0;
 }
 
 AVCodec ff_mmvideo_decoder = {
     .name           = "mmvideo",
+    .long_name      = NULL_IF_CONFIG_SMALL("American Laser Games MM Video"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_MMVIDEO,
+    .id             = AV_CODEC_ID_MMVIDEO,
     .priv_data_size = sizeof(MmContext),
     .init           = mm_decode_init,
     .close          = mm_decode_end,
     .decode         = mm_decode_frame,
-    .capabilities   = CODEC_CAP_DR1,
-    .long_name = NULL_IF_CONFIG_SMALL("American Laser Games MM Video"),
+    .capabilities   = AV_CODEC_CAP_DR1,
 };

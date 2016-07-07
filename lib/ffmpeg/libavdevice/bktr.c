@@ -3,7 +3,7 @@
  * Copyright (c) 2002 Steve O'Hara-Smith
  * based on
  *           Linux video grab interface
- *           Copyright (c) 2000,2001 Gerard Lantau
+ *           Copyright (c) 2000, 2001 Fabrice Bellard
  * and
  *           simple_grab.c Copyright (c) 1999 Roger Hardiman
  *
@@ -25,9 +25,11 @@
  */
 
 #include "libavformat/internal.h"
+#include "libavutil/internal.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
 #include "libavutil/parseutils.h"
+#include "libavutil/time.h"
 #if HAVE_DEV_BKTR_IOCTL_METEOR_H && HAVE_DEV_BKTR_IOCTL_BT848_H
 # include <dev/bktr/ioctl_meteor.h>
 # include <dev/bktr/ioctl_bt848.h>
@@ -49,14 +51,13 @@
 #include <stdint.h>
 #include "avdevice.h"
 
-typedef struct {
+typedef struct VideoData {
     AVClass *class;
     int video_fd;
     int tuner_fd;
     int width, height;
     uint64_t per_frame;
     int standard;
-    char *video_size; /**< String describing video size, set by a private option. */
     char *framerate;  /**< Set by a private option. */
 } VideoData;
 
@@ -79,7 +80,7 @@ typedef struct {
 #define VIDEO_FORMAT NTSC
 #endif
 
-static int bktr_dev[] = { METEOR_DEV0, METEOR_DEV1, METEOR_DEV2,
+static const int bktr_dev[] = { METEOR_DEV0, METEOR_DEV1, METEOR_DEV2,
     METEOR_DEV3, METEOR_DEV_SVIDEO };
 
 uint8_t *video_buf;
@@ -102,7 +103,9 @@ static av_cold int bktr_init(const char *video_device, int width, int height,
     long ioctl_frequency;
     char *arg;
     int c;
-    struct sigaction act, old;
+    struct sigaction act = { {0} }, old;
+    int ret;
+    char errbuf[128];
 
     if (idev < 0 || idev > 4)
     {
@@ -131,19 +134,20 @@ static av_cold int bktr_init(const char *video_device, int width, int height,
             frequency = 0.0;
     }
 
-    memset(&act, 0, sizeof(act));
     sigemptyset(&act.sa_mask);
     act.sa_handler = catchsignal;
     sigaction(SIGUSR1, &act, &old);
 
-    *tuner_fd = open("/dev/tuner0", O_RDONLY);
+    *tuner_fd = avpriv_open("/dev/tuner0", O_RDONLY);
     if (*tuner_fd < 0)
         av_log(NULL, AV_LOG_ERROR, "Warning. Tuner not opened, continuing: %s\n", strerror(errno));
 
-    *video_fd = open(video_device, O_RDONLY);
+    *video_fd = avpriv_open(video_device, O_RDONLY);
     if (*video_fd < 0) {
-        av_log(NULL, AV_LOG_ERROR, "%s: %s\n", video_device, strerror(errno));
-        return -1;
+        ret = AVERROR(errno);
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(NULL, AV_LOG_ERROR, "%s: %s\n", video_device, errbuf);
+        return ret;
     }
 
     geo.rows = height;
@@ -165,19 +169,25 @@ static av_cold int bktr_init(const char *video_device, int width, int height,
         geo.oformat |= METEOR_GEO_EVEN_ONLY;
 
     if (ioctl(*video_fd, METEORSETGEO, &geo) < 0) {
-        av_log(NULL, AV_LOG_ERROR, "METEORSETGEO: %s\n", strerror(errno));
-        return -1;
+        ret = AVERROR(errno);
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(NULL, AV_LOG_ERROR, "METEORSETGEO: %s\n", errbuf);
+        return ret;
     }
 
     if (ioctl(*video_fd, BT848SFMT, &c) < 0) {
-        av_log(NULL, AV_LOG_ERROR, "BT848SFMT: %s\n", strerror(errno));
-        return -1;
+        ret = AVERROR(errno);
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(NULL, AV_LOG_ERROR, "BT848SFMT: %s\n", errbuf);
+        return ret;
     }
 
     c = bktr_dev[idev];
     if (ioctl(*video_fd, METEORSINPUT, &c) < 0) {
-        av_log(NULL, AV_LOG_ERROR, "METEORSINPUT: %s\n", strerror(errno));
-        return -1;
+        ret = AVERROR(errno);
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(NULL, AV_LOG_ERROR, "METEORSINPUT: %s\n", errbuf);
+        return ret;
     }
 
     video_buf_size = width * height * 12 / 8;
@@ -185,8 +195,10 @@ static av_cold int bktr_init(const char *video_device, int width, int height,
     video_buf = (uint8_t *)mmap((caddr_t)0, video_buf_size,
         PROT_READ, MAP_SHARED, *video_fd, (off_t)0);
     if (video_buf == MAP_FAILED) {
-        av_log(NULL, AV_LOG_ERROR, "mmap: %s\n", strerror(errno));
-        return -1;
+        ret = AVERROR(errno);
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(NULL, AV_LOG_ERROR, "mmap: %s\n", errbuf);
+        return ret;
     }
 
     if (frequency != 0.0) {
@@ -243,18 +255,12 @@ static int grab_read_packet(AVFormatContext *s1, AVPacket *pkt)
     return video_buf_size;
 }
 
-static int grab_read_header(AVFormatContext *s1, AVFormatParameters *ap)
+static int grab_read_header(AVFormatContext *s1)
 {
     VideoData *s = s1->priv_data;
     AVStream *st;
-    int width, height;
     AVRational framerate;
     int ret = 0;
-
-    if ((ret = av_parse_video_size(&width, &height, s->video_size)) < 0) {
-        av_log(s1, AV_LOG_ERROR, "Could not parse video size '%s'.\n", s->video_size);
-        goto out;
-    }
 
     if (!s->framerate)
         switch (s->standard) {
@@ -278,20 +284,18 @@ static int grab_read_header(AVFormatContext *s1, AVFormatParameters *ap)
     }
     avpriv_set_pts_info(st, 64, 1, 1000000); /* 64 bits pts in use */
 
-    s->width = width;
-    s->height = height;
     s->per_frame = ((uint64_t)1000000 * framerate.den) / framerate.num;
 
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->pix_fmt = PIX_FMT_YUV420P;
-    st->codec->codec_id = CODEC_ID_RAWVIDEO;
-    st->codec->width = width;
-    st->codec->height = height;
+    st->codec->pix_fmt = AV_PIX_FMT_YUV420P;
+    st->codec->codec_id = AV_CODEC_ID_RAWVIDEO;
+    st->codec->width = s->width;
+    st->codec->height = s->height;
     st->codec->time_base.den = framerate.num;
     st->codec->time_base.num = framerate.den;
 
 
-    if (bktr_init(s1->filename, width, height, s->standard,
+    if (bktr_init(s1->filename, s->width, s->height, s->standard,
                   &s->video_fd, &s->tuner_fd, -1, 0.0) < 0) {
         ret = AVERROR(EIO);
         goto out;
@@ -325,14 +329,14 @@ static int grab_read_close(AVFormatContext *s1)
 #define OFFSET(x) offsetof(VideoData, x)
 #define DEC AV_OPT_FLAG_DECODING_PARAM
 static const AVOption options[] = {
-    { "standard", "", offsetof(VideoData, standard), AV_OPT_TYPE_INT, {.dbl = VIDEO_FORMAT}, PAL, NTSCJ, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "PAL",      "", 0, AV_OPT_TYPE_CONST, {.dbl = PAL},   0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "NTSC",     "", 0, AV_OPT_TYPE_CONST, {.dbl = NTSC},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "SECAM",    "", 0, AV_OPT_TYPE_CONST, {.dbl = SECAM}, 0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "PALN",     "", 0, AV_OPT_TYPE_CONST, {.dbl = PALN},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "PALM",     "", 0, AV_OPT_TYPE_CONST, {.dbl = PALM},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "NTSCJ",    "", 0, AV_OPT_TYPE_CONST, {.dbl = NTSCJ}, 0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
-    { "video_size", "A string describing frame size, such as 640x480 or hd720.", OFFSET(video_size), AV_OPT_TYPE_STRING, {.str = "vga"}, 0, 0, DEC },
+    { "standard", "", offsetof(VideoData, standard), AV_OPT_TYPE_INT, {.i64 = VIDEO_FORMAT}, PAL, NTSCJ, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "PAL",      "", 0, AV_OPT_TYPE_CONST, {.i64 = PAL},   0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "NTSC",     "", 0, AV_OPT_TYPE_CONST, {.i64 = NTSC},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "SECAM",    "", 0, AV_OPT_TYPE_CONST, {.i64 = SECAM}, 0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "PALN",     "", 0, AV_OPT_TYPE_CONST, {.i64 = PALN},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "PALM",     "", 0, AV_OPT_TYPE_CONST, {.i64 = PALM},  0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "NTSCJ",    "", 0, AV_OPT_TYPE_CONST, {.i64 = NTSCJ}, 0, 0, AV_OPT_FLAG_DECODING_PARAM, "standard" },
+    { "video_size", "A string describing frame size, such as 640x480 or hd720.", OFFSET(width), AV_OPT_TYPE_IMAGE_SIZE, {.str = "vga"}, 0, 0, DEC },
     { "framerate", "", OFFSET(framerate), AV_OPT_TYPE_STRING, {.str = NULL}, 0, 0, DEC },
     { NULL },
 };
@@ -342,6 +346,7 @@ static const AVClass bktr_class = {
     .item_name  = av_default_item_name,
     .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,
+    .category   = AV_CLASS_CATEGORY_DEVICE_VIDEO_INPUT,
 };
 
 AVInputFormat ff_bktr_demuxer = {

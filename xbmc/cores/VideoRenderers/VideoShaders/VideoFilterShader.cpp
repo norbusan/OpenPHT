@@ -37,7 +37,6 @@
 #endif
 
 using namespace Shaders;
-using namespace std;
 
 //////////////////////////////////////////////////////////////////////
 // BaseVideoFilterShader - base class for video filter shaders
@@ -55,7 +54,7 @@ BaseVideoFilterShader::BaseVideoFilterShader()
 
   m_stretch = 0.0f;
 
-  string shaderv =
+  std::string shaderv =
     "varying vec2 cord;"
     "void main()"
     "{"
@@ -65,7 +64,7 @@ BaseVideoFilterShader::BaseVideoFilterShader()
     "}";
   VertexShader()->SetSource(shaderv);
 
-  string shaderp =
+  std::string shaderp =
     "uniform sampler2D img;"
     "varying vec2 cord;"
     "void main()"
@@ -81,8 +80,8 @@ ConvolutionFilterShader::ConvolutionFilterShader(ESCALINGMETHOD method, bool str
   m_method = method;
   m_kernelTex1 = 0;
 
-  string shadername;
-  string defines;
+  std::string shadername;
+  std::string defines;
 
 #if defined(HAS_GL)
   m_floattex = glewIsSupported("GL_ARB_texture_float");

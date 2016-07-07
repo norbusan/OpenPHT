@@ -1,24 +1,24 @@
 /*
  * Copyright (c) 2011 Janne Grunau <janne-libav@jannau.net>
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "asm.S"
+#include "libavutil/arm/asm.S"
 #include "neon.S"
 
 .macro rv34_inv_transform    r0
@@ -67,7 +67,7 @@
         vsub.s32        q15, q14, q9    @ z0 - z3
 .endm
 
-/* void rv34_idct_add_c(uint8_t *dst, int stride, DCTELEM *block) */
+/* void rv34_idct_add_c(uint8_t *dst, int stride, int16_t *block) */
 function ff_rv34_idct_add_neon, export=1
         mov             r3,  r0
         rv34_inv_transform   r2
@@ -97,7 +97,7 @@ function ff_rv34_idct_add_neon, export=1
         bx              lr
 endfunc
 
-/* void rv34_inv_transform_noround_neon(DCTELEM *block); */
+/* void rv34_inv_transform_noround_neon(int16_t *block); */
 function ff_rv34_inv_transform_noround_neon, export=1
         rv34_inv_transform   r0
         vshl.s32        q11, q2,  #1
@@ -142,7 +142,7 @@ function ff_rv34_idct_dc_add_neon, export=1
         bx              lr
 endfunc
 
-/* void rv34_inv_transform_dc_noround_c(DCTELEM *block) */
+/* void rv34_inv_transform_dc_noround_c(int16_t *block) */
 function ff_rv34_inv_transform_noround_dc_neon, export=1
         vld1.16         {d28[]}, [r0,:16]       @ block[0]
         vmov.i16        d4,  #251

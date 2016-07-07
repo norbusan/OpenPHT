@@ -22,10 +22,13 @@
  */
 
 #include <string.h>
+
+#include "attributes.h"
 #include "avutil.h"
 #include "bswap.h"
 #include "sha.h"
 #include "intreadwrite.h"
+#include "mem.h"
 
 /** hash context */
 typedef struct AVSHA {
@@ -39,17 +42,22 @@ typedef struct AVSHA {
 
 const int av_sha_size = sizeof(AVSHA);
 
+struct AVSHA *av_sha_alloc(void)
+{
+    return av_mallocz(sizeof(struct AVSHA));
+}
+
 #define rol(value, bits) (((value) << (bits)) | ((value) >> (32 - (bits))))
 
 /* (R0+R1), R2, R3, R4 are the different operations used in SHA1 */
 #define blk0(i) (block[i] = AV_RB32(buffer + 4 * (i)))
-#define blk(i)  (block[i] = rol(block[i-3] ^ block[i-8] ^ block[i-14] ^ block[i-16], 1))
+#define blk(i)  (block[i] = rol(block[(i)-3] ^ block[(i)-8] ^ block[(i)-14] ^ block[(i)-16], 1))
 
-#define R0(v,w,x,y,z,i) z += ((w&(x^y))^y)     + blk0(i) + 0x5A827999 + rol(v, 5); w = rol(w, 30);
-#define R1(v,w,x,y,z,i) z += ((w&(x^y))^y)     + blk (i) + 0x5A827999 + rol(v, 5); w = rol(w, 30);
-#define R2(v,w,x,y,z,i) z += ( w^x     ^y)     + blk (i) + 0x6ED9EBA1 + rol(v, 5); w = rol(w, 30);
-#define R3(v,w,x,y,z,i) z += (((w|x)&y)|(w&x)) + blk (i) + 0x8F1BBCDC + rol(v, 5); w = rol(w, 30);
-#define R4(v,w,x,y,z,i) z += ( w^x     ^y)     + blk (i) + 0xCA62C1D6 + rol(v, 5); w = rol(w, 30);
+#define R0(v,w,x,y,z,i) z += (((w)&((x)^(y)))^(y))       + blk0(i) + 0x5A827999 + rol(v, 5); w = rol(w, 30);
+#define R1(v,w,x,y,z,i) z += (((w)&((x)^(y)))^(y))       + blk (i) + 0x5A827999 + rol(v, 5); w = rol(w, 30);
+#define R2(v,w,x,y,z,i) z += ( (w)^(x)       ^(y))       + blk (i) + 0x6ED9EBA1 + rol(v, 5); w = rol(w, 30);
+#define R3(v,w,x,y,z,i) z += ((((w)|(x))&(y))|((w)&(x))) + blk (i) + 0x8F1BBCDC + rol(v, 5); w = rol(w, 30);
+#define R4(v,w,x,y,z,i) z += ( (w)^(x)       ^(y))       + blk (i) + 0xCA62C1D6 + rol(v, 5); w = rol(w, 30);
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
 
@@ -90,39 +98,53 @@ static void sha1_transform(uint32_t state[5], const uint8_t buffer[64])
         a = t;
     }
 #else
-    for (i = 0; i < 15; i += 5) {
-        R0(a, b, c, d, e, 0 + i);
-        R0(e, a, b, c, d, 1 + i);
-        R0(d, e, a, b, c, 2 + i);
-        R0(c, d, e, a, b, 3 + i);
-        R0(b, c, d, e, a, 4 + i);
-    }
+
+#define R1_0 \
+    R0(a, b, c, d, e, 0 + i); \
+    R0(e, a, b, c, d, 1 + i); \
+    R0(d, e, a, b, c, 2 + i); \
+    R0(c, d, e, a, b, 3 + i); \
+    R0(b, c, d, e, a, 4 + i); \
+    i += 5
+
+    i = 0;
+    R1_0; R1_0; R1_0;
     R0(a, b, c, d, e, 15);
     R1(e, a, b, c, d, 16);
     R1(d, e, a, b, c, 17);
     R1(c, d, e, a, b, 18);
     R1(b, c, d, e, a, 19);
-    for (i = 20; i < 40; i += 5) {
-        R2(a, b, c, d, e, 0 + i);
-        R2(e, a, b, c, d, 1 + i);
-        R2(d, e, a, b, c, 2 + i);
-        R2(c, d, e, a, b, 3 + i);
-        R2(b, c, d, e, a, 4 + i);
-    }
-    for (; i < 60; i += 5) {
-        R3(a, b, c, d, e, 0 + i);
-        R3(e, a, b, c, d, 1 + i);
-        R3(d, e, a, b, c, 2 + i);
-        R3(c, d, e, a, b, 3 + i);
-        R3(b, c, d, e, a, 4 + i);
-    }
-    for (; i < 80; i += 5) {
-        R4(a, b, c, d, e, 0 + i);
-        R4(e, a, b, c, d, 1 + i);
-        R4(d, e, a, b, c, 2 + i);
-        R4(c, d, e, a, b, 3 + i);
-        R4(b, c, d, e, a, 4 + i);
-    }
+
+#define R1_20 \
+    R2(a, b, c, d, e, 0 + i); \
+    R2(e, a, b, c, d, 1 + i); \
+    R2(d, e, a, b, c, 2 + i); \
+    R2(c, d, e, a, b, 3 + i); \
+    R2(b, c, d, e, a, 4 + i); \
+    i += 5
+
+    i = 20;
+    R1_20; R1_20; R1_20; R1_20;
+
+#define R1_40 \
+    R3(a, b, c, d, e, 0 + i); \
+    R3(e, a, b, c, d, 1 + i); \
+    R3(d, e, a, b, c, 2 + i); \
+    R3(c, d, e, a, b, 3 + i); \
+    R3(b, c, d, e, a, 4 + i); \
+    i += 5
+
+    R1_40; R1_40; R1_40; R1_40;
+
+#define R1_60 \
+    R4(a, b, c, d, e, 0 + i); \
+    R4(e, a, b, c, d, 1 + i); \
+    R4(d, e, a, b, c, 2 + i); \
+    R4(c, d, e, a, b, 3 + i); \
+    R4(b, c, d, e, a, 4 + i); \
+    i += 5
+
+    R1_60; R1_60; R1_60; R1_60;
 #endif
     state[0] += a;
     state[1] += b;
@@ -152,7 +174,7 @@ static const uint32_t K256[64] = {
 
 
 #define Ch(x,y,z)   (((x) & ((y) ^ (z))) ^ (z))
-#define Maj(x,y,z)  ((((x) | (y)) & (z)) | ((x) & (y)))
+#define Maj(z,y,x)  ((((x) | (y)) & (z)) | ((x) & (y)))
 
 #define Sigma0_256(x)   (rol((x), 30) ^ rol((x), 19) ^ rol((x), 10))
 #define Sigma1_256(x)   (rol((x), 26) ^ rol((x), 21) ^ rol((x),  7))
@@ -181,7 +203,7 @@ static void sha256_transform(uint32_t *state, const uint8_t buffer[64])
 {
     unsigned int i, a, b, c, d, e, f, g, h;
     uint32_t block[64];
-    uint32_t T1, av_unused(T2);
+    uint32_t T1;
 
     a = state[0];
     b = state[1];
@@ -193,6 +215,7 @@ static void sha256_transform(uint32_t *state, const uint8_t buffer[64])
     h = state[7];
 #if CONFIG_SMALL
     for (i = 0; i < 64; i++) {
+        uint32_t T2;
         if (i < 16)
             T1 = blk0(i);
         else
@@ -209,27 +232,32 @@ static void sha256_transform(uint32_t *state, const uint8_t buffer[64])
         a = T1 + T2;
     }
 #else
-    for (i = 0; i < 16;) {
-        ROUND256_0_TO_15(a, b, c, d, e, f, g, h);
-        ROUND256_0_TO_15(h, a, b, c, d, e, f, g);
-        ROUND256_0_TO_15(g, h, a, b, c, d, e, f);
-        ROUND256_0_TO_15(f, g, h, a, b, c, d, e);
-        ROUND256_0_TO_15(e, f, g, h, a, b, c, d);
-        ROUND256_0_TO_15(d, e, f, g, h, a, b, c);
-        ROUND256_0_TO_15(c, d, e, f, g, h, a, b);
-        ROUND256_0_TO_15(b, c, d, e, f, g, h, a);
-    }
 
-    for (; i < 64;) {
-        ROUND256_16_TO_63(a, b, c, d, e, f, g, h);
-        ROUND256_16_TO_63(h, a, b, c, d, e, f, g);
-        ROUND256_16_TO_63(g, h, a, b, c, d, e, f);
-        ROUND256_16_TO_63(f, g, h, a, b, c, d, e);
-        ROUND256_16_TO_63(e, f, g, h, a, b, c, d);
-        ROUND256_16_TO_63(d, e, f, g, h, a, b, c);
-        ROUND256_16_TO_63(c, d, e, f, g, h, a, b);
-        ROUND256_16_TO_63(b, c, d, e, f, g, h, a);
-    }
+    i = 0;
+#define R256_0 \
+    ROUND256_0_TO_15(a, b, c, d, e, f, g, h); \
+    ROUND256_0_TO_15(h, a, b, c, d, e, f, g); \
+    ROUND256_0_TO_15(g, h, a, b, c, d, e, f); \
+    ROUND256_0_TO_15(f, g, h, a, b, c, d, e); \
+    ROUND256_0_TO_15(e, f, g, h, a, b, c, d); \
+    ROUND256_0_TO_15(d, e, f, g, h, a, b, c); \
+    ROUND256_0_TO_15(c, d, e, f, g, h, a, b); \
+    ROUND256_0_TO_15(b, c, d, e, f, g, h, a)
+
+    R256_0; R256_0;
+
+#define R256_16 \
+    ROUND256_16_TO_63(a, b, c, d, e, f, g, h); \
+    ROUND256_16_TO_63(h, a, b, c, d, e, f, g); \
+    ROUND256_16_TO_63(g, h, a, b, c, d, e, f); \
+    ROUND256_16_TO_63(f, g, h, a, b, c, d, e); \
+    ROUND256_16_TO_63(e, f, g, h, a, b, c, d); \
+    ROUND256_16_TO_63(d, e, f, g, h, a, b, c); \
+    ROUND256_16_TO_63(c, d, e, f, g, h, a, b); \
+    ROUND256_16_TO_63(b, c, d, e, f, g, h, a)
+
+    R256_16; R256_16; R256_16;
+    R256_16; R256_16; R256_16;
 #endif
     state[0] += a;
     state[1] += b;
@@ -242,7 +270,7 @@ static void sha256_transform(uint32_t *state, const uint8_t buffer[64])
 }
 
 
-int av_sha_init(AVSHA* ctx, int bits)
+av_cold int av_sha_init(AVSHA *ctx, int bits)
 {
     ctx->digest_len = bits >> 5;
     switch (bits) {
@@ -325,14 +353,13 @@ void av_sha_final(AVSHA* ctx, uint8_t *digest)
 
 #ifdef TEST
 #include <stdio.h>
-#undef printf
 
 int main(void)
 {
     int i, j, k;
     AVSHA ctx;
     unsigned char digest[32];
-    const int lengths[3] = { 160, 224, 256 };
+    static const int lengths[3] = { 160, 224, 256 };
 
     for (j = 0; j < 3; j++) {
         printf("Testing SHA-%d\n", lengths[j]);

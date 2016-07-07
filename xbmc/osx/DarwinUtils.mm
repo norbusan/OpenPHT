@@ -36,12 +36,26 @@
 #else
   #import <Cocoa/Cocoa.h>
   #import <CoreFoundation/CoreFoundation.h>
+  #import <IOKit/IOKitLib.h>
   #import <IOKit/ps/IOPowerSources.h>
   #import <IOKit/ps/IOPSKeys.h>
 #endif
 
 #import "AutoPool.h"
 #import "DarwinUtils.h"
+
+#ifndef NSAppKitVersionNumber10_5
+#define NSAppKitVersionNumber10_5 949
+#endif
+
+#ifndef NSAppKitVersionNumber10_6
+#define NSAppKitVersionNumber10_6 1038
+#endif
+
+#ifndef NSAppKitVersionNumber10_9
+#define NSAppKitVersionNumber10_9 1265
+#endif
+
 
 enum iosPlatform
 {
@@ -163,6 +177,16 @@ bool DarwinHasRetina(void)
   }
 #endif
   return (platform >= iPhone4);
+}
+
+bool DarwinDeviceHasLeakyVDA(void)
+{
+  static int hasLeakyVDA = -1;
+#if defined(TARGET_DARWIN_OSX)
+  if (hasLeakyVDA == -1)
+    hasLeakyVDA = NSAppKitVersionNumber <= NSAppKitVersionNumber10_9 ? 1 : 0;
+#endif
+  return hasLeakyVDA == 1;
 }
 
 const char *GetDarwinOSReleaseString(void)
@@ -397,8 +421,10 @@ int DarwinBatteryLevel(void)
     powerSourceVal = CFDictionaryGetValue(powerSource, CFSTR(kIOPSMaxCapacityKey));
     CFNumberGetValue((CFNumberRef)powerSourceVal, kCFNumberSInt32Type, &maxLevel);
 
-    batteryLevel = (int)((double)curLevel/(double)maxLevel);
+    batteryLevel = (double)curLevel/(double)maxLevel;
   }
+  CFRelease(powerSources);
+  CFRelease(powerSourceInfo);
 #endif
   return batteryLevel * 100;  
 }
@@ -409,23 +435,23 @@ void DarwinSetScheduling(int message)
   struct sched_param param;
   pthread_t this_pthread_self = pthread_self();
 
-  int32_t result = pthread_getschedparam(this_pthread_self, &policy, &param );
+  pthread_getschedparam(this_pthread_self, &policy, &param );
 
   policy = SCHED_OTHER;
   thread_extended_policy_data_t theFixedPolicy={true};
 
-  if (message == GUI_MSG_PLAYBACK_STARTED && g_application.IsPlayingVideo())
+  if (message == GUI_MSG_PLAYBACK_STARTED && g_application.m_pPlayer->IsPlayingVideo())
   {
     policy = SCHED_RR;
     theFixedPolicy.timeshare = false;
   }
 
-  result = thread_policy_set(pthread_mach_thread_np(this_pthread_self),
+  thread_policy_set(pthread_mach_thread_np(this_pthread_self),
     THREAD_EXTENDED_POLICY, 
     (thread_policy_t)&theFixedPolicy,
     THREAD_EXTENDED_POLICY_COUNT);
 
-  result = pthread_setschedparam(this_pthread_self, policy, &param );
+  pthread_setschedparam(this_pthread_self, policy, &param );
 }
 
 bool DarwinCFStringRefToStringWithEncoding(CFStringRef source, std::string &destination, CFStringEncoding encoding)

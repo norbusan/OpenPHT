@@ -132,6 +132,8 @@ void Renderer::RenderFrame(PresetOutputs *presetOutputs, PresetInputs *presetInp
 	glPushMatrix();
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
 	
 	totalframes++;		
 	
@@ -228,7 +230,7 @@ void Renderer::RenderFrame(PresetOutputs *presetOutputs, PresetInputs *presetInp
 	}
 	else 
 #endif
-	glViewport( vx, vy, this->vw + vx, this->vh + vy );
+		glViewport( viewport[0], viewport[1], viewport[2], viewport[3] );
 	
 	
 	
@@ -1744,10 +1746,10 @@ void Renderer::render_texture_to_screen(PresetOutputs *presetOutputs)
 		default: flipx=1;flipy=1; break;
 	}
 
-	float pointsFlip[4][2] = {{-0.5*flipx, -0.5*flipy},
-				  {-0.5*flipx,  0.5*flipy},
-				  { 0.5*flipx,  0.5*flipy},
-				  { 0.5*flipx, -0.5*flipy}};
+	float pointsFlip[4][2] = {{(float)-0.5*flipx, (float)-0.5*flipy},
+				  {(float)-0.5*flipx,  (float)0.5*flipy},
+				  { (float)0.5*flipx,  (float)0.5*flipy},
+				  { (float)0.5*flipx, (float)-0.5*flipy}};
 	
 	glVertexPointer(2,GL_FLOAT,0,pointsFlip);
 	glDrawArrays(GL_TRIANGLE_FAN,0,4);	

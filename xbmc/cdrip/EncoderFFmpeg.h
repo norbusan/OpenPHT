@@ -22,9 +22,12 @@
  */
 
 #include "Encoder.h"
-#include "DllAvFormat.h"
-#include "DllAvCodec.h"
-#include "DllAvUtil.h"
+
+extern "C" {
+#include "libavformat/avformat.h"
+#include "libavcodec/avcodec.h"
+#include "libswresample/swresample.h"
+}
 
 class CEncoderFFmpeg : public CEncoder
 {
@@ -37,10 +40,6 @@ public:
   void AddTag(int key, const char* value);
 
 private:
-  DllAvCodec  m_dllAvCodec;
-  DllAvUtil   m_dllAvUtil;
-  DllAvFormat m_dllAvFormat;
-
   AVFormatContext  *m_Format;
   AVCodecContext   *m_CodecCtx;
   AVStream         *m_Stream;

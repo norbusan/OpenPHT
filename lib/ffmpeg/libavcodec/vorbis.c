@@ -66,14 +66,12 @@ int ff_vorbis_len2vlc(uint8_t *bits, uint32_t *codes, unsigned num)
 
     for (p = 0; (bits[p] == 0) && (p < num); ++p)
         ;
-    if (p == num) {
-//        av_log(vc->avccontext, AV_LOG_INFO, "An empty codebook. Heh?! \n");
+    if (p == num)
         return 0;
-    }
 
     codes[p] = 0;
     if (bits[p] > 32)
-        return 1;
+        return AVERROR_INVALIDDATA;
     for (i = 0; i < bits[p]; ++i)
         exit_at_level[i+1] = 1 << i;
 
@@ -87,9 +85,14 @@ int ff_vorbis_len2vlc(uint8_t *bits, uint32_t *codes, unsigned num)
 
     ++p;
 
+    for (i = p; (bits[i] == 0) && (i < num); ++i)
+        ;
+    if (i == num)
+        return 0;
+
     for (; p < num; ++p) {
         if (bits[p] > 32)
-             return 1;
+             return AVERROR_INVALIDDATA;
         if (bits[p] == 0)
              continue;
         // find corresponding exit(node which the tree can grow further from)
@@ -97,7 +100,7 @@ int ff_vorbis_len2vlc(uint8_t *bits, uint32_t *codes, unsigned num)
             if (exit_at_level[i])
                 break;
         if (!i) // overspecified tree
-             return 1;
+             return AVERROR_INVALIDDATA;
         code = exit_at_level[i];
         exit_at_level[i] = 0;
         // construct code (append 0s to end) and introduce new exits
@@ -118,12 +121,12 @@ int ff_vorbis_len2vlc(uint8_t *bits, uint32_t *codes, unsigned num)
     //no exits should be left (underspecified tree - ie. unused valid vlcs - not allowed by SPEC)
     for (p = 1; p < 33; p++)
         if (exit_at_level[p])
-            return 1;
+            return AVERROR_INVALIDDATA;
 
     return 0;
 }
 
-int ff_vorbis_ready_floor1_list(AVCodecContext *avccontext,
+int ff_vorbis_ready_floor1_list(AVCodecContext *avctx,
                                 vorbis_floor1_entry *list, int values)
 {
     int i;
@@ -149,7 +152,7 @@ int ff_vorbis_ready_floor1_list(AVCodecContext *avccontext,
         int j;
         for (j = i + 1; j < values; j++) {
             if (list[i].x == list[j].x) {
-                av_log(avccontext, AV_LOG_ERROR,
+                av_log(avctx, AV_LOG_ERROR,
                        "Duplicate value found in floor 1 X coordinates\n");
                 return AVERROR_INVALIDDATA;
             }

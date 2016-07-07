@@ -22,7 +22,6 @@
 
 #if defined(HAS_GL) || HAS_GLES == 2
 #include "FrameBufferObject.h"
-#include "settings/Settings.h"
 #include "windowing/WindowingFactory.h"
 #include "utils/GLUtils.h"
 #include "utils/log.h"
@@ -155,7 +154,7 @@ bool CFrameBufferObject::BeginRender()
 }
 
 // Finish rendering to FBO
-void CFrameBufferObject::EndRender()
+void CFrameBufferObject::EndRender() const
 {
   if (IsValid())
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);

@@ -21,8 +21,12 @@
  */
 
 #include "system.h" // until we get sane int types used here
-#include "IAudioCallback.h"
+#include <boost/shared_ptr.hpp>
+#include "IPlayerCallback.h"
+#include "guilib/Geometry.h"
 #include "utils/StdString.h"
+
+#define CURRENT_STREAM -1
 
 struct TextCacheStruct_t;
 class TiXmlElement;
@@ -32,22 +36,8 @@ class CAction;
 namespace PVR
 {
   class CPVRChannel;
+  typedef boost::shared_ptr<PVR::CPVRChannel> CPVRChannelPtr;
 }
-
-class IPlayerCallback
-{
-public:
-  virtual ~IPlayerCallback() {}
-  virtual void OnPlayBackEnded() = 0;
-  virtual void OnPlayBackStarted() = 0;
-  virtual void OnPlayBackPaused() {};
-  virtual void OnPlayBackResumed() {};
-  virtual void OnPlayBackStopped() = 0;
-  virtual void OnQueueNextItem() = 0;
-  virtual void OnPlayBackSeek(int iTime, int seekOffset) {};
-  virtual void OnPlayBackSeekChapter(int iChapter) {};
-  virtual void OnPlayBackSpeedChanged(int iSpeed) {};
-};
 
 class CPlayerOptions
 {
@@ -69,7 +59,6 @@ public:
 };
 
 class CFileItem;
-class CRect;
 
 enum IPlayerAudioCapabilities
 {
@@ -89,18 +78,63 @@ enum IPlayerSubtitleCapabilities
   IPC_SUBS_OFFSET
 };
 
+struct SPlayerAudioStreamInfo
+{
+  int bitrate;
+  int channels;
+  int samplerate;
+  int bitspersample;
+  std::string language;
+  std::string name;
+  std::string audioCodecName;
+
+  SPlayerAudioStreamInfo()
+  {
+    bitrate = 0;
+    channels = 0;
+    samplerate = 0;
+    bitspersample = 0;
+  }
+};
+
+struct SPlayerSubtitleStreamInfo
+{
+  std::string language;
+  std::string name;
+};
+
+struct SPlayerVideoStreamInfo
+{
+  int bitrate;
+  float videoAspectRatio;
+  int height;
+  int width;
+  std::string language;
+  std::string name;
+  std::string videoCodecName;
+  CRect SrcRect;
+  CRect DestRect;
+  std::string stereoMode;
+
+  SPlayerVideoStreamInfo()
+  {
+    bitrate = 0;
+    videoAspectRatio = 1.0f;
+    height = 0;
+    width = 0;
+  }
+};
+
 class IPlayer
 {
 public:
   IPlayer(IPlayerCallback& callback): m_callback(callback){};
   virtual ~IPlayer(){};
   virtual bool Initialize(TiXmlElement* pConfig) { return true; };
-  virtual void RegisterAudioCallback(IAudioCallback* pCallback) {};
-  virtual void UnRegisterAudioCallback() {};
   virtual bool OpenFile(const CFileItem& file, const CPlayerOptions& options){ return false;}
   virtual bool QueueNextFile(const CFileItem &file) { return false; }
   virtual void OnNothingToQueueNotify() {}
-  virtual bool CloseFile(){ return true;}
+  virtual bool CloseFile(bool reopen = false) = 0;
   virtual bool IsPlaying() const { return false;}
   virtual bool CanPause() { return true; };
   virtual void Pause() = 0;
@@ -109,21 +143,18 @@ public:
   virtual bool HasAudio() const = 0;
   virtual bool IsPassthrough() const { return false;}
   virtual bool CanSeek() {return true;}
-  virtual void Seek(bool bPlus = true, bool bLargeStep = false) = 0;
+  virtual void Seek(bool bPlus = true, bool bLargeStep = false, bool bChapterOverride = false) = 0;
   virtual bool SeekScene(bool bPlus = true) {return false;}
   virtual void SeekPercentage(float fPercent = 0){}
   virtual float GetPercentage(){ return 0;}
   virtual float GetCachePercentage(){ return 0;}
-  virtual bool ControlsVolume(){ return false;}
   virtual void SetMute(bool bOnOff){}
   virtual void SetVolume(float volume){}
+  virtual bool ControlsVolume(){ return false;}
   virtual void SetDynamicRangeCompression(long drc){}
   virtual void GetAudioInfo( CStdString& strAudioInfo) = 0;
   virtual void GetVideoInfo( CStdString& strVideoInfo) = 0;
-  virtual void GetGeneralInfo( CStdString& strVideoInfo) = 0;
-  virtual void Update(bool bPauseDrawing = false) = 0;
-  virtual void GetVideoRect(CRect& SrcRect, CRect& DestRect) {}
-  virtual void GetVideoAspectRatio(float& fAR) { fAR = 1.0f; }
+  virtual void GetGeneralInfo( CStdString& strGeneralInfo) = 0;
   virtual bool CanRecord() { return false;};
   virtual bool IsRecording() { return false;};
   virtual bool Record(bool bOnOff) { return false;};
@@ -135,49 +166,68 @@ public:
   virtual float GetSubTitleDelay()    { return 0.0f; }
   virtual int  GetSubtitleCount()     { return 0; }
   virtual int  GetSubtitle()          { return -1; }
-  virtual void GetSubtitleName(int iStream, CStdString &strStreamName){};
-  virtual void GetSubtitleLanguage(int iStream, CStdString &strStreamLang){};
+  virtual void GetSubtitleStreamInfo(int index, SPlayerSubtitleStreamInfo &info){};
   virtual void SetSubtitle(int iStream){};
   virtual bool GetSubtitleVisible(){ return false;};
   virtual void SetSubtitleVisible(bool bVisible){};
-  virtual bool GetSubtitleExtension(CStdString &strSubtitleExtension){ return false;};
-  virtual int  AddSubtitle(const CStdString& strSubPath) {return -1;};
+
+  /** \brief Adds the subtitle(s) provided by the given file to the available player streams
+  *          and actives the first of the added stream(s). E.g., vob subs can contain multiple streams.
+  *   \param[in] strSubPath The full path of the subtitle file.
+  */
+  virtual void  AddSubtitle(const CStdString& strSubPath) {};
 
   virtual int  GetAudioStreamCount()  { return 0; }
   virtual int  GetAudioStream()       { return -1; }
-  virtual void GetAudioStreamName(int iStream, CStdString &strStreamName){};
   virtual void SetAudioStream(int iStream){};
-  virtual void GetAudioStreamLanguage(int iStream, CStdString &strLanguage){};
+  virtual void GetAudioStreamInfo(int index, SPlayerAudioStreamInfo &info){};
 
   virtual TextCacheStruct_t* GetTeletextCache() { return NULL; };
   virtual void LoadPage(int p, int sp, unsigned char* buffer) {};
 
   virtual int  GetChapterCount()                               { return 0; }
   virtual int  GetChapter()                                    { return -1; }
-  virtual void GetChapterName(CStdString& strChapterName)      { return; }
+  virtual void GetChapterName(CStdString& strChapterName, int chapterIdx = -1) { return; }
+  virtual int64_t GetChapterPos(int chapterIdx=-1)             { return 0; }
   virtual int  SeekChapter(int iChapter)                       { return -1; }
 //  virtual bool GetChapterInfo(int chapter, SChapterInfo &info) { return false; }
 
   virtual float GetActualFPS() { return 0.0f; };
   virtual void SeekTime(int64_t iTime = 0){};
+  /*
+   \brief seek relative to current time, returns false if not implemented by player
+   \param iTime The time in milliseconds to seek. A positive value will seek forward, a negative backward.
+   \return True if the player supports relative seeking, otherwise false
+   */
+  virtual bool SeekTimeRelative(int64_t iTime) { return false; }
   /*!
    \brief current time in milliseconds
    */
   virtual int64_t GetTime() { return 0; }
   /*!
+   \brief Sets the current time. This 
+   can be used for injecting the current time. 
+   This is not to be confused with a seek. It just
+   can be used if endless streams contain multiple
+   tracks in reality (like with airtunes)
+   */
+  virtual void SetTime(int64_t time) { }
+  /*!
+   \brief time of frame on screen in milliseconds
+   */
+  virtual int64_t GetDisplayTime() { return GetTime(); }
+  /*!
    \brief total time in milliseconds
    */
   virtual int64_t GetTotalTime() { return 0; }
-  virtual int GetAudioBitrate(){ return 0;}
-  virtual int GetVideoBitrate(){ return 0;}
+  /*!
+   \brief Set the total time  in milliseconds
+   this can be used for injecting the duration in case
+   its not available in the underlaying decoder (airtunes for example)
+   */
+  virtual void SetTotalTime(int64_t time) { }
+  virtual void GetVideoStreamInfo(SPlayerVideoStreamInfo &info){};
   virtual int GetSourceBitrate(){ return 0;}
-  virtual int GetChannels(){ return 0;};
-  virtual int GetBitsPerSample(){ return 0;};
-  virtual int GetSampleRate(){ return 0;};
-  virtual CStdString GetAudioCodecName(){ return "";}
-  virtual CStdString GetVideoCodecName(){ return "";}
-  virtual int GetPictureWidth(){ return 0;}
-  virtual int GetPictureHeight(){ return 0;}
   virtual bool GetStreamDetails(CStreamDetails &details){ return false;}
   virtual void ToFFRW(int iSpeed = 0){};
   // Skip to next track/item inside the current media (if supported).
@@ -194,31 +244,32 @@ public:
   virtual void DoAudioWork(){};
   virtual bool OnAction(const CAction &action) { return false; };
 
-  virtual bool GetCurrentSubtitle(CStdString& strSubtitle) { strSubtitle = ""; return false; }
   //returns a state that is needed for resuming from a specific time
   virtual CStdString GetPlayerState() { return ""; };
-  virtual bool SetPlayerState(CStdString state) { return false;};
+  virtual bool SetPlayerState(const CStdString& state) { return false;};
   
   virtual CStdString GetPlayingTitle() { return ""; };
 
-  virtual bool SwitchChannel(const PVR::CPVRChannel &channel) { return false; }
+  virtual bool SwitchChannel(const PVR::CPVRChannelPtr &channel) { return false; }
 
+  // Note: the following "OMX" methods are deprecated and will be removed in the future
+  // They should be handled by the video renderer, not the player
   /*!
    \brief If the player uses bypass mode, define its rendering capabilities
    */
-  virtual void GetRenderFeatures(std::vector<int> &renderFeatures) {};
+  virtual void OMXGetRenderFeatures(std::vector<int> &renderFeatures) {};
   /*!
    \brief If the player uses bypass mode, define its deinterlace algorithms
    */
-  virtual void GetDeinterlaceMethods(std::vector<int> &deinterlaceMethods) {};
+  virtual void OMXGetDeinterlaceMethods(std::vector<int> &deinterlaceMethods) {};
   /*!
    \brief If the player uses bypass mode, define how deinterlace is set
    */
-  virtual void GetDeinterlaceModes(std::vector<int> &deinterlaceModes) {};
+  virtual void OMXGetDeinterlaceModes(std::vector<int> &deinterlaceModes) {};
   /*!
    \brief If the player uses bypass mode, define its scaling capabilities
    */
-  virtual void GetScalingMethods(std::vector<int> &scalingMethods) {};
+  virtual void OMXGetScalingMethods(std::vector<int> &scalingMethods) {};
   /*!
    \brief define the audio capabilities of the player (default=all)
    */
@@ -235,10 +286,8 @@ public:
   virtual int GetSubtitlePlexID() { return -1; };
   virtual int GetAudioStreamPlexID() { return -1; };
   virtual int GetPlexMediaPartID() { return -1; };
-  virtual bool CanOpenAsync() { return false; };
   virtual void Abort() {};
   virtual void FadeOut(int milliseconds) {};
-  virtual bool IsTranscoded() { return false; };
   /* END PLEX */
 
 protected:

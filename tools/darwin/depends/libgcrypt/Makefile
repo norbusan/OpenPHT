@@ -1,8 +1,9 @@
 include ../Makefile.include
+DEPS= Makefile 03-gcrypt-android-select.patch
 
 # lib name, version
 LIBNAME=libgcrypt
-VERSION=1.6.4
+VERSION=1.6.5
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.bz2
 
@@ -14,16 +15,16 @@ ifeq ($(DARWIN),osx)
 CONFIGURE+=--disable-asm --disable-avx-support --disable-avx2-support
 endif
 
-LIBDYLIB=$(SOURCE)/.libs/libgcrypt.dylib
+LIBDYLIB=$(SOURCE)/src/.libs/$(LIBNAME).dylib
 
 CLEAN_FILES=$(ARCHIVE) $(SOURCE)
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
@@ -34,9 +35,9 @@ $(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
-	make -j $(MAKE_JOBS) -C $(SOURCE)
+	make -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

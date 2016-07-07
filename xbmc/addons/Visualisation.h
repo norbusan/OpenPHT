@@ -19,11 +19,12 @@
  */
 #pragma once
 
-#include "guilib/Key.h"
 #include "AddonDll.h"
 #include "cores/IAudioCallback.h"
 #include "include/xbmc_vis_types.h"
+#include "utils/rfft.h"
 
+#include <algorithm>
 #include <map>
 #include <list>
 #include <memory>
@@ -101,8 +102,9 @@ namespace ADDON
     std::list<CAudioBuffer*> m_vecBuffers;
     int m_iNumBuffers;        // Number of Audio buffers
     bool m_bWantsFreq;
-    float m_fFreq[2*AUDIO_BUFFER_SIZE];         // Frequency data
+    float m_fFreq[AUDIO_BUFFER_SIZE];         // Frequency data
     bool m_bCalculate_Freq;       // True if the vis wants freq data
+    std::unique_ptr<RFFT> m_transform;
 
     // track information
     CStdString m_AlbumThumb;

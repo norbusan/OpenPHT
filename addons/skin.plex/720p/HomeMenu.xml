@@ -217,6 +217,15 @@
 						<onclick>Plex.UpdateAndRestart</onclick>
 						<visible>System.UpdateIsAvailable</visible>
 					</item>
+					<item id="121">
+						<description>Play File</description>
+						<label>$LOCALIZE[32205]</label>
+						<onclick>Skin.Reset(PlayFilePath)</onclick>
+						<onclick>Skin.SetFile(PlayFilePath,,$ESCINFO[Skin.String(HomeMenuPlayFilePath)])</onclick>
+						<onclick>PlayMedia($ESCINFO[Skin.String(PlayFilePath)])</onclick>
+						<onclick>Skin.Reset(PlayFilePath)</onclick>
+						<visible>Skin.HasSetting(HomeMenuPlayFile)</visible>
+					</item>
 				</content>
 			</control>
 		</control>

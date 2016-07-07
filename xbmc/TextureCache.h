@@ -22,6 +22,7 @@
 
 #include <set>
 #include "utils/StdString.h"
+#include <vector>
 #include "utils/JobManager.h"
 #include "TextureDatabase.h"
 #include "threads/Event.h"

@@ -9,9 +9,9 @@ if(TARGET_WIN32)
   list(REMOVE_ITEM input_SRCS ./SDLJoystick.cpp)
 endif(TARGET_WIN32)
 
-if(TARGET_RPI)
+if(TARGET_RPI OR TARGET_AML)
   list(REMOVE_ITEM input_SRCS ./SDLJoystick.cpp)
-endif(TARGET_RPI)
+endif(TARGET_RPI OR TARGET_AML)
 
 
 add_sources(${input_SRCS})

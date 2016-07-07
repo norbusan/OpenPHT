@@ -125,10 +125,6 @@ bool CAudioDecoder::Create(const CFileItem &file, int64_t seekOffset)
   /* allocate the pcmBuffer for 2 seconds of audio */
   m_pcmBuffer.Create(2 * blockSize * m_codec->m_SampleRate);
 
-  // set total time from the given tag
-  if (file.HasMusicInfoTag() && file.GetMusicInfoTag()->GetDuration())
-    m_codec->SetTotalTime(file.GetMusicInfoTag()->GetDuration());
-
   if (seekOffset)
     m_codec->Seek(seekOffset);
 
@@ -156,6 +152,12 @@ int64_t CAudioDecoder::Seek(int64_t time)
   if (time < 0) time = 0;
   if (time > m_codec->m_TotalTime) time = m_codec->m_TotalTime;
   return m_codec->Seek(time);
+}
+
+void CAudioDecoder::SetTotalTime(int64_t time)
+{
+  if (m_codec)
+    m_codec->m_TotalTime = time;
 }
 
 int64_t CAudioDecoder::TotalTime()

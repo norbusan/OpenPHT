@@ -19,7 +19,9 @@
  *  <http://www.gnu.org/licenses/>.
  *
  */
+
 #include <stdio.h>
+#include <string.h>
 
 #define FLAG_BOLD   0
 #define FLAG_ITALIC 1
@@ -33,6 +35,10 @@ class CDVDOverlayText;
 class CDVDSubtitleTagMicroDVD
 {
 public:
+  CDVDSubtitleTagMicroDVD()
+  {
+    memset(&m_flag, 0, sizeof(m_flag));
+  }
   void ConvertLine(CDVDOverlayText* pOverlay, const char* line, int len);
 
 private:

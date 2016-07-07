@@ -21,24 +21,15 @@
 #include "DVDPlayerSubtitle.h"
 #include "DVDCodecs/Overlay/DVDOverlay.h"
 #include "DVDCodecs/Overlay/DVDOverlaySpu.h"
-#include "DVDCodecs/Overlay/DVDOverlayText.h"
 #include "DVDCodecs/Overlay/DVDOverlayCodec.h"
 #include "DVDClock.h"
-#include "DVDInputStreams/DVDFactoryInputStream.h"
-#include "DVDInputStreams/DVDInputStream.h"
-#include "DVDInputStreams/DVDInputStreamNavigator.h"
 #include "DVDSubtitles/DVDSubtitleParser.h"
-#include "DVDSubtitles/DVDSubtitleStream.h"
-#include "DVDCodecs/DVDCodecs.h"
 #include "DVDCodecs/DVDFactoryCodec.h"
-#include "DVDDemuxers/DVDDemuxUtils.h"
 #include "utils/log.h"
 #include "threads/SingleLock.h"
-#ifdef _LINUX
+#ifdef TARGET_POSIX
 #include "config.h"
 #endif
-
-using namespace std;
 
 CDVDPlayerSubtitle::CDVDPlayerSubtitle(CDVDOverlayContainer* pOverlayContainer)
 {
@@ -52,16 +43,16 @@ CDVDPlayerSubtitle::CDVDPlayerSubtitle(CDVDOverlayContainer* pOverlayContainer)
 
 CDVDPlayerSubtitle::~CDVDPlayerSubtitle()
 {
-  CloseStream(false);
+  CloseStream(true);
 }
 
 
 void CDVDPlayerSubtitle::Flush()
 {
-  SendMessage(new CDVDMsg(CDVDMsg::GENERAL_FLUSH));
+  SendMessage(new CDVDMsg(CDVDMsg::GENERAL_FLUSH), 0);
 }
 
-void CDVDPlayerSubtitle::SendMessage(CDVDMsg* pMsg)
+void CDVDPlayerSubtitle::SendMessage(CDVDMsg* pMsg, int priority)
 {
   CSingleLock lock(m_section);
 
@@ -80,19 +71,17 @@ void CDVDPlayerSubtitle::SendMessage(CDVDMsg* pMsg)
 
         while((overlay = m_pOverlayCodec->GetOverlay()) != NULL)
         {
-          overlay->iGroupId = pPacket->iGroupId;
           m_pOverlayContainer->Add(overlay);
           overlay->Release();
         }
       }
     }
-    else if (m_streaminfo.codec == CODEC_ID_DVD_SUBTITLE)
+    else if (m_streaminfo.codec == AV_CODEC_ID_DVD_SUBTITLE)
     {
       CDVDOverlaySpu* pSPUInfo = m_dvdspus.AddData(pPacket->pData, pPacket->iSize, pPacket->pts);
       if (pSPUInfo)
       {
         CLog::Log(LOGDEBUG, "CDVDPlayer::ProcessSubData: Got complete SPU packet");
-        pSPUInfo->iGroupId = pPacket->iGroupId;
         m_pOverlayContainer->Add(pSPUInfo);
         pSPUInfo->Release();
       }
@@ -104,8 +93,8 @@ void CDVDPlayerSubtitle::SendMessage(CDVDMsg* pMsg)
     CDVDMsgSubtitleClutChange* pData = (CDVDMsgSubtitleClutChange*)pMsg;
     for (int i = 0; i < 16; i++)
     {
-      BYTE* color = m_dvdspus.m_clut[i];
-      BYTE* t = (BYTE*)pData->m_data[i];
+      uint8_t* color = m_dvdspus.m_clut[i];
+      uint8_t* t = (uint8_t*)pData->m_data[i];
 
 // pData->m_data[i] points to an uint32_t
 // Byte swapping is needed between big and little endian systems
@@ -142,11 +131,11 @@ void CDVDPlayerSubtitle::SendMessage(CDVDMsg* pMsg)
   pMsg->Release();
 }
 
-bool CDVDPlayerSubtitle::OpenStream(CDVDStreamInfo &hints, string &filename)
+bool CDVDPlayerSubtitle::OpenStream(CDVDStreamInfo &hints, std::string &filename)
 {
   CSingleLock lock(m_section);
 
-  CloseStream(false);
+  CloseStream(true);
   m_streaminfo = hints;
 
   // okey check if this is a filesubtitle
@@ -156,14 +145,14 @@ bool CDVDPlayerSubtitle::OpenStream(CDVDStreamInfo &hints, string &filename)
     if (!m_pSubtitleFileParser)
     {
       CLog::Log(LOGERROR, "%s - Unable to create subtitle parser", __FUNCTION__);
-      CloseStream(false);
+      CloseStream(true);
       return false;
     }
 
     if (!m_pSubtitleFileParser->Open(hints))
     {
       CLog::Log(LOGERROR, "%s - Unable to init subtitle parser", __FUNCTION__);
-      CloseStream(false);
+      CloseStream(true);
       return false;
     }
     m_pSubtitleFileParser->Reset();
@@ -171,7 +160,7 @@ bool CDVDPlayerSubtitle::OpenStream(CDVDStreamInfo &hints, string &filename)
   }
 
   // dvd's use special subtitle decoder
-  if(hints.codec == CODEC_ID_DVD_SUBTITLE && filename == "dvd")
+  if(hints.codec == AV_CODEC_ID_DVD_SUBTITLE && filename == "dvd")
     return true;
 
   m_pOverlayCodec = CDVDFactoryCodec::CreateOverlayCodec(hints);
@@ -182,7 +171,7 @@ bool CDVDPlayerSubtitle::OpenStream(CDVDStreamInfo &hints, string &filename)
   return false;
 }
 
-void CDVDPlayerSubtitle::CloseStream(bool flush)
+void CDVDPlayerSubtitle::CloseStream(bool bWaitForBuffers)
 {
   CSingleLock lock(m_section);
 
@@ -195,11 +184,11 @@ void CDVDPlayerSubtitle::CloseStream(bool flush)
 
   m_dvdspus.FlushCurrentPacket();
 
-  if(flush)
+  if (!bWaitForBuffers)
     m_pOverlayContainer->Clear();
 }
 
-void CDVDPlayerSubtitle::Process(double pts)
+void CDVDPlayerSubtitle::Process(double pts, double offset)
 {
   CSingleLock lock(m_section);
 
@@ -221,6 +210,10 @@ void CDVDPlayerSubtitle::Process(double pts)
     // add all overlays which fit the pts
     while(pOverlay)
     {
+      pOverlay->iPTSStartTime -= offset;
+      if(pOverlay->iPTSStopTime != 0.0)
+        pOverlay->iPTSStopTime -= offset;
+
       m_pOverlayContainer->Add(pOverlay);
       pOverlay->Release();
       pOverlay = m_pSubtitleFileParser->Parse(pts);
@@ -230,43 +223,9 @@ void CDVDPlayerSubtitle::Process(double pts)
   }
 }
 
-bool CDVDPlayerSubtitle::AcceptsData()
+bool CDVDPlayerSubtitle::AcceptsData() const
 {
   // FIXME : This may still be causing problems + magic number :(
   return m_pOverlayContainer->GetSize() < 5;
 }
 
-void CDVDPlayerSubtitle::GetCurrentSubtitle(CStdString& strSubtitle, double pts)
-{
-  strSubtitle = "";
-
-  Process(pts); // TODO: move to separate thread?
-
-  CSingleLock lock(*m_pOverlayContainer);
-  VecOverlays* pOverlays = m_pOverlayContainer->GetOverlays();
-  if (pOverlays)
-  {
-    for(vector<CDVDOverlay*>::iterator it = pOverlays->begin();it != pOverlays->end();it++)
-    {
-      CDVDOverlay* pOverlay = *it;
-
-      if (pOverlay->IsOverlayType(DVDOVERLAY_TYPE_TEXT)
-      && (pOverlay->iPTSStartTime <= pts)
-      && (pOverlay->iPTSStopTime >= pts || pOverlay->iPTSStopTime == 0LL))
-      {
-        CDVDOverlayText::CElement* e = ((CDVDOverlayText*)pOverlay)->m_pHead;
-        while (e)
-        {
-          if (e->IsElementType(CDVDOverlayText::ELEMENT_TYPE_TEXT))
-          {
-            CDVDOverlayText::CElementText* t = (CDVDOverlayText::CElementText*)e;
-            strSubtitle += t->m_text;
-            strSubtitle += "\n";
-          }
-          e = e->pNext;
-        }
-      }
-    }
-  }
-  strSubtitle.TrimRight('\n');
-}

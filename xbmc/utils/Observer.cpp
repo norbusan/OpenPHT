@@ -21,9 +21,8 @@
 #include "Application.h"
 #include "Observer.h"
 #include "threads/SingleLock.h"
-#include "utils/JobManager.h"
 
-using namespace std;
+#include <algorithm>
 
 Observer::~Observer(void)
 {
@@ -33,9 +32,9 @@ Observer::~Observer(void)
 void Observer::StopObserving(void)
 {
   CSingleLock lock(m_obsCritSection);
-  for (unsigned int iObsPtr = 0; iObsPtr < m_observables.size(); iObsPtr++)
-    m_observables.at(iObsPtr)->UnregisterObserver(this);
-  m_observables.clear();
+  std::vector<Observable *> observables = m_observables;
+  for (unsigned int iObsPtr = 0; iObsPtr < observables.size(); iObsPtr++)
+    observables.at(iObsPtr)->UnregisterObserver(this);
 }
 
 bool Observer::IsObserving(const Observable &obs) const
@@ -54,7 +53,7 @@ void Observer::RegisterObservable(Observable *obs)
 void Observer::UnregisterObservable(Observable *obs)
 {
   CSingleLock lock(m_obsCritSection);
-  vector<Observable *>::iterator it = find(m_observables.begin(), m_observables.end(), obs);
+  std::vector<Observable *>::iterator it = find(m_observables.begin(), m_observables.end(), obs);
   if (it != m_observables.end())
     m_observables.erase(it);
 }
@@ -84,9 +83,9 @@ Observable &Observable::operator=(const Observable &observable)
 void Observable::StopObserver(void)
 {
   CSingleLock lock(m_obsCritSection);
-  for (unsigned int iObsPtr = 0; iObsPtr < m_observers.size(); iObsPtr++)
-    m_observers.at(iObsPtr)->UnregisterObservable(this);
-  m_observers.clear();
+  std::vector<Observer *> observers = m_observers;
+  for (unsigned int iObsPtr = 0; iObsPtr < observers.size(); iObsPtr++)
+    observers.at(iObsPtr)->UnregisterObservable(this);
 }
 
 bool Observable::IsObserving(const Observer &obs) const
@@ -108,7 +107,7 @@ void Observable::RegisterObserver(Observer *obs)
 void Observable::UnregisterObserver(Observer *obs)
 {
   CSingleLock lock(m_obsCritSection);
-  vector<Observer *>::iterator it = find(m_observers.begin(), m_observers.end(), obs);
+  std::vector<Observer *>::iterator it = find(m_observers.begin(), m_observers.end(), obs);
   if (it != m_observers.end())
   {
     obs->UnregisterObservable(this);

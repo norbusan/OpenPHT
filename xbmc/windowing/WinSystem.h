@@ -40,7 +40,7 @@ struct RESOLUTION_WHR
 {
   int width;
   int height;
-  int interlaced;
+  int flags; //< only D3DPRESENTFLAG_MODEMASK flags
   int ResInfo_Index;
 };
 
@@ -59,7 +59,7 @@ public:
 
   // windowing interfaces
   virtual bool InitWindowSystem();
-  virtual bool DestroyWindowSystem(){ return false; }
+  virtual bool DestroyWindowSystem();
   virtual bool CreateNewWindow(const CStdString& name, bool fullScreen, RESOLUTION_INFO& res, PHANDLE_EVENT_FUNC userFunction) = 0;
   virtual bool DestroyWindow(){ return false; }
   virtual bool ResizeWindow(int newWidth, int newHeight, int newLeft, int newTop) = 0;
@@ -96,13 +96,21 @@ public:
   unsigned int GetHeight() { return m_nHeight; }
   virtual int GetNumScreens() { return 0; }
   virtual int GetCurrentScreen() { return 0; }
+  virtual bool CanDoWindowed() { return true; }
   bool IsFullScreen() { return m_bFullScreen; }
   virtual void UpdateResolutions();
   void SetWindowResolution(int width, int height);
   int DesktopResolution(int screen);
-  std::vector<RESOLUTION_WHR> ScreenResolutions(int screen);
+  std::vector<RESOLUTION_WHR> ScreenResolutions(int screen, float refreshrate);
   std::vector<REFRESHRATE> RefreshRates(int screen, int width, int height, uint32_t dwFlags);
   REFRESHRATE DefaultRefreshRate(int screen, std::vector<REFRESHRATE> rates);
+  virtual bool HasCalibration(const RESOLUTION_INFO &resInfo) { return true; };
+
+  // text input interface
+  virtual void EnableTextInput(bool bEnable) {}
+  virtual bool IsTextInputEnabled() { return false; }
+
+  std::string GetClipboardText(void);
 
   /* PLEX */
   virtual void UpdateDisplayBlanking();

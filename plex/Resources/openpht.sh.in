@@ -1,0 +1,4 @@
+#!/bin/sh
+export LD_LIBRARY_PATH=@CMAKE_INSTALL_PREFIX@/lib/openpht/system/players/dvdplayer:$LD_LIBRARY_PATH
+export XBMC_HOME=@CMAKE_INSTALL_PREFIX@/share/openpht
+exec @CMAKE_INSTALL_PREFIX@/lib/openpht/plexhometheater "$@"

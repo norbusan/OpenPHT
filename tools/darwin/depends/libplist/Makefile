@@ -1,5 +1,6 @@
 include ../Makefile.include
 include ../config.site.mk
+DEPS= Makefile 0001-dontbuildswig.patch 0002-fixclang.patch 0003-fixc++1.patch
 
 # lib name, version
 LIBNAME=libplist
@@ -15,12 +16,13 @@ all: $(LIBDYLIB) .installed
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
 	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
 	cd $(SOURCE); patch -p1 < ../0001-dontbuildswig.patch
 	cd $(SOURCE); patch -p1 < ../0002-fixclang.patch
+	cd $(SOURCE); patch -p1 < ../0003-fixc++1.patch
 	cd $(SOURCE); rm -rf build; mkdir -p build
 	cd $(SOURCE)/build; CC="$(CC)" CXX="$(CXX)" cmake        \
 	  -DCMAKE_C_FLAGS:STRING="$(CPPFLAGS) $(CFLAGS)"     \

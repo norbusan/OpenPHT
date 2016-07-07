@@ -21,10 +21,12 @@
  */
 
 #include "vaapi_internal.h"
+#include "internal.h"
 #include "h263.h"
+#include "mpeg4video.h"
 
 /** Reconstruct bitstream intra_dc_vlc_thr */
-static int mpeg4_get_intra_dc_vlc_thr(MpegEncContext *s)
+static int mpeg4_get_intra_dc_vlc_thr(Mpeg4DecContext *s)
 {
     switch (s->intra_dc_threshold) {
     case 99: return 0;
@@ -41,13 +43,14 @@ static int mpeg4_get_intra_dc_vlc_thr(MpegEncContext *s)
 
 static int vaapi_mpeg4_start_frame(AVCodecContext *avctx, av_unused const uint8_t *buffer, av_unused uint32_t size)
 {
-    MpegEncContext * const s = avctx->priv_data;
-    struct vaapi_context * const vactx = avctx->hwaccel_context;
+    Mpeg4DecContext *ctx = avctx->priv_data;
+    MpegEncContext * const s = &ctx->m;
+    FFVAContext * const vactx = ff_vaapi_get_context(avctx);
     VAPictureParameterBufferMPEG4 *pic_param;
     VAIQMatrixBufferMPEG4 *iq_matrix;
     int i;
 
-    av_dlog(avctx, "vaapi_mpeg4_start_frame()\n");
+    ff_dlog(avctx, "vaapi_mpeg4_start_frame()\n");
 
     vactx->slice_param_size = sizeof(VASliceParameterBufferMPEG4);
 
@@ -60,42 +63,42 @@ static int vaapi_mpeg4_start_frame(AVCodecContext *avctx, av_unused const uint8_
     pic_param->forward_reference_picture                = VA_INVALID_ID;
     pic_param->backward_reference_picture               = VA_INVALID_ID;
     pic_param->vol_fields.value                         = 0; /* reset all bits */
-    pic_param->vol_fields.bits.short_video_header       = avctx->codec->id == CODEC_ID_H263;
+    pic_param->vol_fields.bits.short_video_header       = avctx->codec->id == AV_CODEC_ID_H263;
     pic_param->vol_fields.bits.chroma_format            = CHROMA_420;
     pic_param->vol_fields.bits.interlaced               = !s->progressive_sequence;
     pic_param->vol_fields.bits.obmc_disable             = 1;
-    pic_param->vol_fields.bits.sprite_enable            = s->vol_sprite_usage;
+    pic_param->vol_fields.bits.sprite_enable            = ctx->vol_sprite_usage;
     pic_param->vol_fields.bits.sprite_warping_accuracy  = s->sprite_warping_accuracy;
     pic_param->vol_fields.bits.quant_type               = s->mpeg_quant;
     pic_param->vol_fields.bits.quarter_sample           = s->quarter_sample;
     pic_param->vol_fields.bits.data_partitioned         = s->data_partitioning;
-    pic_param->vol_fields.bits.reversible_vlc           = s->rvlc;
-    pic_param->vol_fields.bits.resync_marker_disable    = !s->resync_marker;
-    pic_param->no_of_sprite_warping_points              = s->num_sprite_warping_points;
-    for (i = 0; i < s->num_sprite_warping_points && i < 3; i++) {
-        pic_param->sprite_trajectory_du[i]              = s->sprite_traj[i][0];
-        pic_param->sprite_trajectory_dv[i]              = s->sprite_traj[i][1];
+    pic_param->vol_fields.bits.reversible_vlc           = ctx->rvlc;
+    pic_param->vol_fields.bits.resync_marker_disable    = !ctx->resync_marker;
+    pic_param->no_of_sprite_warping_points              = ctx->num_sprite_warping_points;
+    for (i = 0; i < ctx->num_sprite_warping_points && i < 3; i++) {
+        pic_param->sprite_trajectory_du[i]              = ctx->sprite_traj[i][0];
+        pic_param->sprite_trajectory_dv[i]              = ctx->sprite_traj[i][1];
     }
     pic_param->quant_precision                          = s->quant_precision;
     pic_param->vop_fields.value                         = 0; /* reset all bits */
     pic_param->vop_fields.bits.vop_coding_type          = s->pict_type - AV_PICTURE_TYPE_I;
-    pic_param->vop_fields.bits.backward_reference_vop_coding_type = s->pict_type == AV_PICTURE_TYPE_B ? s->next_picture.f.pict_type - AV_PICTURE_TYPE_I : 0;
+    pic_param->vop_fields.bits.backward_reference_vop_coding_type = s->pict_type == AV_PICTURE_TYPE_B ? s->next_picture.f->pict_type - AV_PICTURE_TYPE_I : 0;
     pic_param->vop_fields.bits.vop_rounding_type        = s->no_rounding;
-    pic_param->vop_fields.bits.intra_dc_vlc_thr         = mpeg4_get_intra_dc_vlc_thr(s);
+    pic_param->vop_fields.bits.intra_dc_vlc_thr         = mpeg4_get_intra_dc_vlc_thr(ctx);
     pic_param->vop_fields.bits.top_field_first          = s->top_field_first;
     pic_param->vop_fields.bits.alternate_vertical_scan_flag = s->alternate_scan;
     pic_param->vop_fcode_forward                        = s->f_code;
     pic_param->vop_fcode_backward                       = s->b_code;
-    pic_param->vop_time_increment_resolution            = avctx->time_base.den;
-    pic_param->num_macroblocks_in_gob                   = s->mb_width * ff_h263_get_gob_height(s);
+    pic_param->vop_time_increment_resolution            = avctx->framerate.num;
+    pic_param->num_macroblocks_in_gob                   = s->mb_width * H263_GOB_HEIGHT(s->height);
     pic_param->num_gobs_in_vop                          = (s->mb_width * s->mb_height) / pic_param->num_macroblocks_in_gob;
     pic_param->TRB                                      = s->pb_time;
     pic_param->TRD                                      = s->pp_time;
 
     if (s->pict_type == AV_PICTURE_TYPE_B)
-        pic_param->backward_reference_picture = ff_vaapi_get_surface_id(&s->next_picture);
+        pic_param->backward_reference_picture = ff_vaapi_get_surface_id(s->next_picture.f);
     if (s->pict_type != AV_PICTURE_TYPE_I)
-        pic_param->forward_reference_picture  = ff_vaapi_get_surface_id(&s->last_picture);
+        pic_param->forward_reference_picture  = ff_vaapi_get_surface_id(s->last_picture.f);
 
     /* Fill in VAIQMatrixBufferMPEG4 */
     /* Only the first inverse quantisation method uses the weighting matrices */
@@ -107,7 +110,7 @@ static int vaapi_mpeg4_start_frame(AVCodecContext *avctx, av_unused const uint8_
         iq_matrix->load_non_intra_quant_mat     = 1;
 
         for (i = 0; i < 64; i++) {
-            int n = s->dsp.idct_permutation[ff_zigzag_direct[i]];
+            int n = s->idsp.idct_permutation[ff_zigzag_direct[i]];
             iq_matrix->intra_quant_mat[i]       = s->intra_matrix[n];
             iq_matrix->non_intra_quant_mat[i]   = s->inter_matrix[n];
         }
@@ -115,36 +118,21 @@ static int vaapi_mpeg4_start_frame(AVCodecContext *avctx, av_unused const uint8_
     return 0;
 }
 
-static int vaapi_mpeg4_end_frame(AVCodecContext *avctx)
-{
-    return ff_vaapi_common_end_frame(avctx->priv_data);
-}
-
 static int vaapi_mpeg4_decode_slice(AVCodecContext *avctx, const uint8_t *buffer, uint32_t size)
 {
     MpegEncContext * const s = avctx->priv_data;
+    FFVAContext * const vactx = ff_vaapi_get_context(avctx);
     VASliceParameterBufferMPEG4 *slice_param;
 
-    av_dlog(avctx, "vaapi_mpeg4_decode_slice(): buffer %p, size %d\n", buffer, size);
-
-    /* video_plane_with_short_video_header() contains all GOBs
-     * in-order, and this is what VA API (Intel backend) expects: only
-     * a single slice param. So fake macroblock_number for FFmpeg so
-     * that we don't call vaapi_mpeg4_decode_slice() again
-     */
-    if (avctx->codec->id == CODEC_ID_H263)
-        size = s->gb.buffer_end - buffer;
+    ff_dlog(avctx, "vaapi_mpeg4_decode_slice(): buffer %p, size %d\n", buffer, size);
 
     /* Fill in VASliceParameterBufferMPEG4 */
-    slice_param = (VASliceParameterBufferMPEG4 *)ff_vaapi_alloc_slice(avctx->hwaccel_context, buffer, size);
+    slice_param = (VASliceParameterBufferMPEG4 *)ff_vaapi_alloc_slice(vactx, buffer, size);
     if (!slice_param)
         return -1;
     slice_param->macroblock_offset      = get_bits_count(&s->gb) % 8;
-    slice_param->macroblock_number      = s->mb_y * s->mb_width + s->mb_x;
+    slice_param->macroblock_number      = 0;
     slice_param->quant_scale            = s->qscale;
-
-    if (avctx->codec->id == CODEC_ID_H263)
-        s->mb_y = s->mb_height;
 
     return 0;
 }
@@ -153,11 +141,14 @@ static int vaapi_mpeg4_decode_slice(AVCodecContext *avctx, const uint8_t *buffer
 AVHWAccel ff_mpeg4_vaapi_hwaccel = {
     .name           = "mpeg4_vaapi",
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_MPEG4,
-    .pix_fmt        = PIX_FMT_VAAPI_VLD,
+    .id             = AV_CODEC_ID_MPEG4,
+    .pix_fmt        = AV_PIX_FMT_VAAPI,
     .start_frame    = vaapi_mpeg4_start_frame,
-    .end_frame      = vaapi_mpeg4_end_frame,
+    .end_frame      = ff_vaapi_mpeg_end_frame,
     .decode_slice   = vaapi_mpeg4_decode_slice,
+    .init           = ff_vaapi_context_init,
+    .uninit         = ff_vaapi_context_fini,
+    .priv_data_size = sizeof(FFVAContext),
 };
 #endif
 
@@ -165,10 +156,13 @@ AVHWAccel ff_mpeg4_vaapi_hwaccel = {
 AVHWAccel ff_h263_vaapi_hwaccel = {
     .name           = "h263_vaapi",
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_H263,
-    .pix_fmt        = PIX_FMT_VAAPI_VLD,
+    .id             = AV_CODEC_ID_H263,
+    .pix_fmt        = AV_PIX_FMT_VAAPI,
     .start_frame    = vaapi_mpeg4_start_frame,
-    .end_frame      = vaapi_mpeg4_end_frame,
+    .end_frame      = ff_vaapi_mpeg_end_frame,
     .decode_slice   = vaapi_mpeg4_decode_slice,
+    .init           = ff_vaapi_context_init,
+    .uninit         = ff_vaapi_context_fini,
+    .priv_data_size = sizeof(FFVAContext),
 };
 #endif

@@ -23,16 +23,8 @@
 class CDVDDemux;
 class CDVDInputStream;
 
-/* PLEX */
-#include "StdString.h"
-/* END PLEX */
-
 class CDVDFactoryDemuxer
 {
 public:
-#ifndef __PLEX__
-  static CDVDDemux* CreateDemuxer(CDVDInputStream* pInputStream);
-#else
-  static CDVDDemux* CreateDemuxer(CDVDInputStream* pInputStream, CStdString& error);
-#endif
+  static CDVDDemux* CreateDemuxer(CDVDInputStream* pInputStream, bool fileinfo = false);
 };

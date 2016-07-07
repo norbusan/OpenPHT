@@ -51,7 +51,7 @@ CTextureCache &CTextureCache::Get()
 
 CTextureCache::CTextureCache()
 /* PLEX */
-#ifndef TARGET_RASPBERRY_PI
+#ifndef TARGET_OPENELEC
   : CJobQueue(false, 2)
 #endif
 /* END PLEX */
@@ -81,6 +81,7 @@ bool CTextureCache::IsCachedImage(const CStdString &url) const
   if (url != "-" && !CURL::IsFullPath(url))
     return true;
   if (URIUtils::IsInPath(url, "special://skin/") ||
+      URIUtils::IsInPath(url, "special://temp/") ||
       URIUtils::IsInPath(url, "androidapp://")   ||
       URIUtils::IsInPath(url, g_settings.GetThumbnailsFolder()))
     return true;
@@ -186,15 +187,6 @@ void CTextureCache::BackgroundCacheImage(const CStdString &url)
   /*END PLEX */
 }
 
-bool CTextureCache::CacheImage(const CStdString &image, CTextureDetails &details)
-{
-  CStdString path = GetCachedImage(image, details);
-  if (path.empty()) // not cached
-    path = CacheImage(image, NULL, &details);
-
-  return !path.empty();
-}
-
 CStdString CTextureCache::CacheImage(const CStdString &image, CBaseTexture **texture, CTextureDetails *details)
 {
   CStdString url = UnwrapImageURL(image);
@@ -235,6 +227,15 @@ CStdString CTextureCache::CacheImage(const CStdString &image, CBaseTexture **tex
   if (!details)
     details = &tempDetails;
   return GetCachedImage(url, *details, true);
+}
+
+bool CTextureCache::CacheImage(const CStdString &image, CTextureDetails &details)
+{
+  CStdString path = GetCachedImage(image, details);
+  if (path.empty()) // not cached
+    path = CacheImage(image, NULL, &details);
+
+  return !path.empty();
 }
 
 void CTextureCache::ClearCachedImage(const CStdString &url, bool deleteSource /*= false */)

@@ -41,8 +41,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "libavutil/avassert.h"
 #include "avcodec.h"
+#include "internal.h"
 #include "lcl.h"
+#include "libavutil/internal.h"
+#include "libavutil/mem.h"
 
 #include <zlib.h>
 
@@ -52,7 +56,6 @@
 typedef struct LclEncContext {
 
     AVCodecContext *avctx;
-    AVFrame pic;
 
     // Image type
     int imgtype;
@@ -68,18 +71,18 @@ typedef struct LclEncContext {
  * Encode a frame
  *
  */
-static int encode_frame(AVCodecContext *avctx, unsigned char *buf, int buf_size, void *data){
+static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
+                        const AVFrame *p, int *got_packet)
+{
     LclEncContext *c = avctx->priv_data;
-    AVFrame *pict = data;
-    AVFrame * const p = &c->pic;
-    int i;
+    int i, ret;
     int zret; // Zlib return code
+    int max_size = deflateBound(&c->zstream, avctx->width * avctx->height * 3);
 
-    *p = *pict;
-    p->pict_type= AV_PICTURE_TYPE_I;
-    p->key_frame= 1;
+    if ((ret = ff_alloc_packet2(avctx, pkt, max_size, 0)) < 0)
+        return ret;
 
-    if(avctx->pix_fmt != PIX_FMT_BGR24){
+    if(avctx->pix_fmt != AV_PIX_FMT_BGR24){
         av_log(avctx, AV_LOG_ERROR, "Format not supported!\n");
         return -1;
     }
@@ -89,8 +92,8 @@ static int encode_frame(AVCodecContext *avctx, unsigned char *buf, int buf_size,
         av_log(avctx, AV_LOG_ERROR, "Deflate reset error: %d\n", zret);
         return -1;
     }
-    c->zstream.next_out = buf;
-    c->zstream.avail_out = buf_size;
+    c->zstream.next_out  = pkt->data;
+    c->zstream.avail_out = pkt->size;
 
     for(i = avctx->height - 1; i >= 0; i--) {
         c->zstream.next_in = p->data[0]+p->linesize[0]*i;
@@ -107,7 +110,11 @@ static int encode_frame(AVCodecContext *avctx, unsigned char *buf, int buf_size,
         return -1;
     }
 
-    return c->zstream.total_out;
+    pkt->size   = c->zstream.total_out;
+    pkt->flags |= AV_PKT_FLAG_KEY;
+    *got_packet = 1;
+
+    return 0;
 }
 
 /*
@@ -122,13 +129,22 @@ static av_cold int encode_init(AVCodecContext *avctx)
 
     c->avctx= avctx;
 
-    assert(avctx->width && avctx->height);
+    av_assert0(avctx->width && avctx->height);
 
-    avctx->extradata= av_mallocz(8);
-    avctx->coded_frame= &c->pic;
+    avctx->extradata = av_mallocz(8 + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!avctx->extradata)
+        return AVERROR(ENOMEM);
 
-    // Will be user settable someday
-    c->compression = 6;
+#if FF_API_CODED_FRAME
+FF_DISABLE_DEPRECATION_WARNINGS
+    avctx->coded_frame->pict_type = AV_PICTURE_TYPE_I;
+    avctx->coded_frame->key_frame = 1;
+FF_ENABLE_DEPRECATION_WARNINGS
+#endif
+
+    c->compression = avctx->compression_level == FF_COMPRESSION_DEFAULT ?
+                            COMP_ZLIB_NORMAL :
+                            av_clip(avctx->compression_level, 0, 9);
     c->flags = 0;
     c->imgtype = IMGTYPE_RGB24;
     avctx->bits_per_coded_sample= 24;
@@ -149,7 +165,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
     zret = deflateInit(&c->zstream, c->compression);
     if (zret != Z_OK) {
         av_log(avctx, AV_LOG_ERROR, "Deflate init error: %d\n", zret);
-        return 1;
+        return AVERROR_UNKNOWN;
     }
 
     return 0;
@@ -172,12 +188,15 @@ static av_cold int encode_end(AVCodecContext *avctx)
 
 AVCodec ff_zlib_encoder = {
     .name           = "zlib",
+    .long_name      = NULL_IF_CONFIG_SMALL("LCL (LossLess Codec Library) ZLIB"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_ZLIB,
+    .id             = AV_CODEC_ID_ZLIB,
     .priv_data_size = sizeof(LclEncContext),
     .init           = encode_init,
-    .encode         = encode_frame,
+    .encode2        = encode_frame,
     .close          = encode_end,
-    .pix_fmts = (const enum PixelFormat[]) { PIX_FMT_BGR24, PIX_FMT_NONE },
-    .long_name = NULL_IF_CONFIG_SMALL("LCL (LossLess Codec Library) ZLIB"),
+    .capabilities   = AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_INTRA_ONLY,
+    .pix_fmts       = (const enum AVPixelFormat[]) { AV_PIX_FMT_BGR24, AV_PIX_FMT_NONE },
+    .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
+                      FF_CODEC_CAP_INIT_CLEANUP,
 };

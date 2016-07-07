@@ -2,7 +2,7 @@
 rem java why you so annoying?
 set path=%path:"C:\Program Files (x86)\Java\jre7\bin"=%
 
-call "%VS110COMNTOOLS%vsvars32.bat" || exit /b 1
+call "%VS120COMNTOOLS%vsvars32.bat" || exit /b 1
 
 rd /s /q c:\tmp
 rd /s /q upload
@@ -14,7 +14,7 @@ rd /s /q build-windows-i386
 md build-windows-i386
 cd build-windows-i386
 
-cmake -GNinja -DCMAKE_INSTALL_PREFIX=output -DCMAKE_BUILD_TYPE=RelWithDebInfo .. || exit /b 1
+cmake -GNinja -DCMAKE_INSTALL_PREFIX=output -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTEXTUREPACKERPATH=TexturePacker.exe .. || exit /b 1
 ninja release_package || exit /b 1
 
 move c:\tmp\OpenPHT*exe %WORKSPACE%\upload

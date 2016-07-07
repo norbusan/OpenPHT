@@ -20,11 +20,12 @@
  *
  */
 
-#include "utils/StdString.h"
 #include "filesystem/File.h"
 #include "music/tags/MusicInfoTag.h"
 
-#include "cores/AudioEngine/AEAudioFormat.h"
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
+
+#include "utils/StdString.h"
 
 #define READ_EOF      -1
 #define READ_SUCCESS   0
@@ -43,7 +44,6 @@ public:
     m_DataFormat = AE_FMT_INVALID;
     m_Channels = 0;
     m_Bitrate = 0;
-    m_CodecName = "";
   };
   virtual ~ICodec() {};
 
@@ -105,7 +105,7 @@ public:
   int m_BitsPerCodedSample;
   enum AEDataFormat m_DataFormat;
   int m_Bitrate;
-  CStdString m_CodecName;
+  std::string m_CodecName;
   MUSIC_INFO::CMusicInfoTag m_tag;
   XFILE::CFile m_file;
 

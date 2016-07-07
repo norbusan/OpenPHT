@@ -22,15 +22,22 @@
 #ifndef AVCODEC_MATHOPS_H
 #define AVCODEC_MATHOPS_H
 
+#include <stdint.h>
+
 #include "libavutil/common.h"
 #include "config.h"
+
+#define MAX_NEG_CROP 1024
+
+extern const uint32_t ff_inverse[257];
+extern const uint8_t ff_sqrt_tab[256];
+extern const uint8_t ff_crop_tab[256 + 2 * MAX_NEG_CROP];
+extern const uint8_t ff_zigzag_direct[64];
 
 #if   ARCH_ARM
 #   include "arm/mathops.h"
 #elif ARCH_AVR32
 #   include "avr32/mathops.h"
-#elif ARCH_BFIN
-#   include "bfin/mathops.h"
 #elif ARCH_MIPS
 #   include "mips/mathops.h"
 #elif ARCH_PPC
@@ -113,6 +120,20 @@ static inline av_const int mid_pred(int a, int b, int c)
 }
 #endif
 
+#ifndef median4
+#define median4 median4
+static inline av_const int median4(int a, int b, int c, int d)
+{
+    if (a < b) {
+        if (c < d) return (FFMIN(b, d) + FFMAX(a, c)) / 2;
+        else       return (FFMIN(b, c) + FFMAX(a, d)) / 2;
+    } else {
+        if (c < d) return (FFMIN(a, d) + FFMAX(b, c)) / 2;
+        else       return (FFMIN(a, c) + FFMAX(b, d)) / 2;
+    }
+}
+#endif
+
 #ifndef sign_extend
 static inline av_const int sign_extend(int val, unsigned bits)
 {
@@ -136,6 +157,13 @@ if ((y) < (x)) {\
     (a) = (b);\
     (c) = (d);\
 }
+#endif
+
+#ifndef MASK_ABS
+#define MASK_ABS(mask, level) do {              \
+        mask  = level >> 31;                    \
+        level = (level ^ mask) - mask;          \
+    } while (0)
 #endif
 
 #ifndef NEG_SSR32
@@ -178,5 +206,41 @@ if ((y) < (x)) {\
 #   define PACK_2S16(a,b)    PACK_2U16((a)&0xffff, (b)&0xffff)
 #endif
 
-#endif /* AVCODEC_MATHOPS_H */
+#ifndef FASTDIV
+#   define FASTDIV(a,b) ((uint32_t)((((uint64_t)a) * ff_inverse[b]) >> 32))
+#endif /* FASTDIV */
 
+#ifndef ff_sqrt
+#define ff_sqrt ff_sqrt
+static inline av_const unsigned int ff_sqrt(unsigned int a)
+{
+    unsigned int b;
+
+    if (a < 255) return (ff_sqrt_tab[a + 1] - 1) >> 4;
+    else if (a < (1 << 12)) b = ff_sqrt_tab[a >> 4] >> 2;
+#if !CONFIG_SMALL
+    else if (a < (1 << 14)) b = ff_sqrt_tab[a >> 6] >> 1;
+    else if (a < (1 << 16)) b = ff_sqrt_tab[a >> 8]   ;
+#endif
+    else {
+        int s = av_log2_16bit(a >> 16) >> 1;
+        unsigned int c = a >> (s + 2);
+        b = ff_sqrt_tab[c >> (s + 8)];
+        b = FASTDIV(c,b) + (b << s);
+    }
+
+    return b - (a < b * b);
+}
+#endif
+
+static inline int8_t ff_u8_to_s8(uint8_t a)
+{
+    union {
+        uint8_t u8;
+        int8_t  s8;
+    } b;
+    b.u8 = a;
+    return b.s8;
+}
+
+#endif /* AVCODEC_MATHOPS_H */

@@ -39,6 +39,23 @@
 #define LOGFATAL   6
 #define LOGNONE    7
 
+// extra masks - from bit 5
+#define LOGMASKBIT  5
+#define LOGMASK     ((1 << LOGMASKBIT) - 1)
+
+#define LOGSAMBA    (1 << (LOGMASKBIT + 0))
+#define LOGCURL     (1 << (LOGMASKBIT + 1))
+#define LOGFFMPEG   (1 << (LOGMASKBIT + 2))
+#define LOGRTMP     (1 << (LOGMASKBIT + 3))
+#define LOGDBUS     (1 << (LOGMASKBIT + 4))
+#define LOGJSONRPC  (1 << (LOGMASKBIT + 5))
+#define LOGAUDIO    (1 << (LOGMASKBIT + 6))
+#define LOGAIRTUNES (1 << (LOGMASKBIT + 7))
+#define LOGUPNP     (1 << (LOGMASKBIT + 8))
+#define LOGCEC      (1 << (LOGMASKBIT + 9))
+#define LOGVIDEO    (1 << (LOGMASKBIT + 10))
+#define LOGOMXPLAYER (1 << (LOGMASKBIT + 16))
+
 #ifdef __GNUC__
 #define ATTRIB_LOG_FORMAT __attribute__((format(printf,3,4)))
 #else

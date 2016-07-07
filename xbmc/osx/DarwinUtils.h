@@ -34,6 +34,7 @@ extern "C"
   bool        DarwinIsAppleTV2(void);
   bool        DarwinIsMavericks(void);
   bool        DarwinHasRetina(void);
+  bool        DarwinDeviceHasLeakyVDA(void);
   const char *GetDarwinOSReleaseString(void);
   const char *GetDarwinVersionString(void);
   float       GetIOSVersion(void);

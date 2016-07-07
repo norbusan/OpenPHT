@@ -24,6 +24,8 @@
 
 #include "url.h"
 
+#define HTTP_HEADERS_SIZE 4096
+
 /**
  * Initialize the authentication state based on another HTTP URLContext.
  * This can be used to pre-initialize the authentication parameters if
@@ -34,5 +36,17 @@
  * @param src URL context whose authentication state gets copied
  */
 void ff_http_init_auth_state(URLContext *dest, const URLContext *src);
+
+/**
+ * Send a new HTTP request, reusing the old connection.
+ *
+ * @param h pointer to the resource
+ * @param uri uri used to perform the request
+ * @return a negative value if an error condition occurred, 0
+ * otherwise
+ */
+int ff_http_do_new_request(URLContext *h, const char *uri);
+
+int ff_http_averror(int status_code, int default_averror);
 
 #endif /* AVFORMAT_HTTP_H */

@@ -21,6 +21,7 @@
  */
 
 #include "utils/StdString.h"
+#include <vector>
 #include "TextureBundleXPR.h"
 #include "TextureBundleXBT.h"
 

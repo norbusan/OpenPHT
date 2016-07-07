@@ -1,6 +1,6 @@
 /*
  * AMR Audio encoder stub
- * Copyright (c) 2003 the ffmpeg project
+ * Copyright (c) 2003 The FFmpeg Project
  *
  * This file is part of FFmpeg.
  *
@@ -20,10 +20,17 @@
  */
 
 #include <vo-amrwbenc/enc_if.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "avcodec.h"
 #include "libavutil/avstring.h"
+#include "libavutil/internal.h"
+#include "libavutil/mem.h"
 #include "libavutil/opt.h"
+#include "avcodec.h"
+#include "internal.h"
+
+#define MAX_PACKET_SIZE  (1 + (477 + 7) / 8)
 
 typedef struct AMRWBContext {
     AVClass *av_class;
@@ -34,11 +41,11 @@ typedef struct AMRWBContext {
 } AMRWBContext;
 
 static const AVOption options[] = {
-    { "dtx", "Allow DTX (generate comfort noise)", offsetof(AMRWBContext, allow_dtx), AV_OPT_TYPE_INT, { 0 }, 0, 1, AV_OPT_FLAG_AUDIO_PARAM | AV_OPT_FLAG_ENCODING_PARAM },
+    { "dtx", "Allow DTX (generate comfort noise)", offsetof(AMRWBContext, allow_dtx), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, AV_OPT_FLAG_AUDIO_PARAM | AV_OPT_FLAG_ENCODING_PARAM },
     { NULL }
 };
 
-static const AVClass class = {
+static const AVClass amrwb_class = {
     "libvo_amrwbenc", av_default_item_name, options, LIBAVUTIL_VERSION_INT
 };
 
@@ -72,7 +79,7 @@ static av_cold int amr_wb_encode_init(AVCodecContext *avctx)
 {
     AMRWBContext *s = avctx->priv_data;
 
-    if (avctx->sample_rate != 16000) {
+    if (avctx->sample_rate != 16000 && avctx->strict_std_compliance > FF_COMPLIANCE_UNOFFICIAL) {
         av_log(avctx, AV_LOG_ERROR, "Only 16000Hz sample rate supported\n");
         return AVERROR(ENOSYS);
     }
@@ -86,7 +93,7 @@ static av_cold int amr_wb_encode_init(AVCodecContext *avctx)
     s->last_bitrate    = avctx->bit_rate;
 
     avctx->frame_size  = 320;
-    avctx->coded_frame = avcodec_alloc_frame();
+    avctx->initial_padding =  80;
 
     s->state     = E_IF_init();
 
@@ -98,36 +105,48 @@ static int amr_wb_encode_close(AVCodecContext *avctx)
     AMRWBContext *s = avctx->priv_data;
 
     E_IF_exit(s->state);
-    av_freep(&avctx->coded_frame);
     return 0;
 }
 
-static int amr_wb_encode_frame(AVCodecContext *avctx,
-                               unsigned char *frame/*out*/,
-                               int buf_size, void *data/*in*/)
+static int amr_wb_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
+                               const AVFrame *frame, int *got_packet_ptr)
 {
     AMRWBContext *s = avctx->priv_data;
-    int size;
+    const int16_t *samples = (const int16_t *)frame->data[0];
+    int size, ret;
+
+    if ((ret = ff_alloc_packet2(avctx, avpkt, MAX_PACKET_SIZE, 0)) < 0)
+        return ret;
 
     if (s->last_bitrate != avctx->bit_rate) {
         s->mode         = get_wb_bitrate_mode(avctx->bit_rate, avctx);
         s->last_bitrate = avctx->bit_rate;
     }
-    size = E_IF_encode(s->state, s->mode, data, frame, s->allow_dtx);
-    return size;
+    size = E_IF_encode(s->state, s->mode, samples, avpkt->data, s->allow_dtx);
+    if (size <= 0 || size > MAX_PACKET_SIZE) {
+        av_log(avctx, AV_LOG_ERROR, "Error encoding frame\n");
+        return AVERROR(EINVAL);
+    }
+
+    if (frame->pts != AV_NOPTS_VALUE)
+        avpkt->pts = frame->pts - ff_samples_to_time_base(avctx, avctx->initial_padding);
+
+    avpkt->size = size;
+    *got_packet_ptr = 1;
+    return 0;
 }
 
 AVCodec ff_libvo_amrwbenc_encoder = {
     .name           = "libvo_amrwbenc",
+    .long_name      = NULL_IF_CONFIG_SMALL("Android VisualOn AMR-WB "
+                                           "(Adaptive Multi-Rate Wide-Band)"),
     .type           = AVMEDIA_TYPE_AUDIO,
-    .id             = CODEC_ID_AMR_WB,
+    .id             = AV_CODEC_ID_AMR_WB,
     .priv_data_size = sizeof(AMRWBContext),
     .init           = amr_wb_encode_init,
-    .encode         = amr_wb_encode_frame,
+    .encode2        = amr_wb_encode_frame,
     .close          = amr_wb_encode_close,
-    .sample_fmts = (const enum AVSampleFormat[]){AV_SAMPLE_FMT_S16,AV_SAMPLE_FMT_NONE},
-    .long_name = NULL_IF_CONFIG_SMALL("Android VisualOn Adaptive Multi-Rate "
-                                      "(AMR) Wide-Band"),
-    .priv_class = &class,
+    .sample_fmts    = (const enum AVSampleFormat[]){ AV_SAMPLE_FMT_S16,
+                                                     AV_SAMPLE_FMT_NONE },
+    .priv_class     = &amrwb_class,
 };
-

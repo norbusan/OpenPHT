@@ -1,4 +1,4 @@
-# XBMC Media Center language file
+# OpenPHT Language File
 msgid ""
 msgstr ""
 "Project-Id-Version: XBMC-Addons\n"
@@ -21,32 +21,32 @@ msgstr "Esplora"
 
 msgctxt "#31001"
 msgid "Videos"
-msgstr "I Video"
+msgstr "Video"
 
 
 msgctxt "#31002"
 msgid "Music"
-msgstr "La Musica"
+msgstr "Musica"
 
 
 msgctxt "#31003"
 msgid "Pictures"
-msgstr "Le Immagini"
+msgstr "Immagini"
 
 
 msgctxt "#31004"
 msgid "Applications"
-msgstr "I Programmi"
+msgstr "Programmi"
 
 
 msgctxt "#31005"
 msgid "Weather"
-msgstr "Il Meteo"
+msgstr "Meteo"
 
 
 msgctxt "#31006"
 msgid "System"
-msgstr "Il Sistema"
+msgstr "Sistema"
 
 
 msgctxt "#31007"
@@ -190,7 +190,7 @@ msgstr "Ind. IP"
 
 msgctxt "#31037"
 msgid "Hard Drive Space"
-msgstr "Spazio Su Disco"
+msgstr "Spazio su Disco"
 
 
 msgctxt "#31038"
@@ -240,14 +240,14 @@ msgstr "Percorso dello Script Lyrics"
 
 msgctxt "#31047"
 msgid "Not Available"
-msgstr ""
+msgstr "Non Disponibile"
 
 
 #empty strings from id 31048 to 31049
 
 msgctxt "#31050"
 msgid "Items"
-msgstr ""
+msgstr "Elementi"
 
 
 #Programs
@@ -272,7 +272,7 @@ msgstr "Applicazioni"
 
 msgctxt "#31060"
 msgid "Settings"
-msgstr "Settaggi"
+msgstr "Impostazioni"
 
 
 msgctxt "#31061"
@@ -312,12 +312,12 @@ msgstr "Il"
 
 msgctxt "#31068"
 msgid "User ID:"
-msgstr ""
+msgstr "ID Utente:"
 
 
 msgctxt "#31069"
 msgid "Password:"
-msgstr ""
+msgstr "Password:"
 
 
 #Power
@@ -353,7 +353,7 @@ msgstr "Ricarica skin"
 
 msgctxt "#31111"
 msgid "Movies"
-msgstr "I Film"
+msgstr "Film"
 
 
 msgctxt "#31112"
@@ -368,7 +368,7 @@ msgstr "Clip"
 
 msgctxt "#31114"
 msgid "Episode"
-msgstr "Episodio:"
+msgstr "Episodio"
 
 
 msgctxt "#31115"
@@ -393,7 +393,7 @@ msgstr "Fanart"
 
 msgctxt "#31119"
 msgid "Synopsis"
-msgstr "Descrizione"
+msgstr "Sinossi"
 
 
 msgctxt "#31120"
@@ -438,7 +438,7 @@ msgstr "Dettagli Episodio"
 
 msgctxt "#31128"
 msgid "Banner"
-msgstr ""
+msgstr "Banner"
 
 
 msgctxt "#31129"
@@ -448,32 +448,32 @@ msgstr "Valutazione"
 
 msgctxt "#31130"
 msgid "IMDb Rating"
-msgstr ""
+msgstr "Valutazione IMDb"
 
 
 msgctxt "#31131"
 msgid "Genre"
-msgstr ""
+msgstr "Genere"
 
 
 msgctxt "#31132"
 msgid "Duration"
-msgstr ""
+msgstr "Durata"
 
 
 msgctxt "#31133"
 msgid "Subtitles"
-msgstr ""
+msgstr "Sottotitoli"
 
 
 msgctxt "#31134"
 msgid "Cast"
-msgstr ""
+msgstr "Cast"
 
 
 msgctxt "#31135"
 msgid "Director"
-msgstr ""
+msgstr "Regista"
 
 
 msgctxt "#31136"
@@ -483,47 +483,47 @@ msgstr "Scrittore"
 
 msgctxt "#31137"
 msgid "Episodes"
-msgstr ""
+msgstr "Episodi"
 
 
 msgctxt "#31138"
 msgid "Watched"
-msgstr ""
+msgstr "Visto"
 
 
 msgctxt "#31139"
 msgid "Unwatched"
-msgstr ""
+msgstr "Non visto"
 
 
 msgctxt "#31140"
 msgid "First Aired"
-msgstr ""
+msgstr "Prima Visione"
 
 
 msgctxt "#31141"
 msgid "Season"
-msgstr ""
+msgstr "Stagione"
 
 
 msgctxt "#31142"
 msgid "Movie"
-msgstr ""
+msgstr "Film"
 
 
 msgctxt "#31143"
 msgid "TV Show"
-msgstr ""
+msgstr "Serie TV"
 
 
 msgctxt "#31144"
 msgid "Video"
-msgstr ""
+msgstr "Video"
 
 
 msgctxt "#31145"
 msgid "Specials"
-msgstr ""
+msgstr "Speciali"
 
 
 #Music
@@ -551,7 +551,7 @@ msgstr "Clicca Per I Testi"
 
 msgctxt "#31224"
 msgid "Open MENU for Options"
-msgstr "Apri Il MENU"
+msgstr "Apri il MENU"
 
 
 msgctxt "#31225"
@@ -566,7 +566,7 @@ msgstr "Cambia"
 
 msgctxt "#31227"
 msgid "Your Preset"
-msgstr "Il Preset"
+msgstr "Il tuo Preset"
 
 
 msgctxt "#31228"
@@ -576,12 +576,12 @@ msgstr "Testi"
 
 msgctxt "#31229"
 msgid "Artist"
-msgstr ""
+msgstr "Artista"
 
 
 msgctxt "#31230"
 msgid "Album"
-msgstr ""
+msgstr "Album"
 
 
 #Settings
@@ -634,7 +634,7 @@ msgstr "Dest."
 
 msgctxt "#31610"
 msgid "Playback"
-msgstr ""
+msgstr "Riproduzione"
 
 
 #empty strings from id 31611 to 31619
@@ -666,7 +666,7 @@ msgstr "Seleziona"
 
 msgctxt "#31625"
 msgid "Use Default"
-msgstr "Usa Il Default"
+msgstr "Usa Default"
 
 
 #empty strings from id 31626 to 31649
@@ -905,7 +905,7 @@ msgstr "Visualizza AM/PM nell'orologio"
 
 msgctxt "#31697"
 msgid "Hide Photo Description in Slideshow"
-msgstr ""
+msgstr "Nascondi Descrizione Foto nello Slideshow"
 
 
 #Options Menu
@@ -1000,17 +1000,17 @@ msgstr "Menu Opzioni"
 
 msgctxt "#31720"
 msgid "Grid"
-msgstr ""
+msgstr "Griglia"
 
 
 msgctxt "#31721"
 msgid "Episodes List"
-msgstr ""
+msgstr "Lista Episodi"
 
 
 msgctxt "#31722"
 msgid "Plugin Stream"
-msgstr ""
+msgstr "Flusso Plugin"
 
 
 #Credits
@@ -1070,59 +1070,59 @@ msgstr "Clicca \"OK\" per continuare e cominciare ad usare la nostra skin"
 
 msgctxt "#31811"
 msgid "Note: This is the only time you will see this message once you hit \"OK\""
-msgstr "Nota: Una volta premuto 'OK' qesto messaggio non apparira' piu'"
+msgstr "Nota: Una volta premuto 'OK' qesto messaggio non apparirà più"
 
 
 #empty strings from id 31812 to 31850
 
 msgctxt "#31851"
 msgid "[COLOR=orange]Plex[/COLOR] bridges the gap between your Mac and your home theater, doing so with a visually appealing user interface that provides instant access to your media. [COLOR=orange]Plex[/COLOR] can play a wide range of video, audio and photo formats as well as online streaming audio and video. The real power of [COLOR=orange]Plex[/COLOR] is found in its library features: Organize your media into versatile libraries, automatically retrieve metadata from the Internet and display your library using one of the visually stunning skins."
-msgstr ""
+msgstr "[COLOR=orange]Plex[/COLOR] colma il divario tra il tuo Mac e il tuo home theater, e lo fa con un'interfaccia utente accativante che garantisce accesso istantaneo ai tuoi media. [COLOR=orange]Plex[/COLOR] può riprodurre un'ampia gamma di formati video, audio e immagini cosiccome streaming audio e video online. Il vero potere di [COLOR=orange]Plex[/COLOR] si trova nelle funzioni della sua libreria: Organizza i tuoi media in librerie versatili, recupera automaticamente metadati da Internet e mostra la tua collezione usando una delle visivamente impressionanti skin."
 
 
 msgctxt "#31852"
 msgid "At Plex, we would like to thank the following projects, without whom none of this would be possible:"
-msgstr ""
+msgstr "Noi di Plex vorremmo ringraziare i seguenti progetti, senza cui niente di questo sarebbe possibile:"
 
 
 msgctxt "#31853"
 msgid "[COLOR=orange]XBMC[/COLOR]: The most important one, for supplying us with a great foundation to build on."
-msgstr ""
+msgstr "[COLOR=orange]XBMC[/COLOR]: Il più importante, per averci fornito grandi fondamenta su cui costruire."
 
 
 msgctxt "#31854"
 msgid "[COLOR=orange]Team RazorFish[/COLOR]: The talented team who created the original MediaStream skin."
-msgstr ""
+msgstr "[COLOR=orange]Team RazorFish[/COLOR]: Il talentuoso team che ha creato originariamente la skin MediaStream."
 
 
 msgctxt "#31855"
 msgid "[COLOR=orange]FFmpeg[/COLOR]: Without this, there would be no decoding of video inside Plex. A critical component, to be sure."
-msgstr ""
+msgstr [COLOR=orange]FFmpeg[/COLOR]: Senza questo, non ci sarebbe la decodifica dei video in Plex. Un componente critico, sicuramente.""
 
 
 msgctxt "#31856"
 msgid "[COLOR=orange]SQLite[/COLOR]: The media database is stored using this excellent, industry standard free database."
-msgstr ""
+msgstr "[COLOR=orange]SQLite[/COLOR]: I dati dei media sono conservati usando questo database gratis, eccellente e di standard industriale."
 
 
 msgctxt "#31857"
 msgid "[COLOR=orange]CxImage[/COLOR]: The workhorse code responsible for loading images and photos. It uses lots of other libraries like libPNG, libJPEG, etc."
-msgstr ""
+msgstr "[COLOR=orange]CxImage[/COLOR]: Il "muletto" responsabile del caricamento di immmagini e foto. Usa molte altre librerie com libPNG, libJPEG, etc."
 
 
 msgctxt "#31858"
 msgid "[COLOR=orange]FreeType[/COLOR]: This code is responsible for the beautiful rendering of fonts within the application."
-msgstr ""
+msgstr "[COLOR=orange]FreeType[/COLOR]: Il responsabile per il fantastico rendering dei caratteri nell'applicazione."
 
 
 msgctxt "#31859"
 msgid "[COLOR=orange]Python[/COLOR]: The media center embeds the Python interpreter to provide powerful scripting functionality."
-msgstr ""
+msgstr "[COLOR=orange]Python[/COLOR]: Il media center contiene l'interprete Python per fornire potenti funzionalità di scripting."
 
 
 msgctxt "#31860"
 msgid "Please visit http://www.plexapp.com/credits.php for links and more information."
-msgstr ""
+msgstr "Per favore visita http://www.plexapp.com/credits.php per link e altre informazioni."
 
 
 #Profiles
@@ -1140,17 +1140,17 @@ msgstr "Modifica"
 
 msgctxt "#31902"
 msgid "Profile"
-msgstr "Il Profilo"
+msgstr "Profilo"
 
 
 msgctxt "#31903"
 msgid "Profile name"
-msgstr "Il Nome Profilo"
+msgstr "Nome Profilo"
 
 
 msgctxt "#31904"
 msgid "Profile picture"
-msgstr "L'Immagine Profilo"
+msgstr "Immagine Profilo"
 
 
 #Plex additions
@@ -1158,113 +1158,113 @@ msgstr "L'Immagine Profilo"
 
 msgctxt "#31950"
 msgid "Go to your"
-msgstr ""
+msgstr "Vai al tuo"
 
 
 msgctxt "#31951"
 msgid "Visit"
-msgstr ""
+msgstr "Visita"
 
 
 msgctxt "#31952"
 msgid "Channel Directory"
-msgstr ""
+msgstr "Elenco dei Canali"
 
 
 msgctxt "#31953"
 msgid "Get"
-msgstr ""
+msgstr "Ottieni"
 
 
 msgctxt "#31954"
 msgid "Help"
-msgstr ""
+msgstr "Aiuto"
 
 
 msgctxt "#31955"
 msgid "Preferences"
-msgstr ""
+msgstr "Preferenze"
 
 
 msgctxt "#31956"
 msgid "Show"
-msgstr ""
+msgstr "Mostra"
 
 
 #empty strings from id 31957 to 31959
 
 msgctxt "#31960"
 msgid "Sleep"
-msgstr ""
+msgstr "Sospendi"
 
 
 msgctxt "#31961"
 msgid "Shut Down"
-msgstr ""
+msgstr "Spegni"
 
 
 msgctxt "#31962"
 msgid "Power Menu"
-msgstr ""
+msgstr "Menu Alimentazione"
 
 
 msgctxt "#31963"
 msgid "displays"
-msgstr ""
+msgstr "schermi"
 
 
 msgctxt "#31964"
 msgid "Sleep Display"
-msgstr ""
+msgstr "Sospensione Schermo"
 
 
 #empty strings from id 31965 to 31969
 
 msgctxt "#31970"
 msgid "Channels"
-msgstr ""
+msgstr "Canali"
 
 
 msgctxt "#31971"
 msgid "Video Channels"
-msgstr ""
+msgstr "Canali Video"
 
 
 msgctxt "#31972"
 msgid "Music Channels"
-msgstr ""
+msgstr "Canali Musicali"
 
 
 msgctxt "#31973"
 msgid "Picture Channels"
-msgstr ""
+msgstr "Canali Immagini"
 
 
 #empty strings from id 31974 to 31980
 
 msgctxt "#31981"
 msgid "Show Thumbnails in List View"
-msgstr ""
+msgstr "Mostra immagini nella Vista Elenco"
 
 
 msgctxt "#31982"
 msgid "Show Plot in Video OSD"
-msgstr ""
+msgstr "Mostra trama in OSD video"
 
 
 msgctxt "#31983"
 msgid "Show Picture Descriptions in Slideshow"
-msgstr ""
+msgstr "Mostra descrizioni immagini negli slideshow"
 
 
 msgctxt "#31984"
 msgid "Show Now Playing Information in Visualisations"
-msgstr ""
+msgstr "Mostra 'In riproduzione' nelle visualizzazioni"
 
 
 msgctxt "#31985"
 msgid "Show Separate Menu Items for Plug-in Sections"
-msgstr ""
+msgstr "Mostra menu separati per le sezioni Plug-in"
 
 
 #empty strings from id 31986 to 31998
@@ -1278,19 +1278,19 @@ msgstr ""
 
 msgctxt "#32000"
 msgid "Please choose the type of audio connector used on this computer.  If you're unsure, or if you're using built-in speakers, you can accept the default and continue.  You can access this setting at any time in the Preferences."
-msgstr ""
+msgstr "Per favore scegli il tipo di connettore audio usato su questo computer. Se non sei sicuro, o se stai usando gli altoparlanti integrati, accetta l'opzione default e continua.  Puoi accedere nuovamente a questa impostazione nelle Preferenze."
 
 
 msgctxt "#32001"
 msgid "OpenPHT Setup"
-msgstr ""
+msgstr "Setup di OpenPHT"
 
 
 #empty string with id 32002
 
 msgctxt "#32003"
 msgid "[B]Welcome to Plex![/B]  [CR][CR]In order to ensure the best experience, let's take a minute to determine some audio settings and get signed in to [B]myPlex[/B].  [CR][CR][B]myPlex[/B] lets you queue and share online videos, and access shared media from your friends' libraries.  [CR][CR]If you don't already have a free [B]myPlex[/B] account, you can create one now at [COLOR=orange]http://my.plexapp.com[/COLOR] before continuing."
-msgstr ""
+msgstr "[B]Benvenuto in Plex![/B]  [CR][CR]Per garantire la migliore esperienza possibile, prendiamo un minuti per determinare alcune impostazioni audio e connettersi a [B]myPlex[/BR].  [CR][CR][B]myPlex[/B] ti conesente di accodare e convidere video online e accedere a media condivisi dalle librerie dei tuoi amici.  [CR][CR]Se non hai già un account gratuito [B]myPlex[/B], puoi crearne uno ora su [COLOR=orange]http://my.plexapp.com[/COLOR] prima di continuare."
 
 
 #Other
@@ -1303,25 +1303,25 @@ msgstr "Imposta Valutazione"
 
 msgctxt "#32101"
 msgid "Episodes added"
-msgstr ""
+msgstr "Episodi aggiunti"
 
 
 msgctxt "#32102"
 msgid "All Episodes"
-msgstr ""
+msgstr "Tutti gli Episodi"
 
 
 msgctxt "#32103"
 msgid "There is no description available for this "
-msgstr ""
+msgstr "Non c'è la descrizione per questo "
 
 
 msgctxt "#32104"
 msgid "You can add one for it in the Media Manager"
-msgstr ""
+msgstr "Puoi aggiungerne una nel Media Manager"
 
 
 msgctxt "#32105"
 msgid "* Plot hidden to avoid spoilers *"
-msgstr ""
+msgstr "* Trama nascosta per evitare spoiler *"
 

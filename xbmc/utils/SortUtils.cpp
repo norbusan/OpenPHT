@@ -109,7 +109,7 @@ string ByDateAdded(SortAttribute attributes, const SortItem &values)
 string BySize(SortAttribute attributes, const SortItem &values)
 {
   CStdString label;
-  label.Format("%"PRId64, values.at(FieldSize).asInteger());
+  label.Format("%" PRId64, values.at(FieldSize).asInteger());
   return label;
 }
 
@@ -291,7 +291,7 @@ string ByEpisodeNumber(SortAttribute attributes, const SortItem &values)
     title = ByLabel(attributes, values);
 
   CStdString label;
-  label.Format("%"PRIu64" %s", num, title.c_str());
+  label.Format("%" PRIu64" %s", num, title.c_str());
   return label;
 }
 
@@ -388,7 +388,7 @@ string BySubtitleLanguage(SortAttribute attributes, const SortItem &values)
 string ByBitrate(SortAttribute attributes, const SortItem &values)
 {
   CStdString label;
-  label.Format("%"PRId64, values.at(FieldBitrate).asInteger());
+  label.Format("%" PRId64, values.at(FieldBitrate).asInteger());
   return label;
 }
 

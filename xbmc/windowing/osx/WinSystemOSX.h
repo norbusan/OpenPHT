@@ -24,23 +24,22 @@
 
 #include "windowing/WinSystem.h"
 #include "threads/CriticalSection.h"
-
-/* PLEX */
-typedef u_int32_t CGDirectDisplayID;
-/* END PLEX */
-
-typedef u_int32_t CGDisplayChangeSummaryFlags;
+#include "threads/Timer.h"
 
 typedef struct SDL_Surface SDL_Surface;
 
 class IDispResource;
 class CWinEventsOSX;
 
-class CWinSystemOSX : public CWinSystemBase
+class CWinSystemOSX : public CWinSystemBase, public ITimerCallback
 {
 public:
+
   CWinSystemOSX();
   virtual ~CWinSystemOSX();
+
+  // ITimerCallback interface
+  virtual void OnTimeout();
 
   // CWinSystemBase
   virtual bool InitWindowSystem();
@@ -68,16 +67,25 @@ public:
   virtual void Unregister(IDispResource *resource);
   
   virtual int GetNumScreens();
-
-  void CheckDisplayChanging(u_int32_t flags);
-
-  /* PLEX */
   virtual int GetCurrentScreen();
-  virtual void UpdateDisplayBlanking();
-  /* END PLEX */
+  virtual double GetCurrentRefreshrate() { return m_refreshRate; }
+  
+  void        WindowChangedScreen();
+
+  void        AnnounceOnLostDevice();
+  void        AnnounceOnResetDevice();
+  void        StartLostDeviceTimer();
+  void        StopLostDeviceTimer();
   
   void* GetCGLContextObj();
+  void* GetNSOpenGLContext();
+
+  /* PLEX */
+  virtual void UpdateDisplayBlanking();
+  /* END PLEX */
+
 protected:
+  void  HandlePossibleRefreshrateChange();
   void* CreateWindowedContext(void* shareCtx);
   void* CreateFullScreenContext(int screen_index, void* shareCtx);
   void  GetScreenResolution(int* w, int* h, double* fps, int screenIdx);
@@ -96,11 +104,16 @@ protected:
 
   bool                         m_use_system_screensaver;
   bool                         m_can_display_switch;
+  bool                         m_movedToOtherScreen;
+  int                          m_lastDisplayNr;
   void                        *m_windowDidMove;
   void                        *m_windowDidReSize;
+  void                        *m_windowChangedScreen;
+  double                       m_refreshRate;
 
   CCriticalSection             m_resourceSection;
   std::vector<IDispResource*>  m_resources;
+  CTimer                       m_lostDeviceTimer;
 };
 
 #endif

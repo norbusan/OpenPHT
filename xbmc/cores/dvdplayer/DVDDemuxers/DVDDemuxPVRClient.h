@@ -21,10 +21,12 @@
 
 #include "DVDDemux.h"
 #include <map>
-#include "DllAvCodec.h"
-#include "DllAvFormat.h"
-
 #include "pvr/addons/PVRClient.h"
+
+extern "C" {
+#include "libavcodec/avcodec.h"
+#include "libavformat/avformat.h"
+}
 
 class CDVDDemuxPVRClient;
 struct PVR_STREAM_PROPERTIES;
@@ -98,11 +100,7 @@ public:
   CDemuxStream* GetStream(int iStreamId);
   int GetNrOfStreams();
   std::string GetFileName();
-  virtual void GetStreamCodecName(int iStreamId, CStdString &strName);
-
-  /* PLEX */
-  virtual int GetStreamBitrate() { return 0; }
-  /* END PLEX */
+  virtual void GetStreamCodecName(int iStreamId, std::string &strName);
 
 protected:
   CDVDInputStream* m_pInput;
@@ -111,8 +109,6 @@ protected:
 #endif
   CDemuxStream* m_streams[MAX_STREAMS]; // maximum number of streams that ffmpeg can handle
   boost::shared_ptr<PVR::CPVRClient> m_pvrClient;
-
-  DllAvCodec  m_dllAvCodec;
 
 private:
   void RequestStreams();

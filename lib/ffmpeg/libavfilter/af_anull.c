@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010 S.N. Hemanth Meenakshisundaram <smeenaks@ucsd.edu>
  * This file is part of FFmpeg.
  *
  * FFmpeg is free software; you can redistribute it and/or
@@ -21,21 +22,31 @@
  * null audio filter
  */
 
+#include "audio.h"
 #include "avfilter.h"
+#include "internal.h"
+#include "libavutil/internal.h"
 
-AVFilter avfilter_af_anull = {
-    .name      = "anull",
-    .description = NULL_IF_CONFIG_SMALL("Pass the source unchanged to the output."),
+static const AVFilterPad avfilter_af_anull_inputs[] = {
+    {
+        .name = "default",
+        .type = AVMEDIA_TYPE_AUDIO,
+    },
+    { NULL }
+};
 
-    .priv_size = 0,
+static const AVFilterPad avfilter_af_anull_outputs[] = {
+    {
+        .name = "default",
+        .type = AVMEDIA_TYPE_AUDIO,
+    },
+    { NULL }
+};
 
-    .inputs    = (const AVFilterPad[]) {{ .name       = "default",
-                                    .type             = AVMEDIA_TYPE_AUDIO,
-                                    .get_audio_buffer = avfilter_null_get_audio_buffer,
-                                    .filter_samples   = avfilter_null_filter_samples },
-                                  { .name = NULL}},
-
-    .outputs   = (const AVFilterPad[]) {{ .name       = "default",
-                                    .type             = AVMEDIA_TYPE_AUDIO, },
-                                  { .name = NULL}},
+AVFilter ff_af_anull = {
+    .name          = "anull",
+    .description   = NULL_IF_CONFIG_SMALL("Pass the source unchanged to the output."),
+    .query_formats = ff_query_formats_all,
+    .inputs        = avfilter_af_anull_inputs,
+    .outputs       = avfilter_af_anull_outputs,
 };

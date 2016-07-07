@@ -49,7 +49,7 @@
       <button id="8"></button>  <!-- r2 -->
       <button id="10">PreviousMenu</button> <!-- R3 - right analog -->      
       <button id="11"></button>  <!-- select/Escape -->      
-      <button id="12">XBMC.ActivateWindow(PlayerControls)</button>  <!-- start/enter --> 
+      <!--<button id="12">XBMC.ActivateWindow(PlayerControls)</button> --> <!-- start/enter --> 
       <button id="20"></button> <!-- Toggle Switch-->
       <!-- Left Analog Left and Right-->
       <axis limit="-1" id="0">AnalogSeekBack</axis>        

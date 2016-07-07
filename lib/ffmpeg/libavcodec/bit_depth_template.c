@@ -1,28 +1,30 @@
 /*
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "dsputil.h"
+#include "mathops.h"
+#include "rnd_avg.h"
+#include "libavutil/intreadwrite.h"
 
 #ifndef BIT_DEPTH
 #define BIT_DEPTH 8
 #endif
 
-#ifdef AVCODEC_H264_HIGH_DEPTH_H
+#ifdef AVCODEC_BIT_DEPTH_TEMPLATE_C
 #   undef pixel
 #   undef pixel2
 #   undef pixel4
@@ -42,7 +44,7 @@
 #   undef av_clip_pixel
 #   undef PIXEL_SPLAT_X4
 #else
-#   define AVCODEC_H264_HIGH_DEPTH_H
+#   define AVCODEC_BIT_DEPTH_TEMPLATE_C
 #endif
 
 #if BIT_DEPTH > 8
@@ -70,7 +72,7 @@
 #   define pixel4 uint32_t
 #   define dctcoef int16_t
 
-#   define INIT_CLIP uint8_t *cm = ff_cropTbl + MAX_NEG_CROP;
+#   define INIT_CLIP
 #   define no_rnd_avg_pixel4 no_rnd_avg32
 #   define    rnd_avg_pixel4    rnd_avg32
 #   define AV_RN2P  AV_RN16
@@ -82,7 +84,7 @@
 #   define PIXEL_SPLAT_X4(x) ((x)*0x01010101U)
 
 #   define av_clip_pixel(a) av_clip_uint8(a)
-#   define CLIP(a) cm[a]
+#   define CLIP(a) av_clip_uint8(a)
 #endif
 
 #define FUNC3(a, b, c)  a ## _ ## b ## c

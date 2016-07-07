@@ -45,6 +45,7 @@ CGUIButtonControl::~CGUIButtonControl(void)
 
 void CGUIButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
+  ProcessText(currentTime);
   if (m_bInvalidated)
   {
     m_imgFocus.SetWidth(m_width);
@@ -84,7 +85,6 @@ void CGUIButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
   m_imgFocus.Process(currentTime);
   m_imgNoFocus.Process(currentTime);
 
-  ProcessText(currentTime);
   CGUIControl::Process(currentTime, dirtyregions);
 }
 
@@ -120,12 +120,11 @@ void CGUIButtonControl::ProcessText(unsigned int currentTime)
   bool changed = m_label.SetMaxRect(m_posX, m_posY, m_width, m_height);
   changed |= m_label.SetText(m_info.GetLabel(m_parentID));
   changed |= m_label.SetScrolling(HasFocus());
+  changed |= m_label2.SetMaxRect(m_posX, m_posY, m_width, m_height);
+  changed |= m_label2.SetText(m_info2.GetLabel(m_parentID));
 
   // render the second label if it exists
-  CStdString label2(m_info2.GetLabel(m_parentID));
-  changed |= m_label2.SetMaxRect(m_posX, m_posY, m_width, m_height);
-  changed |= m_label2.SetText(label2);
-  if (!label2.IsEmpty())
+  if (!m_info2.GetLabel(m_parentID).IsEmpty())
   {
     changed |= m_label2.SetAlign(XBFONT_RIGHT | (m_label.GetLabelInfo().align & XBFONT_CENTER_Y) | XBFONT_TRUNCATED);
     changed |= m_label2.SetScrolling(HasFocus());
@@ -137,8 +136,10 @@ void CGUIButtonControl::ProcessText(unsigned int currentTime)
                   m_label2.GetRenderRect() != label2RenderRect);
 
     changed |= m_label2.SetColor(GetTextColor());
+    changed |= m_label2.Process(currentTime);
   }
   changed |= m_label.SetColor(GetTextColor());
+  changed |= m_label.Process(currentTime);
   if (changed)
     MarkDirtyRegion();
 }
@@ -223,14 +224,20 @@ void CGUIButtonControl::SetInvalid()
 
 void CGUIButtonControl::SetLabel(const string &label)
 { // NOTE: No fallback for buttons at this point
-  m_info.SetLabel(label, "", GetParentID());
-  SetInvalid();
+  if (m_info.GetLabel(GetParentID(), false) != label)
+  {
+    m_info.SetLabel(label, "", GetParentID());
+    SetInvalid();
+  }
 }
 
 void CGUIButtonControl::SetLabel2(const string &label2)
 { // NOTE: No fallback for buttons at this point
-  m_info2.SetLabel(label2, "", GetParentID());
-  SetInvalid();
+  if (m_info2.GetLabel(GetParentID(), false) != label2)
+  {
+    m_info2.SetLabel(label2, "", GetParentID());
+    SetInvalid();
+  }
 }
 
 void CGUIButtonControl::SetPosition(float posX, float posY)
@@ -251,6 +258,7 @@ bool CGUIButtonControl::UpdateColors()
 {
   bool changed = CGUIControl::UpdateColors();
   changed |= m_label.UpdateColors();
+  changed |= m_label2.UpdateColors();
   changed |= m_imgFocus.SetDiffuseColor(m_diffuseColor);
   changed |= m_imgNoFocus.SetDiffuseColor(m_diffuseColor);
 

@@ -31,6 +31,7 @@
 #include "TextureManager.h"
 #include "Geometry.h"
 #include "system.h" // HAS_GL, HAS_DX, etc
+#include "GUIInfoTypes.h"
 
 typedef uint32_t color_t;
 
@@ -74,14 +75,15 @@ public:
   CTextureInfo(const CStdString &file);
   CTextureInfo& operator=(const CTextureInfo &right);
   bool       useLarge;
-  CRect      border;      // scaled  - unneeded if we get rid of scale on load
-  int        orientation; // orientation of the texture (0 - 7 == EXIForientation - 1)
+  CRect      border;          // scaled  - unneeded if we get rid of scale on load
+  int        orientation;     // orientation of the texture (0 - 7 == EXIForientation - 1)
   /* PLEX */
   CStdString blur;
   CStdString saturation;
   /* END PLEX */
 
   CStdString diffuse;     // diffuse overlay texture
+  CGUIInfoColor diffuseColor; // diffuse color
   CStdString filename;    // main texture file
 };
 
@@ -111,6 +113,7 @@ public:
   bool SetWidth(float width);
   bool SetHeight(float height);
   bool SetFileName(const CStdString &filename);
+  void SetUseCache(const bool useCache = true);
   bool SetAspectRatio(const CAspectRatio &aspect);
 
   const CStdString& GetFileName() const { return m_info.filename; };
@@ -142,9 +145,10 @@ protected:
   bool CalculateSize();
   void LoadDiffuseImage();
   bool AllocateOnDemand();
-  bool UpdateAnimFrame();
+  bool UpdateAnimFrame(unsigned int currentTime);
   void Render(float left, float top, float bottom, float right, float u1, float v1, float u2, float v2, float u3, float v3);
-  void OrientateTexture(CRect &rect, float width, float height, int orientation);
+  static void OrientateTexture(CRect &rect, float width, float height, int orientation);
+  void ResetAnimState();
 
   // functions that our implementation classes handle
   virtual void Allocate() {}; ///< called after our textures have been allocated
@@ -163,7 +167,7 @@ protected:
 
   CRect m_vertex;       // vertex coords to render
   bool m_invalid;       // if true, we need to recalculate
-
+  bool m_use_cache;
   unsigned char m_alpha;
 
   float m_frameWidth, m_frameHeight;          // size in pixels of the actual frame within the texture
@@ -172,7 +176,7 @@ protected:
   // animations
   int m_currentLoop;
   unsigned int m_currentFrame;
-  uint32_t m_frameCounter;
+  uint32_t m_lasttime;
 
   float m_diffuseU, m_diffuseV;           // size of the diffuse frame (in tex coords)
   float m_diffuseScaleU, m_diffuseScaleV; // scale factor of the diffuse frame (from texture coords to diffuse tex coords)

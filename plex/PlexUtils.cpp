@@ -827,7 +827,7 @@ unsigned long PlexUtils::GetFastHash(std::string Data)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool PlexUtils::IsPlayingPlaylist()
 {
-  if (!g_application.IsPlaying())
+  if (!g_application.m_pPlayer->IsPlaying())
     return false;
 
   int playlist = g_playlistPlayer.GetCurrentPlaylist();

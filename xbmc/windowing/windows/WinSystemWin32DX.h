@@ -25,9 +25,6 @@
 
 #pragma once
 
-#include <d3d9.h>
-#include <d3dx9.h>
-#include <dxdiag.h>
 #include "windowing/windows/WinSystemWin32.h"
 #include "rendering/dx/RenderSystemDX.h"
 #include "utils/GlobalsHandling.h"
@@ -44,6 +41,8 @@ public:
   virtual void OnMove(int x, int y);
   virtual bool SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays);
   virtual bool WindowedMode() { return CRenderSystemDX::m_useWindowedDX; }
+
+  std::string GetClipboardText(void);
 
 protected:
   virtual void UpdateMonitor();

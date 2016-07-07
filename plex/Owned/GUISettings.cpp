@@ -53,12 +53,11 @@
 #include "utils/XBMCTinyXML.h"
 #include "windowing/WindowingFactory.h"
 #include "powermanagement/PowerManager.h"
-#include "cores/dvdplayer/DVDCodecs/Video/CrystalHD.h"
 #include "cores/AudioEngine/AEFactory.h"
-#include "cores/AudioEngine/AEAudioFormat.h"
+#include "cores/AudioEngine/Utils/AEAudioFormat.h"
 #include "guilib/GUIFont.h" // for FONT_STYLE_* definitions
 #if defined(TARGET_DARWIN_OSX)
-  #include "cores/AudioEngine/Engines/CoreAudio/CoreAudioHardware.h"
+  #include "cores/AudioEngine/Sinks/osx/CoreAudioHardware.h"
 #endif
 #include "guilib/GUIFontManager.h"
 #include "utils/Weather.h"
@@ -73,6 +72,7 @@
 #include "PlexUtils.h"
 #include "Client/MyPlex/MyPlexManager.h"
 #include "Client/PlexServerManager.h"
+#include "guilib/StereoscopicsManager.h"
 
 
 using namespace std;
@@ -348,79 +348,88 @@ void CGUISettings::Initialize()
   // System/Audio output
   CSettingsCategory* ao = AddCategory(SETTINGS_SYSTEM, "audiooutput", 772);
 
-  map<int,int> audiomode;
-  audiomode.insert(make_pair(338,AUDIO_ANALOG));
-  audiomode.insert(make_pair(339,AUDIO_IEC958));
-  audiomode.insert(make_pair(420,AUDIO_HDMI  ));
-#if defined(TARGET_RASPBERRY_PI)
-  AddInt(ao, "audiooutput.mode", 337, AUDIO_HDMI, audiomode, SPIN_CONTROL_TEXT);
-#else
-  AddInt(ao, "audiooutput.mode", 337, AUDIO_ANALOG, audiomode, SPIN_CONTROL_TEXT);
-#endif
+  AddString(ao, "audiooutput.audiodevice", 545, CStdString(CAEFactory::GetDefaultDevice(false)), SPIN_CONTROL_TEXT);
 
-  AddInt(ao, "audiooutput.defaultdelay", 297, 0, (int)(-g_advancedSettings.m_videoAudioDelayRange*1000), 25, (int)(g_advancedSettings.m_videoAudioDelayRange*1000), SPIN_CONTROL_INT_PLUS, MASK_MS, TEXT_OFF);
-#if defined(TARGET_DARWIN_IOS)
-  CSettingsCategory* aocat = g_sysinfo.IsAppleTV2() ? ao : NULL;
-#else
-  CSettingsCategory* aocat = ao;
-#endif
-  AddBool(aocat, "audiooutput.ac3passthrough"   , 364, true);
-  AddBool(aocat, "audiooutput.eac3passthrough"  , 472, true);
-  AddBool(aocat, "audiooutput.dtspassthrough"   , 254, true);
-#if !defined(TARGET_DARWIN) && !defined(TARGET_RASPBERRY_PI)
-  AddBool(aocat, "audiooutput.passthroughaac"   , 299, true);
-#else
-  AddBool(NULL, "audiooutput.passthroughaac"   , 299, false);
-#endif
-#if !defined(TARGET_DARWIN_IOS) && !defined(TARGET_RASPBERRY_PI)
-  AddBool(aocat, "audiooutput.multichannellpcm" , 348, true );
-#else
-  AddBool(NULL, "audiooutput.multichannellpcm" , 348, false );
-#endif
-#if !defined(TARGET_DARWIN) && !defined(TARGET_RASPBERRY_PI)
-  AddBool(aocat, "audiooutput.truehdpassthrough", 349, false );
-  AddBool(aocat, "audiooutput.dtshdpassthrough" , 347, false );
-#else
-  AddBool(NULL, "audiooutput.truehdpassthrough", 349, false );
-  AddBool(NULL, "audiooutput.dtshdpassthrough" , 347, false );
-#endif
-
-#ifdef TARGET_RASPBERRY_PI
-  AddBool(ao, "audiooutput.supportdtshdcpudecoding", 38118, false);
-#endif
-  AddBool(ao, "audiooutput.stereoupmix", 252, false);
-  AddBool(ao, "audiooutput.normalizelevels", 346, true);
-#ifdef TARGET_RASPBERRY_PI
-  AddInt(ao, "audiooutput.boostcenter", 36043, 0, 0, 1, 30, SPIN_CONTROL_INT);
-#endif
-
-  map<int,int> channelLayout;
-  for(int layout = AE_CH_LAYOUT_2_0; layout < AE_CH_LAYOUT_MAX; ++layout)
+  map<int, int> channelLayout;
+  for (int layout = AE_CH_LAYOUT_2_0; layout < AE_CH_LAYOUT_MAX; ++layout)
     channelLayout.insert(make_pair(34100 + layout, layout));
-  AddInt(ao, "audiooutput.channels", 18110, AE_CH_LAYOUT_2_0, channelLayout, SPIN_CONTROL_TEXT);
+  AddInt(ao, "audiooutput.channels", 34100, AE_CH_LAYOUT_2_0, channelLayout, SPIN_CONTROL_TEXT);
 
-#if defined(TARGET_DARWIN)
-#if defined(TARGET_DARWIN_IOS)
-  CStdString defaultDeviceName = "Default";
+  // Plex stuff
+  AddInt(ao, "audiooutput.defaultdelay", 297, 0, (int)(-g_advancedSettings.m_videoAudioDelayRange * 1000), 25, (int)(g_advancedSettings.m_videoAudioDelayRange * 1000), SPIN_CONTROL_INT_PLUS, MASK_MS, TEXT_OFF);
+
+  map<int, int> outputConfig;
+  outputConfig.insert(make_pair(338, AE_CONFIG_FIXED));
+  outputConfig.insert(make_pair(339, AE_CONFIG_AUTO));
+  outputConfig.insert(make_pair(420, AE_CONFIG_MATCH));
+  AddInt(ao, "audiooutput.config", 337, AE_CONFIG_AUTO, outputConfig, SPIN_CONTROL_TEXT);
+
+  map<int, int> samplerate;
+  samplerate.insert(make_pair(34124, 44100));
+  samplerate.insert(make_pair(34125, 48000));
+  samplerate.insert(make_pair(34126, 88200));
+  samplerate.insert(make_pair(34127, 96000));
+  samplerate.insert(make_pair(34128, 192000));
+  AddInt(ao, "audiooutput.samplerate", 458, 48000, samplerate, SPIN_CONTROL_TEXT);
+
+  AddBool(ao, "audiooutput.stereoupmix", 252, false);
+  AddBool(ao, "audiooutput.maintainoriginalvolume", 346, true);
+  AddInt(ao, "audiooutput.boostcenter", 38007, 0, 0, 1, 30, SPIN_CONTROL_INT, MASK_DB);
+
+  map<int, int> processquality;
+  if (CAEFactory::GetEngine() && CAEFactory::GetEngine()->SupportsQualityLevel(AE_QUALITY_LOW))
+    processquality.insert(make_pair(13506, AE_QUALITY_LOW));
+  if (CAEFactory::GetEngine() && CAEFactory::GetEngine()->SupportsQualityLevel(AE_QUALITY_MID))
+    processquality.insert(make_pair(13507, AE_QUALITY_MID));
+  if (CAEFactory::GetEngine() && CAEFactory::GetEngine()->SupportsQualityLevel(AE_QUALITY_HIGH))
+    processquality.insert(make_pair(13508, AE_QUALITY_HIGH));
+  if (CAEFactory::GetEngine() && CAEFactory::GetEngine()->SupportsQualityLevel(AE_QUALITY_REALLYHIGH))
+    processquality.insert(make_pair(13509, AE_QUALITY_REALLYHIGH));
+  if (CAEFactory::GetEngine() && CAEFactory::GetEngine()->SupportsQualityLevel(AE_QUALITY_GPU))
+    processquality.insert(make_pair(38010, AE_QUALITY_GPU));
+#ifdef TARGET_RASPBERRY_PI
+  AddInt(ao, "audiooutput.processquality", 13505, AE_QUALITY_GPU, processquality, SPIN_CONTROL_TEXT);
 #else
-  CStdString defaultDeviceName;
-  CCoreAudioHardware::GetOutputDeviceName(defaultDeviceName);
+  AddInt(ao, "audiooutput.processquality", 13505, AE_QUALITY_MID, processquality, SPIN_CONTROL_TEXT);
 #endif
-  AddString(ao, "audiooutput.audiodevice", 545, defaultDeviceName.c_str(), SPIN_CONTROL_TEXT);
-  AddString(ao, "audiooutput.passthroughdevice", 546, defaultDeviceName.c_str(), SPIN_CONTROL_TEXT);
-#else
+
+  map<int, int> streamsilence;
+  streamsilence.insert(make_pair(20422, XbmcThreads::EndTime::InfiniteValue));
+  streamsilence.insert(make_pair(13551, 0));
+  for (int seconds = 1; seconds <= 10; seconds++)
+    streamsilence.insert(make_pair(38500 + seconds, seconds));
+  AddInt(ao, "audiooutput.streamsilence", 421, 1, streamsilence, SPIN_CONTROL_TEXT);
+
+  AddBool(ao, "audiooutput.supportdtshdcpudecoding", 38019, false);
+
   AddSeparator(ao, "audiooutput.sep1");
-  AddString   (ao, "audiooutput.audiodevice"      , 545, CStdString(CAEFactory::GetDefaultDevice(false)), SPIN_CONTROL_TEXT);
-  AddString   (ao, "audiooutput.passthroughdevice", 546, CStdString(CAEFactory::GetDefaultDevice(true )), SPIN_CONTROL_TEXT);
-  AddSeparator(ao, "audiooutput.sep2");
-#endif
 
-  map<int,int> guimode;
-  guimode.insert(make_pair(34121, AE_SOUND_IDLE  ));
+  map<int, int> guimode;
+  guimode.insert(make_pair(34121, AE_SOUND_IDLE));
   guimode.insert(make_pair(34122, AE_SOUND_ALWAYS));
-  guimode.insert(make_pair(34123, AE_SOUND_OFF   ));
+  guimode.insert(make_pair(34123, AE_SOUND_OFF));
   AddInt(ao, "audiooutput.guisoundmode", 34120, AE_SOUND_IDLE, guimode, SPIN_CONTROL_TEXT);
 
+  AddSeparator(ao, "audiooutput.sep2");
+
+  AddBool(ao, "audiooutput.passthrough", 348, false);
+  AddString(ao, "audiooutput.passthroughdevice", 546, CStdString(CAEFactory::GetDefaultDevice(true)), SPIN_CONTROL_TEXT);
+
+  AddBool(ao, "audiooutput.ac3passthrough", 364, true);
+  AddBool(ao, "audiooutput.ac3transcode", 667, false);
+#ifndef TARGET_DARWIN
+  AddBool(ao, "audiooutput.eac3passthrough", 448, false);
+#else
+  AddBool(NULL, "audiooutput.eac3passthrough", 448, false);
+#endif
+  AddBool(ao, "audiooutput.dtspassthrough", 254, false);
+#ifndef TARGET_DARWIN
+  AddBool(ao, "audiooutput.truehdpassthrough", 349, false);
+  AddBool(ao, "audiooutput.dtshdpassthrough", 347, false);
+#else
+  AddBool(NULL, "audiooutput.truehdpassthrough", 349, false);
+  AddBool(NULL, "audiooutput.dtshdpassthrough", 347, false);
+#endif
 
 
   // System/Power saving
@@ -533,10 +542,15 @@ void CGUISettings::Initialize()
   // System/Advanced
   CSettingsCategory* advs = AddCategory(SETTINGS_SYSTEM, "advanced", 18105);
   AddString(advs, "advanced.labelvideo", 291, "", BUTTON_CONTROL_STANDARD);
+
+#ifdef HAS_GLX
+  AddString(NULL, "videoscreen.monitor", 246, "Default", EDIT_CONTROL_INPUT);
+#endif
+
   // this setting would ideally not be saved, as its value is systematically derived from videoscreen.screenmode.
   // contains a DISPLAYMODE
 #if !defined(TARGET_DARWIN_IOS_ATV2) && !defined(TARGET_RASPBERRY_PI)
-  AddInt(advs, "videoscreen.screen", 240, 0, -1, 1, 32, SPIN_CONTROL_TEXT);
+  AddInt(g_Windowing.CanDoWindowed() ? advs : NULL, "videoscreen.screen", 240, 0, -1, 1, 32, SPIN_CONTROL_TEXT);
 #endif
   // this setting would ideally not be saved, as its value is systematically derived from videoscreen.screenmode.
   // contains an index to the g_settings.m_ResInfo array. the only meaningful fields are iScreen, iWidth, iHeight.
@@ -561,24 +575,24 @@ void CGUISettings::Initialize()
   fakeFullScreen = true;
   showSetting = false;
 #endif
-#if defined(TARGET_DARWIN)
+#if defined(TARGET_DARWIN) || defined(TARGET_RASPBERRY_PI)
   showSetting = false;
 #endif
   AddBool(showSetting ? advs : NULL, "videoscreen.fakefullscreen", 14083, fakeFullScreen);
-#ifdef TARGET_DARWIN_IOS
+#if defined(TARGET_DARWIN_IOS) || defined(TARGET_RASPBERRY_PI)
   AddBool(NULL, "videoscreen.blankdisplays", 13130, false);
 #else
   AddBool(advs, "videoscreen.blankdisplays", 13130, false);
 #endif
   AddSeparator(advs, "videoscreen.sep1");
 #endif
-#ifdef TARGET_RASPBERRY_PI_1
-  AddBool(advs, "videoscreen.textures32", 37020, false);
-#endif
+
+#ifdef TARGET_RASPBERRY_PI
 #ifdef TARGET_RASPBERRY_PI_2
   AddBool(advs, "videoscreen.textures32", 37020, true);
+#else
+  AddBool(advs, "videoscreen.textures32", 37020, false);
 #endif
-#ifdef TARGET_RASPBERRY_PI
   map<int,int> limitgui;
   limitgui.insert(make_pair(37026,0));
   limitgui.insert(make_pair(37027,540));
@@ -588,8 +602,35 @@ void CGUISettings::Initialize()
   AddInt(advs, "videoscreen.limitgui", 37021, 0, limitgui, SPIN_CONTROL_TEXT);
 #endif
 
+  map<int, int> stereoscopicmodes;
+  for (int i = RENDER_STEREO_MODE_OFF; i < RENDER_STEREO_MODE_COUNT; i++)
+  {
+    RENDER_STEREO_MODE mode = (RENDER_STEREO_MODE)i;
+    if (g_Windowing.SupportsStereo(mode))
+      stereoscopicmodes.insert(make_pair(CStereoscopicsManager::Get().GetLabelIdForStereoMode(mode), mode));
+  }
+  AddInt(advs, "videoscreen.stereoscopicmode", 36500, 0, stereoscopicmodes, SPIN_CONTROL_TEXT);
+
+  map<int, int> preferedstereoscopicmodes;
+  preferedstereoscopicmodes.insert(make_pair(CStereoscopicsManager::Get().GetLabelIdForStereoMode(RENDER_STEREO_MODE_AUTO), RENDER_STEREO_MODE_AUTO)); // option for autodetect
+  // don't add "off" to the list of preferred modes as this doesn't make sense
+  for (int i = RENDER_STEREO_MODE_OFF +1; i < RENDER_STEREO_MODE_COUNT; i++)
+  {
+    RENDER_STEREO_MODE mode = (RENDER_STEREO_MODE)i;
+    // also skip "mono" mode which is no real stereoscopic mode
+    if (mode != RENDER_STEREO_MODE_MONO && g_Windowing.SupportsStereo(mode))
+      preferedstereoscopicmodes.insert(std::make_pair(CStereoscopicsManager::Get().GetLabelIdForStereoMode(mode), mode));
+  }
+  AddInt(advs, "videoscreen.preferedstereoscopicmode", 36524, 100, preferedstereoscopicmodes, SPIN_CONTROL_TEXT);
+
+#ifdef TARGET_RASPBERRY_PI
+  // videoscreen.framepacking
+  AddBool(advs, "videoscreen.framepacking", 38029, false);
+#endif
+
   map<int,int> vsync;
-#if defined(_LINUX) && !defined(TARGET_DARWIN)
+  // This ifdef is intended to catch everything except Linux and FreeBSD
+#if defined(TARGET_LINUX) && !defined(TARGET_DARWIN) && !defined(TARGET_ANDROID) && !defined(TARGET_RASPBERRY_PI)
   vsync.insert(make_pair(13101,VSYNC_DRIVER));
 #endif
   vsync.insert(make_pair(13106,VSYNC_DISABLED));
@@ -705,6 +746,8 @@ void CGUISettings::Initialize()
   subtitleAlignments.insert(make_pair(21465, SUBTITLE_ALIGN_TOP_OUTSIDE));
   AddInt(sub, "subtitles.align", 21460, SUBTITLE_ALIGN_MANUAL, subtitleAlignments, SPIN_CONTROL_TEXT);
 
+  AddInt(sub, "subtitles.videoplayer.preferdefaultflag", 36545, 0, 0, 1, 10, SPIN_CONTROL_INT);
+
   //CSettingsCategory* dvd = AddCategory(SETTINGS_VIDEOS, "dvds", 14087);
   AddBool(NULL, "dvds.autorun", 14088, false);
   AddInt(NULL, "dvds.playerregion", 21372, 0, 0, 1, 8, SPIN_CONTROL_INT_PLUS, -1, TEXT_OFF);
@@ -715,6 +758,7 @@ void CGUISettings::Initialize()
 
   // Playback/Music
   CSettingsCategory* mp = AddCategory(SETTINGS_VIDEOS, "musicplayer", 18107);
+  AddInt(mp, "musicplayer.seekdelay", 13557, 750, 0, 250, 3000, SPIN_CONTROL_INT_PLUS, MASK_MS, TEXT_NONE);
   AddSeparator(mp, "musicplayer.sep1");
   AddInt(mp, "musicplayer.crossfade", 13314, 0, 0, 1, 15, SPIN_CONTROL_INT_PLUS, MASK_SECS, TEXT_OFF);
   AddBool(mp, "musicplayer.crossfadealbumtracks", 13400, true);
@@ -824,56 +868,50 @@ void CGUISettings::Initialize()
   //AddInt(5, "videoplayer.displayresolution", 169, (int)RES_AUTORES, (int)RES_AUTORES, 1, (int)CUSTOM+MAX_RESOLUTIONS, SPIN_CONTROL_TEXT);
   AddInt(NULL, "videoplayer.displayresolution", 169, (int)RES_AUTORES, (int)RES_AUTORES, 1, (int)RES_AUTORES, SPIN_CONTROL_TEXT);
 
+  AddInt(adv, "videoplayer.seekdelay", 13557, 750, 0, 250, 3000, SPIN_CONTROL_INT_PLUS, MASK_MS, TEXT_NONE);
+
   map<int, int> adjustTypes;
   adjustTypes.insert(make_pair(351, ADJUST_REFRESHRATE_OFF));
   adjustTypes.insert(make_pair(36035, ADJUST_REFRESHRATE_ALWAYS));
   adjustTypes.insert(make_pair(36036, ADJUST_REFRESHRATE_ON_STARTSTOP));
-#if !defined(TARGET_DARWIN_IOS)
   AddInt(adv, "videoplayer.adjustrefreshrate", 170, ADJUST_REFRESHRATE_OFF, adjustTypes, SPIN_CONTROL_TEXT);
-  //  AddBool(vp, "videoplayer.adjustrefreshrate", 170, false);
   AddInt(adv, "videoplayer.pauseafterrefreshchange", 13550, 0, 0, 1, MAXREFRESHCHANGEDELAY, SPIN_CONTROL_TEXT);
-#else
-  AddInt(NULL, "videoplayer.adjustrefreshrate", 170, ADJUST_REFRESHRATE_OFF, adjustTypes, SPIN_CONTROL_TEXT);
-  //AddBool(NULL, "videoplayer.adjustrefreshrate", 170, false);
-  AddInt(NULL, "videoplayer.pauseafterrefreshchange", 13550, 0, 0, 1, MAXREFRESHCHANGEDELAY, SPIN_CONTROL_TEXT);
-#endif
 
-  //sync settings not available on windows gl build
-#if defined(_WIN32) && defined(HAS_GL)
-#define SYNCSETTINGS 0
+#ifdef TARGET_RASPBERRY_PI
+  AddBool(adv, "videoplayer.usedisplayasclock", 13510, true);
 #else
-#define SYNCSETTINGS 1
+  AddBool(adv, "videoplayer.usedisplayasclock", 13510, false);
 #endif
-  AddBool(SYNCSETTINGS ? adv : NULL, "videoplayer.usedisplayasclock", 13510, false);
 
   map<int, int> syncTypes;
-  syncTypes.insert(make_pair(13501, SYNC_DISCON));
-  syncTypes.insert(make_pair(13502, SYNC_SKIPDUP));
   syncTypes.insert(make_pair(13503, SYNC_RESAMPLE));
-  AddInt(SYNCSETTINGS ? adv : NULL, "videoplayer.synctype", 13500, SYNC_RESAMPLE, syncTypes, SPIN_CONTROL_TEXT);
+#ifdef TARGET_RASPBERRY_PI
+  syncTypes.insert(make_pair(13504, SYNC_PLLADJUST));
+  AddInt(adv, "videoplayer.synctype", 13500, SYNC_RESAMPLE, syncTypes, SPIN_CONTROL_TEXT);
+#else
+  AddInt(NULL, "videoplayer.synctype", 13500, SYNC_RESAMPLE, syncTypes, SPIN_CONTROL_TEXT);
+#endif
 
-  AddFloat(NULL, "videoplayer.maxspeedadjust", 13504, 5.0f, 0.0f, 0.1f, 10.0f);
+  AddInt(adv, "videoplayer.errorinaspect", 22021, 0, 0, 1, 20, SPIN_CONTROL_INT_PLUS, MASK_PERCENT, TEXT_NONE);
 
   map<int,int> stretch;
   stretch.insert(make_pair(630,VIEW_MODE_NORMAL));
   stretch.insert(make_pair(633,VIEW_MODE_WIDE_ZOOM));
   stretch.insert(make_pair(634,VIEW_MODE_STRETCH_16x9));
   stretch.insert(make_pair(631,VIEW_MODE_ZOOM));
-
   AddInt(adv, "videoplayer.stretch43", 173, VIEW_MODE_NORMAL, stretch, SPIN_CONTROL_TEXT);
-#ifdef HAVE_LIBVDPAU
-  AddBool(NULL, "videoplayer.vdpau_allow_xrandr", 13122, false);
-#endif
-#if defined(HAS_GL) || HAS_GLES == 2  // May need changing for GLES
-  AddSeparator(adv, "videoplayer.sep1.5");
-#ifdef HAVE_LIBVDPAU
-  AddBool(NULL, "videoplayer.vdpauUpscalingLevel", 13121, false);
-  AddBool(NULL, "videoplayer.vdpaustudiolevel", 0, false); //depreciated
-#endif
-#endif
-  AddSeparator(NULL, "videoplayer.sep5");
+  
   AddBool(NULL, "videoplayer.teletextenabled", 23050, true);
-  AddBool(NULL, "Videoplayer.teletextscale", 23055, true);
+  AddBool(NULL, "videoplayer.teletextscale", 23055, true);
+
+  map<int, int> stereoscopicplaybackmode;
+  stereoscopicplaybackmode.insert(make_pair(36521, 0));
+  stereoscopicplaybackmode.insert(make_pair(36524, 1));
+  stereoscopicplaybackmode.insert(make_pair(36509, 2));
+  stereoscopicplaybackmode.insert(make_pair(36028, 100));
+  AddInt(adv, "videoplayer.stereoscopicplaybackmode", 36520, 0, stereoscopicplaybackmode, SPIN_CONTROL_TEXT);
+
+  AddBool(adv, "videoplayer.quitstereomodeonstop", 36526, true);
 
   map<int, int> myVideosSelectActions;
   myVideosSelectActions.insert(make_pair(22080, SELECT_ACTION_CHOOSE));
@@ -886,25 +924,13 @@ void CGUISettings::Initialize()
   AddBool(NULL, "myvideos.replacelabels", 20419, true);
   AddBool(NULL, "myvideos.extractthumb",20433, true);
 
-  map<int, int> resampleQualities;
-  resampleQualities.insert(make_pair(13506, RESAMPLE_LOW));
-  resampleQualities.insert(make_pair(13507, RESAMPLE_MID));
-  resampleQualities.insert(make_pair(13508, RESAMPLE_HIGH));
-  resampleQualities.insert(make_pair(13509, RESAMPLE_REALLYHIGH));
-  AddInt(NULL, "videoplayer.resamplequality", 13505, RESAMPLE_MID, resampleQualities, SPIN_CONTROL_TEXT);
-
-  AddInt(adv, "videoplayer.errorinaspect", 22021, 0, 0, 1, 20, SPIN_CONTROL_INT_PLUS, MASK_PERCENT, TEXT_NONE);
-
   map<int, int> renderers;
   renderers.insert(make_pair(13416, RENDER_METHOD_AUTO));
-
 #ifdef HAS_DX
-  if (g_sysinfo.IsVistaOrHigher())
-    renderers.insert(make_pair(16319, RENDER_METHOD_DXVA));
+  renderers.insert(make_pair(16319, RENDER_METHOD_DXVA));
   renderers.insert(make_pair(13431, RENDER_METHOD_D3D_PS));
   renderers.insert(make_pair(13419, RENDER_METHOD_SOFTWARE));
 #endif
-
 #ifdef HAS_GL
   renderers.insert(make_pair(13417, RENDER_METHOD_ARB));
   renderers.insert(make_pair(13418, RENDER_METHOD_GLSL));
@@ -913,23 +939,33 @@ void CGUISettings::Initialize()
   AddInt(adv, "videoplayer.rendermethod", 18109, RENDER_METHOD_AUTO, renderers, SPIN_CONTROL_TEXT);
 
 #if defined(HAS_GL) || defined(HAS_DX)
-  AddInt(adv, "videoplayer.hqscalers", 13435, 0, 0, 10, 100, SPIN_CONTROL_INT);
+  AddInt(adv, "videoplayer.hqscalers", 13435, 20, 0, 10, 100, SPIN_CONTROL_INT, 14047);
+#endif
+
+#ifdef HAS_LIBAMCODEC
+  AddBool(adv, "videoplayer.useamcodec", 13438, true);
 #endif
 
 #ifdef HAVE_LIBVDPAU
   AddBool(adv, "videoplayer.usevdpau", 13425, true);
+  AddBool(adv, "videoplayer.usevdpaumixer", 13437, true);
+  AddBool(adv, "videoplayer.usevdpaumpeg2", 13441, true);
+  AddBool(adv, "videoplayer.usevdpaumpeg4", 13443, false);
+  AddBool(adv, "videoplayer.usevdpauvc1", 13445, true);
 #endif
 #ifdef HAVE_LIBVA
   AddBool(adv, "videoplayer.usevaapi", 13426, true);
+  AddBool(adv, "videoplayer.usevaapimpeg2", 13447, true);
+  AddBool(adv, "videoplayer.usevaapimpeg4", 13449, true);
+  AddBool(adv, "videoplayer.usevaapivc1", 13451, true);
+  AddBool(adv, "videoplayer.prefervaapirender", 13457, true);
 #endif
 #ifdef HAS_DX
-  AddBool(g_sysinfo.IsVistaOrHigher() ? adv: NULL, "videoplayer.usedxva2", 13427, g_sysinfo.IsVistaOrHigher() ? true : false);
+  AddBool(adv, "videoplayer.usedxva2", 13427, true);
 #endif
-#ifdef HAVE_LIBCRYSTALHD
-  AddBool(CCrystalHD::GetInstance()->DevicePresent() ? adv: NULL, "videoplayer.usechd", 13428, true);
-#endif
-#ifdef HAVE_LIBVDADECODER
-  AddBool(g_sysinfo.HasVDADecoder() ? adv: NULL, "videoplayer.usevda", 13429, true);
+#ifdef TARGET_RASPBERRY_PI
+  AddBool(adv, "videoplayer.useomxplayer", 13458, true);
+  AddBool(adv, "videoplayer.usemmal", 36434, true);
 #endif
 #ifdef HAVE_LIBOPENMAX
   AddBool(adv, "videoplayer.useomx", 13430, true);
@@ -937,9 +973,13 @@ void CGUISettings::Initialize()
 #ifdef HAVE_VIDEOTOOLBOXDECODER
   AddBool(g_sysinfo.HasVideoToolBoxDecoder() ? adv: NULL, "videoplayer.usevideotoolbox", 13432, true);
 #endif
+#ifdef HAVE_LIBVDADECODER
+  AddBool(g_sysinfo.HasVDADecoder() ? adv: NULL, "videoplayer.usevda", 13429, true);
+#endif
 
-#ifdef HAS_GL
-  AddBool(NULL, "videoplayer.usepbo", 13424, true);
+#ifdef TARGET_RASPBERRY_PI
+  AddInt(adv, "videoplayer.limitguiupdate", 38013, 10, 0, 5, 25, SPIN_CONTROL_INT, 38016, 38015);
+  AddBool(adv, "videoplayer.supportmvc", 38027, true);
 #endif
 
 #ifdef TARGET_RASPBERRY_PI
@@ -972,7 +1012,33 @@ void CGUISettings::Initialize()
 
   AddBool(qual, "plexmediaserver.transcodesubtitles", 52502, false);
 
+  map<int, int> limithevc;
+  limithevc.insert(make_pair(52640, 0));
+  limithevc.insert(make_pair(52641, 960));
+  limithevc.insert(make_pair(52642, 1280));
+  limithevc.insert(make_pair(52643, 1920));
+#if !defined(TARGET_RASPBERRY_PI)
+  limithevc.insert(make_pair(52644, 2560));
+  limithevc.insert(make_pair(52645, 3840));
+  limithevc.insert(make_pair(52646, 7680));
+#endif
+#if defined(TARGET_RASPBERRY_PI_1) || defined(TARGET_WETEK_PLAY)
+  int defaultHevc = 0;
+#elif defined(TARGET_RASPBERRY_PI_2)
+  int defaultHevc = 1280;
+#else
+  int defaultHevc = 7680;
+#endif
+#if defined(TARGET_RASPBERRY_PI_1) || defined(TARGET_WETEK_PLAY)
+  AddInt(NULL, "plexmediaserver.limithevc", 52639, defaultHevc, limithevc, SPIN_CONTROL_TEXT);
+#else
+  AddInt(qual, "plexmediaserver.limithevc", 52639, defaultHevc, limithevc, SPIN_CONTROL_TEXT);
+#endif
+
   CSettingsCategory* pms = AddCategory(SETTINGS_SERVICE, "plexmediaserver", 40210);
+#ifndef TARGET_OPENELEC
+  AddBool(pms, "plexmediaserver.localhost", 40215, true);
+#endif
   AddBool(pms, "plexmediaserver.manualaddress", 40211, false);
   AddString(pms, "plexmediaserver.address", 40212, "0.0.0.0", EDIT_CONTROL_IP_INPUT);
   AddString(pms,"plexmediaserver.port", 792, "32400", EDIT_CONTROL_NUMBER_INPUT, false, 792);
@@ -980,7 +1046,7 @@ void CGUISettings::Initialize()
 
   // Plex "Appearance" Settings
   AddGroup(SETTINGS_APPEARANCE, 480);
-  //  CSettingsCategory* laf = AddCategory(SETTINGS_APPEARANCE,"lookandfeel", 166);
+  CSettingsCategory* laf = AddCategory(SETTINGS_APPEARANCE,"lookandfeel", 166);
   AddSeparator(NULL, "lookandfeel.sep2");
   AddBool(NULL, "lookandfeel.enablerssfeeds",13305,  false);
   AddString(NULL, "lookandfeel.rssedit", 21450, "", BUTTON_CONTROL_STANDARD);
@@ -1015,7 +1081,9 @@ void CGUISettings::Initialize()
 #endif
   //AddSeparator(loc, "locale.sep3");
   AddString(NULL, "locale.audiolanguage", 285, "original", SPIN_CONTROL_TEXT);
+  AddBool(NULL, "videoplayer.preferdefaultflag", 37040, true);
   AddString(NULL, "locale.subtitlelanguage", 286, "original", SPIN_CONTROL_TEXT);
+  AddBool(NULL, "subtitles.parsecaptions", 24130, false);
 
   //CSettingsCategory* fl = AddCategory(SETTINGS_APPEARANCE, "filelists", 14081);
   AddBool(NULL, "filelists.showparentdiritems", 13306, false);
@@ -1044,18 +1112,18 @@ void CGUISettings::Initialize()
   AddInt(bgm, "backgroundmusic.bgmusicvolume", 18101, 50, 5, 5, 100, SPIN_CONTROL_INT_PLUS, MASK_PERCENT);
 
   // Appearance/Advanced
-  CSettingsCategory* adva = AddCategory(SETTINGS_APPEARANCE, "advanced", 18105);
-  AddDefaultAddon(adva, "lookandfeel.skin",166,DEFAULT_SKIN, ADDON_SKIN);
-  AddString(adva, "lookandfeel.skinsettings", 21417, "", BUTTON_CONTROL_STANDARD);
-  AddString(adva, "lookandfeel.skintheme",15111,"SKINDEFAULT", SPIN_CONTROL_TEXT);
-  AddString(adva, "lookandfeel.skincolors",14078, "SKINDEFAULT", SPIN_CONTROL_TEXT);
-  AddString(adva, "lookandfeel.font",13303,"Default", SPIN_CONTROL_TEXT);
-  AddInt(adva, "lookandfeel.skinzoom",20109, 0, -20, 2, 20, SPIN_CONTROL_INT, MASK_PERCENT);
+  //CSettingsCategory* adva = AddCategory(SETTINGS_APPEARANCE, "advanced", 18105);
+  AddDefaultAddon(laf, "lookandfeel.skin",166,DEFAULT_SKIN, ADDON_SKIN);
+  AddString(laf, "lookandfeel.skinsettings", 21417, "", BUTTON_CONTROL_STANDARD);
+  AddString(laf, "lookandfeel.skintheme", 15111, "SKINDEFAULT", SPIN_CONTROL_TEXT);
+  AddString(laf, "lookandfeel.skincolors", 14078, "SKINDEFAULT", SPIN_CONTROL_TEXT);
+  AddString(laf, "lookandfeel.font", 13303, "Default", SPIN_CONTROL_TEXT);
+  AddInt(laf, "lookandfeel.skinzoom", 20109, 0, -20, 2, 20, SPIN_CONTROL_INT, MASK_PERCENT);
   AddInt(NULL, "lookandfeel.startupwindow",512,1, WINDOW_HOME, 1, WINDOW_PYTHON_END, SPIN_CONTROL_TEXT);
-  AddString(adva, "lookandfeel.soundskin",15108,"SKINDEFAULT", SPIN_CONTROL_TEXT);
+  AddString(laf, "lookandfeel.soundskin", 15108, "SKINDEFAULT", SPIN_CONTROL_TEXT);
 #ifndef __PLEX__
-  AddBool(adva, "lookandfeel.enableglobalslideshow", 15150, true);
-  AddString(adva, "locale.charset", 14091, "DEFAULT", SPIN_CONTROL_TEXT); // charset is set by the language file
+  AddBool(laf, "lookandfeel.enableglobalslideshow", 15150, true);
+  AddString(laf, "locale.charset", 14091, "DEFAULT", SPIN_CONTROL_TEXT); // charset is set by the language file
 #endif
 
 //  AddCategory(SETTINGS_APPEARANCE, "window", 0);
@@ -1427,11 +1495,9 @@ void CGUISettings::LoadXML(TiXmlElement *pRootElement, bool hideSettings /* = fa
   // FIXME: Check if the hardware supports it (if possible ;)
   //SetBool("audiooutput.ac3passthrough", g_audioConfig.GetAC3Enabled());
   //SetBool("audiooutput.dtspassthrough", g_audioConfig.GetDTSEnabled());
-  CLog::Log(LOGINFO, "Using %s output", GetInt("audiooutput.mode") == AUDIO_ANALOG ? "analog" : "digital");
   CLog::Log(LOGINFO, "AC3 pass through is %s", GetBool("audiooutput.ac3passthrough") ? "enabled" : "disabled");
   CLog::Log(LOGINFO, "EAC3 pass through is %s", GetBool("audiooutput.eac3passthrough") ? "enabled" : "disabled");
   CLog::Log(LOGINFO, "DTS pass through is %s", GetBool("audiooutput.dtspassthrough") ? "enabled" : "disabled");
-  CLog::Log(LOGINFO, "AAC pass through is %s", GetBool("audiooutput.passthroughaac") ? "enabled" : "disabled");
 
 #if defined(TARGET_DARWIN)
   // trap any previous vsync by driver setting, does not exist on OSX
@@ -1577,96 +1643,163 @@ RESOLUTION CGUISettings::GetResolution() const
   return GetResFromString(GetString("videoscreen.screenmode"));
 }
 
+void CGUISettings::SetCurrentResolution(RESOLUTION resolution, bool save /* = false */)
+{
+  if (resolution == RES_WINDOW && !g_Windowing.CanDoWindowed())
+    resolution = RES_DESKTOP;
+
+  CLog::Log(LOGDEBUG, "Setting GUI settings res to: %dx%d", g_settings.m_ResInfo[resolution].iWidth, g_settings.m_ResInfo[resolution].iHeight);
+
+  if (save)
+  {
+    CStdString mode = GetStringFromRes(resolution);
+    SetString("videoscreen.screenmode", mode);
+  }
+  
+  if (resolution != m_LookAndFeelResolution)
+  {
+    m_LookAndFeelResolution = resolution;
+    SetChanged();
+  }
+}
+
 RESOLUTION CGUISettings::GetResFromString(const CStdString &res)
 {
   if (res == "DESKTOP")
     return RES_DESKTOP;
   else if (res == "WINDOW")
     return RES_WINDOW;
-  else if (res.GetLength() == 21)
+  else if (res.GetLength() >= 21)
   {
-    // format: SWWWWWHHHHHRRR.RRRRRP, where S = screen, W = width, H = height, R = refresh, P = interlace
-    int screen = atol(res.Mid(0,1).c_str());
-    int width = atol(res.Mid(1,5).c_str());
-    int height = atol(res.Mid(6,5).c_str());
-    float refresh = (float)atof(res.Mid(11,9).c_str());
+    // format: SWWWWWHHHHHRRR.RRRRRP333, where S = screen, W = width, H = height, R = refresh, P = interlace, 3 = stereo mode
+    int screen = std::strtol(res.Mid(0,1).c_str(), NULL, 10);
+    int width = std::strtol(res.Mid(1,5).c_str(), NULL, 10);
+    int height = std::strtol(res.Mid(6,5).c_str(), NULL, 10);
+    float refresh = (float)std::strtod(res.Mid(11,9).c_str(), NULL);
+    unsigned flags = 0;
+
     // look for 'i' and treat everything else as progressive,
-    // and use 100/200 to get a nice square_error.
-    int interlaced = (res.Right(1) == "i") ? 100:200;
-    // find the closest match to these in our res vector.  If we have the screen, we score the res
-    RESOLUTION bestRes = RES_DESKTOP;
-    float bestScore = FLT_MAX;
-    for (unsigned int i = RES_DESKTOP; i < g_settings.m_ResInfo.size(); ++i)
-    {
-      const RESOLUTION_INFO &info = g_settings.m_ResInfo[i];
-      if (info.iScreen != screen)
-        continue;
-      float score = 10 * (square_error((float)info.iScreenWidth, (float)width) +
-        square_error((float)info.iScreenHeight, (float)height) +
-        square_error(info.fRefreshRate, refresh) +
-        square_error((float)((info.dwFlags & D3DPRESENTFLAG_INTERLACED) ? 100:200), (float)interlaced));
-      if (score < bestScore)
-      {
-        bestScore = score;
-        bestRes = (RESOLUTION)i;
-      }
-    }
-    return bestRes;
+    if(res.Mid(20,1) == "i")
+      flags |= D3DPRESENTFLAG_INTERLACED;
+
+    if(res.Mid(21,3) == "sbs")
+      flags |= D3DPRESENTFLAG_MODE3DSBS;
+    else if(res.Mid(21,3) == "tab")
+      flags |= D3DPRESENTFLAG_MODE3DTB;
+
+    std::map<RESOLUTION, RESOLUTION_INFO> resolutionInfos;
+    for (size_t resolution = RES_DESKTOP; resolution < g_settings.m_ResInfo.size(); resolution++)
+      resolutionInfos.insert(std::make_pair((RESOLUTION)resolution, g_settings.m_ResInfo[resolution]));
+
+    return FindBestMatchingResolution(resolutionInfos, screen, width, height, refresh, flags);
   }
+
   return RES_DESKTOP;
+}
+
+RESOLUTION CGUISettings::FindBestMatchingResolution(const std::map<RESOLUTION, RESOLUTION_INFO> &resolutionInfos, int screen, int width, int height, float refreshrate, unsigned flags)
+{
+  // find the closest match to these in our res vector.  If we have the screen, we score the res
+  RESOLUTION bestRes = RES_DESKTOP;
+  float bestScore = FLT_MAX;
+  flags &= D3DPRESENTFLAG_MODEMASK;
+
+  for (std::map<RESOLUTION, RESOLUTION_INFO>::const_iterator it = resolutionInfos.begin(); it != resolutionInfos.end(); ++it)
+  {
+    const RESOLUTION_INFO &info = it->second;
+
+    if (info.iScreen != screen
+      || (info.dwFlags & D3DPRESENTFLAG_MODEMASK) != flags)
+      continue;
+
+    float score = 10 * (square_error((float)info.iScreenWidth, (float)width) +
+      square_error((float)info.iScreenHeight, (float)height) +
+      square_error(info.fRefreshRate, refreshrate));
+    if (score < bestScore)
+    {
+      bestScore = score;
+      bestRes = it->first;
+    }
+  }
+
+  return bestRes;
+}
+
+RESOLUTION CGUISettings::GetResolutionForScreen()
+{
+  DisplayMode mode = GetInt("videoscreen.screen");
+  if (mode == DM_WINDOWED)
+    return RES_WINDOW;
+
+  for (int idx=0; idx < g_Windowing.GetNumScreens(); idx++)
+  {
+    if (g_settings.m_ResInfo[RES_DESKTOP + idx].iScreen == mode)
+      return (RESOLUTION)(RES_DESKTOP + idx);
+  }
+
+  return RES_DESKTOP;
+}
+
+std::string CGUISettings::ModeFlagsToString(unsigned int flags, bool identifier)
+{
+  std::string res;
+  if (flags & D3DPRESENTFLAG_INTERLACED)
+    res += "i";
+  else
+    res += "p";
+
+  if (!identifier)
+    res += " ";
+
+  if (flags & D3DPRESENTFLAG_MODE3DSBS)
+    res += "sbs";
+  else if (flags & D3DPRESENTFLAG_MODE3DTB)
+    res += "tab";
+  else if (identifier)
+    res += "std";
+  return res;
+}
+
+CStdString CGUISettings::GetStringFromRes(RESOLUTION resolution, float refreshrate /* = 0.0f */)
+{
+  if (resolution == RES_WINDOW)
+    return "WINDOW";
+
+  if (resolution >= RES_DESKTOP && resolution < (RESOLUTION)g_settings.m_ResInfo.size())
+  {
+    const RESOLUTION_INFO &info = g_settings.m_ResInfo[resolution];
+    // also handle RES_DESKTOP resolutions with non-default refresh rates
+    if (resolution != RES_DESKTOP || (refreshrate > 0.0f && refreshrate != info.fRefreshRate))
+    {
+      return StringUtils::Format("%1i%05i%05i%09.5f%s", info.iScreen,
+        info.iScreenWidth, info.iScreenHeight,
+        refreshrate > 0.0f ? refreshrate : info.fRefreshRate, ModeFlagsToString(info.dwFlags, true).c_str());
+    }
+  }
+
+  return "DESKTOP";
 }
 
 void CGUISettings::SetResolution(RESOLUTION res)
 {
-  CStdString mode;
-  if (res == RES_DESKTOP)
-    mode = "DESKTOP";
-  else if (res == RES_WINDOW)
-    mode = "WINDOW";
-  else if (res >= RES_CUSTOM && res < (RESOLUTION)g_settings.m_ResInfo.size())
-  {
-    const RESOLUTION_INFO &info = g_settings.m_ResInfo[res];
-    mode.Format("%1i%05i%05i%09.5f%s", info.iScreen,
-      info.iScreenWidth, info.iScreenHeight, info.fRefreshRate,
-      (info.dwFlags & D3DPRESENTFLAG_INTERLACED) ? "i":"p");
-  }
-  else
-  {
-    CLog::Log(LOGWARNING, "%s, setting invalid resolution %i", __FUNCTION__, res);
-    mode = "DESKTOP";
-  }
-  SetString("videoscreen.screenmode", mode);
-  m_LookAndFeelResolution = res;
-  CLog::Log(LOGDEBUG, "Setting GUI settings res to: %dx%d", g_settings.m_ResInfo[res].iWidth, g_settings.m_ResInfo[res].iHeight);
-
-  SetChanged();
+  SetCurrentResolution(res, true);
 }
 
 bool CGUISettings::SetLanguage(const CStdString &strLanguage)
 {
   CStdString strPreviousLanguage = GetString("locale.language");
-  CStdString strNewLanguage = strLanguage;
-  if (strNewLanguage != strPreviousLanguage)
+  if (strLanguage != strPreviousLanguage)
   {
     CStdString strLangInfoPath;
-    strLangInfoPath.Format("special://xbmc/language/%s/langinfo.xml", strNewLanguage.c_str());
+    strLangInfoPath.Format("special://xbmc/language/%s/langinfo.xml", strLanguage.c_str());
     if (!g_langInfo.Load(strLangInfoPath))
       return false;
 
-    if (g_langInfo.ForceUnicodeFont() && !g_fontManager.IsFontSetUnicode())
-    {
-      CLog::Log(LOGINFO, "Language needs a ttf font, loading first ttf font available");
-      CStdString strFontSet;
-      if (g_fontManager.GetFirstFontSetUnicode(strFontSet))
-        strNewLanguage = strFontSet;
-      else
-        CLog::Log(LOGERROR, "No ttf font found but needed: %s", strFontSet.c_str());
-    }
-    SetString("locale.language", strNewLanguage);
+    SetString("locale.language", strLanguage);
 
     g_charsetConverter.reset();
 
-    if (!g_localizeStrings.Load("special://xbmc/language/", strNewLanguage))
+    if (!g_localizeStrings.Load("special://xbmc/language/", strLanguage))
       return false;
 
     // also tell our weather and skin to reload as these are localized

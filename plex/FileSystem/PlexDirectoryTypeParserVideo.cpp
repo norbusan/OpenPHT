@@ -189,7 +189,7 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
   {
     item.GetVideoInfoTag()->m_iDbId = item.GetProperty("playQueueItemID").asInteger();
   }
-  else if (item.HasProperty("ratingKey"))
+  else if (item.HasProperty("ratingKey") && item.GetProperty("ratingKey").asInteger(-1) >= 0)
   {
     item.GetVideoInfoTag()->m_iDbId = item.GetProperty("ratingKey").asInteger();
   }
@@ -281,6 +281,13 @@ void CPlexDirectoryTypeParserVideo::ParseMediaParts(CFileItem &mediaItem, XML_EL
   {
     CFileItemPtr mediaPart = CPlexDirectory::NewPlexElement(part, mediaItem, mediaItem.GetPath());
     mediaPart->SetProperty("partIndex", partIndex ++);
+
+    if (mediaPart->HasProperty("indexes") && boost::starts_with(mediaPart->GetProperty("indexes").asString(), "sd"))
+    {
+      CURL url(mediaItem.GetPath());
+      url.SetFileName("library/parts/" + mediaPart->GetProperty("id").asString() + "/indexes/sd/");
+      mediaPart->SetProperty("indexesUrl", url.Get());
+    }
 
     ParseMediaStreams(*mediaPart, part);
     

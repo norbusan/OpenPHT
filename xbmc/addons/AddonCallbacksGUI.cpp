@@ -1246,13 +1246,11 @@ CGUIAddonWindow::~CGUIAddonWindow(void)
 
 bool CGUIAddonWindow::OnAction(const CAction &action)
 {
-  // do the base class window first, and the call to python after this
-  bool ret = CGUIWindow::OnAction(action);  // we don't currently want the mediawindow actions here
-  if (CBOnAction)
-  {
-    CBOnAction(m_clientHandle, action.GetID());
-  }
-  return ret;
+  // Let addon decide whether it wants to hande action first
+  if (CBOnAction && CBOnAction(m_clientHandle, action.GetID()))
+    return true;
+
+  return CGUIWindow::OnAction(action);
 }
 
 bool CGUIAddonWindow::OnMessage(CGUIMessage& message)
@@ -1326,7 +1324,8 @@ bool CGUIAddonWindow::OnMessage(CGUIMessage& message)
                                                  message.GetParam1() == ACTION_MOUSE_LEFT_CLICK)) ||
                                                  !controlClicked->IsContainer())
           {
-            CBOnClick(m_clientHandle, iControl);
+            if (CBOnClick(m_clientHandle, iControl))
+              return true;
           }
           else if (controlClicked->IsContainer() && message.GetParam1() == ACTION_MOUSE_RIGHT_CLICK)
           {
@@ -1338,7 +1337,6 @@ bool CGUIAddonWindow::OnMessage(CGUIMessage& message)
 //            PyXBMC_AddPendingCall(Py_XBMC_Event_OnAction, inf);
 //            PulseActionEvent();
           }
-          return true;
         }
       }
     }

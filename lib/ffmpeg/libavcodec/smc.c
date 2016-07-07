@@ -1,6 +1,6 @@
 /*
  * Quicktime Graphics (SMC) Video Decoder
- * Copyright (C) 2003 the ffmpeg project
+ * Copyright (c) 2003 The FFmpeg Project
  *
  * This file is part of FFmpeg.
  *
@@ -35,6 +35,7 @@
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
 #include "bytestream.h"
+#include "internal.h"
 
 #define CPAIR 2
 #define CQUAD 4
@@ -45,7 +46,7 @@
 typedef struct SmcContext {
 
     AVCodecContext *avctx;
-    AVFrame frame;
+    AVFrame *frame;
 
     GetByteContext gb;
 
@@ -80,10 +81,10 @@ static void smc_decode_stream(SmcContext *s)
 {
     int width = s->avctx->width;
     int height = s->avctx->height;
-    int stride = s->frame.linesize[0];
+    int stride = s->frame->linesize[0];
     int i;
     int chunk_size;
-    int buf_size = (int) (s->gb.buffer_end - s->gb.buffer_start);
+    int buf_size = bytestream2_size(&s->gb);
     unsigned char opcode;
     int n_blocks;
     unsigned int color_flags;
@@ -91,9 +92,9 @@ static void smc_decode_stream(SmcContext *s)
     unsigned int color_flags_b;
     unsigned int flag_mask;
 
-    unsigned char *pixels = s->frame.data[0];
+    unsigned char *pixels = s->frame->data[0];
 
-    int image_size = height * s->frame.linesize[0];
+    int image_size = height * s->frame->linesize[0];
     int row_ptr = 0;
     int pixel_ptr = 0;
     int pixel_x, pixel_y;
@@ -111,7 +112,7 @@ static void smc_decode_stream(SmcContext *s)
     int color_octet_index = 0;
 
     /* make the palette available */
-    memcpy(s->frame.data[1], s->pal, AVPALETTE_SIZE);
+    memcpy(s->frame->data[1], s->pal, AVPALETTE_SIZE);
 
     bytestream2_skip(&s->gb, 1);
     chunk_size = bytestream2_get_be24(&s->gb);
@@ -401,7 +402,7 @@ static void smc_decode_stream(SmcContext *s)
             break;
 
         case 0xF0:
-            av_log_missing_feature(s->avctx, "0xF0 opcode", 1);
+            avpriv_request_sample(s->avctx, "0xF0 opcode");
             break;
         }
     }
@@ -414,42 +415,40 @@ static av_cold int smc_decode_init(AVCodecContext *avctx)
     SmcContext *s = avctx->priv_data;
 
     s->avctx = avctx;
-    avctx->pix_fmt = PIX_FMT_PAL8;
+    avctx->pix_fmt = AV_PIX_FMT_PAL8;
 
-    avcodec_get_frame_defaults(&s->frame);
-    s->frame.data[0] = NULL;
+    s->frame = av_frame_alloc();
+    if (!s->frame)
+        return AVERROR(ENOMEM);
 
     return 0;
 }
 
 static int smc_decode_frame(AVCodecContext *avctx,
-                             void *data, int *data_size,
+                             void *data, int *got_frame,
                              AVPacket *avpkt)
 {
     const uint8_t *buf = avpkt->data;
     int buf_size = avpkt->size;
     SmcContext *s = avctx->priv_data;
     const uint8_t *pal = av_packet_get_side_data(avpkt, AV_PKT_DATA_PALETTE, NULL);
+    int ret;
 
     bytestream2_init(&s->gb, buf, buf_size);
 
-    s->frame.reference = 3;
-    s->frame.buffer_hints = FF_BUFFER_HINTS_VALID | FF_BUFFER_HINTS_PRESERVE |
-                            FF_BUFFER_HINTS_REUSABLE | FF_BUFFER_HINTS_READABLE;
-    if (avctx->reget_buffer(avctx, &s->frame)) {
-        av_log(s->avctx, AV_LOG_ERROR, "reget_buffer() failed\n");
-        return -1;
-    }
+    if ((ret = ff_reget_buffer(avctx, s->frame)) < 0)
+        return ret;
 
     if (pal) {
-        s->frame.palette_has_changed = 1;
+        s->frame->palette_has_changed = 1;
         memcpy(s->pal, pal, AVPALETTE_SIZE);
     }
 
     smc_decode_stream(s);
 
-    *data_size = sizeof(AVFrame);
-    *(AVFrame*)data = s->frame;
+    *got_frame      = 1;
+    if ((ret = av_frame_ref(data, s->frame)) < 0)
+        return ret;
 
     /* always report that the buffer was completely consumed */
     return buf_size;
@@ -459,20 +458,19 @@ static av_cold int smc_decode_end(AVCodecContext *avctx)
 {
     SmcContext *s = avctx->priv_data;
 
-    if (s->frame.data[0])
-        avctx->release_buffer(avctx, &s->frame);
+    av_frame_free(&s->frame);
 
     return 0;
 }
 
 AVCodec ff_smc_decoder = {
     .name           = "smc",
+    .long_name      = NULL_IF_CONFIG_SMALL("QuickTime Graphics (SMC)"),
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_SMC,
+    .id             = AV_CODEC_ID_SMC,
     .priv_data_size = sizeof(SmcContext),
     .init           = smc_decode_init,
     .close          = smc_decode_end,
     .decode         = smc_decode_frame,
-    .capabilities   = CODEC_CAP_DR1,
-    .long_name = NULL_IF_CONFIG_SMALL("QuickTime Graphics (SMC)"),
+    .capabilities   = AV_CODEC_CAP_DR1,
 };

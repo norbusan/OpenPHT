@@ -50,8 +50,9 @@ public:
 
   // Accessors
   LPDIRECT3DTEXTURE9 Get() const { return m_texture; };
-  UINT GetWidth()  { return m_width; }
-  UINT GetHeight() { return m_height; }
+  UINT GetWidth()  const { return m_width; }
+  UINT GetHeight() const { return m_height; }
+  D3DFORMAT GetFormat() const { return m_format; }
 
   virtual void OnDestroyDevice();
   virtual void OnCreateDevice();

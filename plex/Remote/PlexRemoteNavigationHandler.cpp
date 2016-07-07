@@ -28,13 +28,15 @@ CPlexRemoteResponse CPlexRemoteNavigationHandler::handle(const CStdString &url, 
     action = ACTION_SELECT_ITEM;
   else if (navigation.Equals("music"))
   {
-    if (g_application.IsPlayingAudio() && activeWindow != WINDOW_VISUALISATION)
+    if (g_application.m_pPlayer->IsPlayingAudio() && activeWindow != WINDOW_VISUALISATION)
       action = ACTION_SHOW_GUI;
   }
   else if (navigation.Equals("home"))
   {
     std::vector<CStdString> args;
+    g_application.ResetSystemIdleTimer();
     g_application.ResetScreenSaver();
+    g_application.ResetScreenSaverTimer();
     g_application.WakeUpScreenSaverAndDPMS();
     CApplicationMessenger::Get().ActivateWindow(WINDOW_HOME, args, false);
     return CPlexRemoteResponse();
@@ -72,9 +74,10 @@ CPlexRemoteResponse CPlexRemoteNavigationHandler::handle(const CStdString &url, 
 
     g_application.ResetSystemIdleTimer();
     g_application.ResetScreenSaver();
+    g_application.ResetScreenSaverTimer();
     g_application.WakeUpScreenSaverAndDPMS();
 
-    if (!g_application.IsPlaying())
+    if (!g_application.m_pPlayer->IsPlaying())
       g_audioManager.PlayActionSound(actionId);
 
     CApplicationMessenger::Get().SendAction(actionId, WINDOW_INVALID, false);

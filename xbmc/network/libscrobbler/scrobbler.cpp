@@ -119,7 +119,7 @@ void CScrobbler::UpdateStatus()
   // Called from CApp::ProcessSlow() every ~500ms.
   if (!CanScrobble())
     return;
-  if (g_application.IsPaused() || (g_application.GetPlaySpeed() != 1))
+  if (g_application.m_pPlayer->IsPaused() || (g_application.m_pPlayer->GetPlaySpeed() != 1))
     return;
 
   m_submissionTimer++;
@@ -222,7 +222,7 @@ CStdString CScrobbler::GetSubmitState()
     return strState;
   if (m_bSubmitting)
     strState = g_localizeStrings.Get(15211);
-  else if (!g_application.IsPlayingAudio() || m_bBadAuth || m_bBanned)
+  else if (!g_application.m_pPlayer->IsPlayingAudio() || m_bBadAuth || m_bBanned)
     strState.Format(strFormat, 0);
   else if (m_strSessionID.IsEmpty())
     strState.Format(strFormat, m_failedHandshakeDelay);
@@ -341,7 +341,7 @@ bool CScrobbler::LoadJournal()
     m_vecSubmissionQueue.push_back(entry);
   }
 
-  CLog::Log(LOGDEBUG, "%s: Journal loaded with %"PRIuS" entries.", m_strLogPrefix.c_str(),
+  CLog::Log(LOGDEBUG, "%s: Journal loaded with %" PRIuS" entries.", m_strLogPrefix.c_str(),
       m_vecSubmissionQueue.size());
   return !m_vecSubmissionQueue.empty();
 }

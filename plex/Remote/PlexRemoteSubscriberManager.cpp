@@ -174,7 +174,7 @@ CPlexRemoteSubscriberPtr CPlexRemoteSubscriberManager::addSubscriber(CPlexRemote
     CLog::Log(LOGDEBUG, "CPlexRemoteSubscriberManager::addSubscriber added %s:%d [%s]",
               subscriber->getURL().GetHostName().c_str(), subscriber->getURL().GetPort(), subscriber->getUUID().c_str());
 
-    if (!g_application.IsPlayingVideo())
+    if (!g_application.m_pPlayer->IsPlayingVideo())
       CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(52500),
                                             subscriber->getName().empty() ? CStdString(subscriber->getURL().GetHostName()) : CStdString(subscriber->getName()),
                                             TOAST_DISPLAY_TIME, false);
@@ -214,7 +214,7 @@ void CPlexRemoteSubscriberManager::removeSubscriber(CPlexRemoteSubscriberPtr sub
   if (m_map.size() == 0)
     g_plexApplication.timer->RemoveTimeout(this);
 
-  if (!g_application.IsPlayingVideo())
+  if (!g_application.m_pPlayer->IsPlayingVideo())
     CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(52501),
                                           subscriber->getName().empty() ? CStdString(subscriber->getURL().GetHostName()) : CStdString(subscriber->getName()),
                                           TOAST_DISPLAY_TIME, false);

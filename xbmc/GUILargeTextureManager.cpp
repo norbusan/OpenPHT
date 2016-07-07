@@ -29,13 +29,14 @@
 #include "utils/log.h"
 #include "TextureCache.h"
 
-using namespace std;
+#include <cassert>
 
-
-CImageLoader::CImageLoader(const CStdString &path)
+CImageLoader::CImageLoader(const CStdString &path, const bool useCache):
+  m_path(path)
 {
-  m_path = path;
   m_texture = NULL;
+  m_use_cache = useCache;
+  m_retries = 0;
 }
 
 CImageLoader::~CImageLoader()
@@ -46,43 +47,61 @@ CImageLoader::~CImageLoader()
 bool CImageLoader::DoWork()
 {
   bool needsChecking = false;
+  CStdString loadPath;
 
   CStdString texturePath = g_TextureManager.GetTexturePath(m_path);
-  CStdString loadPath = CTextureCache::Get().CheckCachedImage(texturePath, true, needsChecking); 
+  if (m_use_cache)
+    loadPath = CTextureCache::Get().CheckCachedImage(texturePath, true, needsChecking);
+  else
+    loadPath = texturePath;
 
-  if (loadPath.IsEmpty())
+  if (m_use_cache && loadPath.IsEmpty())
   {
     // not in our texture cache, so try and load directly and then cache the result
     loadPath = CTextureCache::Get().CacheImage(texturePath, &m_texture);
     if (m_texture)
       return true; // we're done
   }
+
   if (!loadPath.IsEmpty())
   {
     // direct route - load the image
     unsigned int start = XbmcThreads::SystemClockMillis();
-    m_texture = CBaseTexture::LoadFromFile(loadPath, g_graphicsContext.GetWidth(), g_graphicsContext.GetHeight(), g_guiSettings.GetBool("pictures.useexifrotation"));
-    if (!m_texture)
-    {
-      /* PLEX */
-      CLog::Log(LOGDEBUG, "CGUILargeTextureManager::DoWork could not load image %s from cache, killing the cached version", loadPath.c_str());
-      CTextureCache::Get().ClearCachedImage(texturePath, true);
-      return DoWork();
-      /* END PLEX */
-      return false;
-    }
+    m_texture = CBaseTexture::LoadFromFile(loadPath, g_graphicsContext.GetWidth(), g_graphicsContext.GetHeight());
+
     if (XbmcThreads::SystemClockMillis() - start > 100)
       CLog::Log(LOGDEBUG, "%s - took %u ms to load %s", __FUNCTION__, XbmcThreads::SystemClockMillis() - start, loadPath.c_str());
 
-    if (needsChecking)
-      CTextureCache::Get().BackgroundCacheImage(texturePath);
+    if (m_texture)
+    {
+      if (needsChecking)
+        CTextureCache::Get().BackgroundCacheImage(texturePath);
+
+      return true;
+    }
+
+    // Fallthrough on failure:
+    CLog::Log(LOGERROR, "%s - Direct texture file loading failed for %s", __FUNCTION__, loadPath.c_str());
   }
-  return true;
+
+  if (!m_use_cache)
+    return false; // We're done
+
+  if (m_retries++ < 3)
+  {
+    CLog::Log(LOGERROR, "CGUILargeTextureManager::DoWork could not load image %s from cache, killing the cached version", loadPath.c_str());
+    if (!loadPath.IsEmpty())
+      CTextureCache::Get().ClearCachedImage(texturePath, false);
+    return DoWork();
+  }
+
+  CLog::Log(LOGERROR, "CGUILargeTextureManager::DoWork could not load image %s", texturePath.c_str());
+  return false; // We're done
 }
 
-CGUILargeTextureManager::CLargeTexture::CLargeTexture(const CStdString &path)
+CGUILargeTextureManager::CLargeTexture::CLargeTexture(const CStdString &path):
+  m_path(path)
 {
-  m_path = path;
   m_refCount = 1;
   m_timeToDelete = 0;
 }
@@ -100,14 +119,8 @@ void CGUILargeTextureManager::CLargeTexture::AddRef()
 
 bool CGUILargeTextureManager::CLargeTexture::DecrRef(bool deleteImmediately)
 {
-#ifndef __PLEX__
   assert(m_refCount);
   m_refCount--;
-#else
-  if (m_refCount > 0)
-    m_refCount --;
-#endif
-
   if (m_refCount == 0)
   {
     if (deleteImmediately)
@@ -161,7 +174,7 @@ void CGUILargeTextureManager::CleanupUnusedImages(bool immediately)
 
 // if available, increment reference count, and return the image.
 // else, add to the queue list if appropriate.
-bool CGUILargeTextureManager::GetImage(const CStdString &path, CTextureArray &texture, bool firstRequest)
+bool CGUILargeTextureManager::GetImage(const CStdString &path, CTextureArray &texture, bool firstRequest, const bool useCache)
 {
   CSingleLock lock(m_listSection);
   for (listIterator it = m_allocated.begin(); it != m_allocated.end(); ++it)
@@ -177,90 +190,40 @@ bool CGUILargeTextureManager::GetImage(const CStdString &path, CTextureArray &te
   }
 
   if (firstRequest)
-  {
-    /* PLEX */
-    lock.unlock();
-    /* END PLEX */
-    QueueImage(path);
-  }
+    QueueImage(path, useCache);
 
   return true;
 }
 
 void CGUILargeTextureManager::ReleaseImage(const CStdString &path, bool immediately)
 {
-  /* PLEX */
-  /* We need to queue up the textures to delete so we don't delete them while we hold
-   * the listSection lock. This is because the destructor of CLargeTexture will take
-   * the graphiccontext's lock and it will easily deadlock */
-  std::vector<CLargeTexture*> texturesToDelete;
-  bool found = false;
-  /* END PLEX */
-
   CSingleLock lock(m_listSection);
   for (listIterator it = m_allocated.begin(); it != m_allocated.end(); ++it)
   {
     CLargeTexture *image = *it;
     if (image->GetPath() == path)
     {
-#ifndef __PLEX__
       if (image->DecrRef(immediately) && immediately)
-      {
         m_allocated.erase(it);
-      }
       return;
-#else
-      if (image->DecrRef(false) && immediately)
-      {
-        m_allocated.erase(it);
-        texturesToDelete.push_back(image);
-      }
-      found = true;
-      break;
-#endif
     }
   }
-
-  /* PLEX */
-  if (!found)
+  for (queueIterator it = m_queued.begin(); it != m_queued.end(); ++it)
   {
-  /* END PLEX */
-    for (queueIterator it = m_queued.begin(); it != m_queued.end(); ++it)
+    unsigned int id = it->first;
+    CLargeTexture *image = it->second;
+    if (image->GetPath() == path && image->DecrRef(true))
     {
-      unsigned int id = it->first;
-      CLargeTexture *image = it->second;
-#ifndef __PLEX__
-      if (image->GetPath() == path && image->DecrRef(true))
-      {
-        // cancel this job
-        CJobManager::GetInstance().CancelJob(id);
-        m_queued.erase(it);
-        return;
-      }
-#else
-      if (image->GetPath() == path)
-      {
-        if (image->DecrRef(false))
-        {
-          CJobManager::GetInstance().CancelJob(id);
-          m_queued.erase(it);
-          texturesToDelete.push_back(image);
-          break;
-        }
-      }
-#endif
+      // cancel this job
+      CJobManager::GetInstance().CancelJob(id);
+      m_queued.erase(it);
+      return;
     }
   }
-
-  lock.unlock();
-  /* PLEX */
-  for(listIterator it = texturesToDelete.begin(); it != texturesToDelete.end(); ++it)
-    delete *it;
-  /* END PLEX */
 }
 
 // queue the image, and start the background loader if necessary
-void CGUILargeTextureManager::QueueImage(const CStdString &path)
+void CGUILargeTextureManager::QueueImage(const CStdString &path, bool useCache)
 {
   CSingleLock lock(m_listSection);
   for (queueIterator it = m_queued.begin(); it != m_queued.end(); ++it)
@@ -275,8 +238,8 @@ void CGUILargeTextureManager::QueueImage(const CStdString &path)
 
   // queue the item
   CLargeTexture *image = new CLargeTexture(path);
-  unsigned int jobID = CJobManager::GetInstance().AddJob(new CImageLoader(path), this, CJob::PRIORITY_NORMAL);
-  m_queued.push_back(make_pair(jobID, image));
+  unsigned int jobID = CJobManager::GetInstance().AddJob(new CImageLoader(path, useCache), this, CJob::PRIORITY_NORMAL);
+  m_queued.push_back(std::make_pair(jobID, image));
 }
 
 void CGUILargeTextureManager::OnJobComplete(unsigned int jobID, bool success, CJob *job)
@@ -297,6 +260,3 @@ void CGUILargeTextureManager::OnJobComplete(unsigned int jobID, bool success, CJ
     }
   }
 }
-
-
-

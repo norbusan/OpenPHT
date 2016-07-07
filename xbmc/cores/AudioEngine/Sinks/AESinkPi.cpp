@@ -24,12 +24,12 @@
 
 #include <stdint.h>
 #include <limits.h>
+#include <cassert>
 
 #include "AESinkPi.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "utils/log.h"
 #include "settings/GUISettings.h"
-#include "settings/Settings.h"
 #include "linux/RBP.h"
 
 #define CLASSNAME "CAESinkPi"
@@ -191,11 +191,11 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
   m_initDevice = device;
   m_initFormat = format;
 
-  if (m_passthrough || g_guiSettings.GetString("audiooutput.audiodevice") == "Pi:HDMI")
+  if (m_passthrough || g_guiSettings.GetString("audiooutput.audiodevice") == "PI:HDMI")
     m_output = AESINKPI_HDMI;
-  else if (g_guiSettings.GetString("audiooutput.audiodevice") == "Pi:Analogue")
+  else if (g_guiSettings.GetString("audiooutput.audiodevice") == "PI:Analogue")
     m_output = AESINKPI_ANALOGUE;
-  else if (g_guiSettings.GetString("audiooutput.audiodevice") == "Pi:Both")
+  else if (g_guiSettings.GetString("audiooutput.audiodevice") == "PI:Both")
     m_output = AESINKPI_BOTH;
   else assert(0);
 
@@ -204,9 +204,9 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
     format.m_channelLayout = AE_CH_LAYOUT_2_0;
 
   // setup for a 50ms sink feed from SoftAE
-  if (format.m_dataFormat != AE_FMT_FLOAT &&
-      format.m_dataFormat != AE_FMT_S32NE && format.m_dataFormat != AE_FMT_S32LE &&
-      format.m_dataFormat != AE_FMT_S16NE && format.m_dataFormat != AE_FMT_S16LE)
+  if (format.m_dataFormat != AE_FMT_FLOATP && format.m_dataFormat != AE_FMT_FLOAT &&
+      format.m_dataFormat != AE_FMT_S32NE && format.m_dataFormat != AE_FMT_S32NEP && format.m_dataFormat != AE_FMT_S32LE &&
+      format.m_dataFormat != AE_FMT_S16NE && format.m_dataFormat != AE_FMT_S16NEP && format.m_dataFormat != AE_FMT_S16LE)
     format.m_dataFormat = AE_FMT_S16LE;
   unsigned int channels    = format.m_channelLayout.Count();
   unsigned int sample_size = CAEUtil::DataFormatToBits(format.m_dataFormat) >> 3;
@@ -249,8 +249,10 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
   m_pcm_input.nBitPerSample         = sample_size * 8;
   // 0x8000 = float, 0x10000 = planar
   uint32_t flags = 0;
-  if (m_format.m_dataFormat == AE_FMT_FLOAT)
+  if (m_format.m_dataFormat == AE_FMT_FLOAT || m_format.m_dataFormat == AE_FMT_FLOATP)
    flags |= 0x8000;
+  if (AE_IS_PLANAR(m_format.m_dataFormat))
+   flags |= 0x10000;
   m_pcm_input.ePCMMode              = flags == 0 ? OMX_AUDIO_PCMModeLinear : (OMX_AUDIO_PCMMODETYPE)flags;
   m_pcm_input.nChannels             = channels;
   m_pcm_input.nSamplingRate         = m_format.m_sampleRate;
@@ -387,7 +389,7 @@ void CAESinkPi::Deinitialize()
   m_Initialized = false;
 }
 
-bool CAESinkPi::IsCompatible(const AEAudioFormat format, const std::string device)
+bool CAESinkPi::IsCompatible(const AEAudioFormat &format, const std::string &device)
 {
   bool compatible =
       /* compare against the requested format and the real format */
@@ -399,13 +401,16 @@ bool CAESinkPi::IsCompatible(const AEAudioFormat format, const std::string devic
   return compatible;
 }
 
-double CAESinkPi::GetDelay()
+void CAESinkPi::GetDelay(AEDelayStatus& status)
 {
   OMX_PARAM_U32TYPE param;
   OMX_INIT_STRUCTURE(param);
 
   if (!m_Initialized)
-    return 0.0;
+  {
+    status.SetDelay(0);
+    return;
+  }
 
   param.nPortIndex = m_omx_render.GetInputPort();
 
@@ -417,12 +422,7 @@ double CAESinkPi::GetDelay()
       CLASSNAME, __func__, omx_err);
   }
   double sinkbuffer_seconds_to_empty = m_sinkbuffer_sec_per_byte * param.nU32 * m_format.m_frameSize;
-  return sinkbuffer_seconds_to_empty;
-}
-
-double CAESinkPi::GetCacheTime()
-{
-  return GetDelay();
+  status.SetDelay(sinkbuffer_seconds_to_empty);
 }
 
 double CAESinkPi::GetCacheTotal()
@@ -430,7 +430,7 @@ double CAESinkPi::GetCacheTotal()
   return AUDIO_PLAYBUFFER;
 }
 
-unsigned int CAESinkPi::AddPackets(uint8_t *data, unsigned int frames, bool hasAudio)
+unsigned int CAESinkPi::AddPackets(uint8_t **data, unsigned int frames, unsigned int offset)
 {
   if (!m_Initialized || !m_omx_output || !frames)
     return frames;
@@ -438,7 +438,15 @@ unsigned int CAESinkPi::AddPackets(uint8_t *data, unsigned int frames, bool hasA
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
   OMX_BUFFERHEADERTYPE *omx_buffer = NULL;
 
-  double delay = GetDelay();
+  unsigned int channels    = m_format.m_channelLayout.Count();
+  unsigned int sample_size = CAEUtil::DataFormatToBits(m_format.m_dataFormat) >> 3;
+  const int planes = AE_IS_PLANAR(m_format.m_dataFormat) ? channels : 1;
+  const int chans  = AE_IS_PLANAR(m_format.m_dataFormat) ? 1 : channels;
+  const int pitch  = chans * sample_size;
+
+  AEDelayStatus status;
+  GetDelay(status);
+  double delay = status.GetDelay();
   if (delay <= 0.0 && m_submitted)
     CLog::Log(LOGNOTICE, "%s:%s Underrun (delay:%.2f frames:%d)", CLASSNAME, __func__, delay, frames);
 
@@ -457,7 +465,9 @@ unsigned int CAESinkPi::AddPackets(uint8_t *data, unsigned int frames, bool hasA
 
   if (omx_buffer->nFilledLen)
   {
-    memcpy((uint8_t *)omx_buffer->pBuffer, data, omx_buffer->nFilledLen);
+    int planesize = omx_buffer->nFilledLen / planes;
+    for (int i=0; i < planes; i++)
+      memcpy((uint8_t *)omx_buffer->pBuffer + i * planesize, data[i] + offset * pitch, planesize);
   }
   omx_err = m_omx_output->EmptyThisBuffer(omx_buffer);
   if (omx_err != OMX_ErrorNone)
@@ -466,7 +476,8 @@ unsigned int CAESinkPi::AddPackets(uint8_t *data, unsigned int frames, bool hasA
     m_omx_output->DecoderEmptyBufferDone(m_omx_output->GetComponent(), omx_buffer);
   }
   m_submitted++;
-  delay = GetDelay();
+  GetDelay(status);
+  delay = status.GetDelay();
   if (delay > AUDIO_PLAYBUFFER)
     Sleep((int)(1000.0f * (delay - AUDIO_PLAYBUFFER)));
   return frames;
@@ -474,10 +485,12 @@ unsigned int CAESinkPi::AddPackets(uint8_t *data, unsigned int frames, bool hasA
 
 void CAESinkPi::Drain()
 {
-  int delay = (int)(GetDelay() * 1000.0);
+  AEDelayStatus status;
+  GetDelay(status);
+  int delay = (int)(status.GetDelay() * 1000.0);
   if (delay)
     Sleep(delay);
-  CLog::Log(LOGDEBUG, "%s:%s delay:%dms now:%dms", CLASSNAME, __func__, delay, (int)(GetDelay() * 1000.0));
+  CLog::Log(LOGDEBUG, "%s:%s delay:%dms now:%dms", CLASSNAME, __func__, delay, (int)(status.GetDelay() * 1000.0));
 }
 
 void CAESinkPi::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
@@ -499,6 +512,9 @@ void CAESinkPi::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
   m_info.m_dataFormats.push_back(AE_FMT_S16NE);
   m_info.m_dataFormats.push_back(AE_FMT_S32LE);
   m_info.m_dataFormats.push_back(AE_FMT_S16LE);
+  m_info.m_dataFormats.push_back(AE_FMT_FLOATP);
+  m_info.m_dataFormats.push_back(AE_FMT_S32NEP);
+  m_info.m_dataFormats.push_back(AE_FMT_S16NEP);
   m_info.m_dataFormats.push_back(AE_FMT_AC3);
   m_info.m_dataFormats.push_back(AE_FMT_DTS);
   m_info.m_dataFormats.push_back(AE_FMT_EAC3);
@@ -519,6 +535,9 @@ void CAESinkPi::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
   m_info.m_dataFormats.push_back(AE_FMT_FLOAT);
   m_info.m_dataFormats.push_back(AE_FMT_S32LE);
   m_info.m_dataFormats.push_back(AE_FMT_S16LE);
+  m_info.m_dataFormats.push_back(AE_FMT_FLOATP);
+  m_info.m_dataFormats.push_back(AE_FMT_S32NEP);
+  m_info.m_dataFormats.push_back(AE_FMT_S16NEP);
 
   list.push_back(m_info);
 
@@ -536,6 +555,9 @@ void CAESinkPi::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
   m_info.m_dataFormats.push_back(AE_FMT_FLOAT);
   m_info.m_dataFormats.push_back(AE_FMT_S32LE);
   m_info.m_dataFormats.push_back(AE_FMT_S16LE);
+  m_info.m_dataFormats.push_back(AE_FMT_FLOATP);
+  m_info.m_dataFormats.push_back(AE_FMT_S32NEP);
+  m_info.m_dataFormats.push_back(AE_FMT_S16NEP);
 
   list.push_back(m_info);
 }

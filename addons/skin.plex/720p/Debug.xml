@@ -97,6 +97,7 @@
 		<value condition="ListItem.Type(photoplaylist)">photoplaylist</value>
 		<value condition="ListItem.Type(videoplaylist)">videoplaylist</value>
 		<value condition="ListItem.Type(musicplaylist)">musicplaylist</value>
+		<value condition="ListItem.Type(homemovies)">homemovies</value>
 		<value/>
 	</variable>
 	<variable name="ItemStatus">
@@ -123,6 +124,7 @@
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(song)">song</value>
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(photo)">photo</value>
 		<value condition="ControlGroup(7001).HasFocus + Container(11000).ListItem.Type(photoAlbum)">photoAlbum</value>
+		<value condition="ControlGroup(7001).HasFocus + Container(11001).ListItem.Type(clip)">clip</value>
 		<!-- queue -->
 		<value condition="ControlGroup(7003).HasFocus + Container(11003).ListItem.Type(episode)">episode</value>
 		<value condition="ControlGroup(7003).HasFocus + Container(11003).ListItem.Type(movie)">movie</value>
@@ -131,19 +133,6 @@
 		<value condition="ControlGroup(7005).HasFocus + Container(11004).ListItem.Type(episode)">episode</value>
 		<value condition="ControlGroup(7005).HasFocus + Container(11004).ListItem.Type(movie)">movie</value>
 		<value condition="ControlGroup(7005).HasFocus + Container(11004).ListItem.Type(clip)">clip</value>
-	</variable>
-	<variable name="HomeListItemFullInfoTitle">
-		<!-- on deck -->
-		<value condition="ControlGroup(7002).HasFocus + Container(11001).ListItem.Type(episode)">$INFO[Container(11001).ListItem.TVShowTitle]</value>
-		<value condition="ControlGroup(7002).HasFocus + Container(11001).ListItem.Type(movie)">$INFO[Container(11001).ListItem.Label]</value>
-		<!-- recently added -->
-		<value condition="ControlGroup(7001).HasFocus + [Container(11000).ListItem.Type(season) | Container(11000).ListItem.Type(episode)]">$INFO[Container(11000).ListItem.TVShowTitle]</value>
-		<value condition="ControlGroup(7001).HasFocus + [Container(11000).ListItem.Type(movie) | Container(11000).ListItem.Type(clip)]">$INFO[Container(11000).ListItem.Label]</value>
-		<!-- queue -->
-		<value condition="ControlGroup(7003).HasFocus">$INFO[Container(11003).ListItem.Label]</value>
-		<!-- recommended -->
-		<value condition="ControlGroup(7005).HasFocus">$INFO[Container(11004).ListItem.Label]</value>
-		<!--><value>No title available (debug).</value>-->
 	</variable>
 	<include name="debugInfos">
 		<control type="group" id="1">

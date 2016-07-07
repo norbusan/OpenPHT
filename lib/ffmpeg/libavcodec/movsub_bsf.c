@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "libavutil/common.h"
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
 
@@ -27,16 +28,17 @@ static int text2movsub(AVBitStreamFilterContext *bsfc, AVCodecContext *avctx, co
                      const uint8_t *buf, int buf_size, int keyframe){
     if (buf_size > 0xffff) return 0;
     *poutbuf_size = buf_size + 2;
-    *poutbuf = av_malloc(*poutbuf_size + FF_INPUT_BUFFER_PADDING_SIZE);
+    *poutbuf = av_malloc(*poutbuf_size + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!*poutbuf)
+        return AVERROR(ENOMEM);
     AV_WB16(*poutbuf, buf_size);
     memcpy(*poutbuf + 2, buf, buf_size);
     return 1;
 }
 
 AVBitStreamFilter ff_text2movsub_bsf={
-    "text2movsub",
-    0,
-    text2movsub,
+    .name   = "text2movsub",
+    .filter = text2movsub,
 };
 
 static int mov2textsub(AVBitStreamFilterContext *bsfc, AVCodecContext *avctx, const char *args,
@@ -44,13 +46,14 @@ static int mov2textsub(AVBitStreamFilterContext *bsfc, AVCodecContext *avctx, co
                      const uint8_t *buf, int buf_size, int keyframe){
     if (buf_size < 2) return 0;
     *poutbuf_size = FFMIN(buf_size - 2, AV_RB16(buf));
-    *poutbuf = av_malloc(*poutbuf_size + FF_INPUT_BUFFER_PADDING_SIZE);
+    *poutbuf = av_malloc(*poutbuf_size + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!*poutbuf)
+        return AVERROR(ENOMEM);
     memcpy(*poutbuf, buf + 2, *poutbuf_size);
     return 1;
 }
 
 AVBitStreamFilter ff_mov2textsub_bsf={
-    "mov2textsub",
-    0,
-    mov2textsub,
+    .name   = "mov2textsub",
+    .filter = mov2textsub,
 };

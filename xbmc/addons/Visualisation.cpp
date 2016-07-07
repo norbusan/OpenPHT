@@ -19,23 +19,22 @@
  */
 #include "system.h"
 #include "Visualisation.h"
-#include "utils/fft.h"
 #include "GUIInfoManager.h"
 #include "Application.h"
+#include "guilib/GraphicContext.h"
+#include "guilib/Key.h"
 #include "music/tags/MusicInfoTag.h"
-#include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
 #include "windowing/WindowingFactory.h"
 #include "utils/URIUtils.h"
 #include "utils/StringUtils.h"
 #include "cores/AudioEngine/AEFactory.h"
-#include "cores/AudioEngine/Utils/AEConvert.h"
-#ifdef _LINUX
+#ifdef TARGET_POSIX
 #include <dlfcn.h>
 #include "filesystem/SpecialProtocol.h"
 #endif
 
-using namespace std;
 using namespace MUSIC_INFO;
 using namespace ADDON;
 
@@ -66,7 +65,7 @@ void CAudioBuffer::Set(const float* psBuffer, int iSize)
 bool CVisualisation::Create(int x, int y, int w, int h)
 {
   m_pInfo = new VIS_PROPS;
-  #ifdef HAS_DX
+#ifdef HAS_DX
   m_pInfo->device     = g_Windowing.Get3DDevice();
 #else
   m_pInfo->device     = NULL;
@@ -75,7 +74,7 @@ bool CVisualisation::Create(int x, int y, int w, int h)
   m_pInfo->y = y;
   m_pInfo->width = w;
   m_pInfo->height = h;
-  m_pInfo->pixelRatio = g_settings.m_ResInfo[g_graphicsContext.GetVideoResolution()].fPixelRatio;
+  m_pInfo->pixelRatio = g_graphicsContext.GetResInfo().fPixelRatio;
 
   m_pInfo->name = strdup(Name().c_str());
   m_pInfo->presets = strdup(CSpecialProtocol::TranslatePath(Path()).c_str());
@@ -106,8 +105,7 @@ bool CVisualisation::Create(int x, int y, int w, int h)
 
     CreateBuffers();
 
-    if (g_application.m_pPlayer)
-      g_application.m_pPlayer->RegisterAudioCallback(this);
+    CAEFactory::RegisterAudioCallback(this);
 
     return true;
   }
@@ -171,7 +169,7 @@ void CVisualisation::Render()
 
 void CVisualisation::Stop()
 {
-  if (g_application.m_pPlayer) g_application.m_pPlayer->UnRegisterAudioCallback();
+  CAEFactory::UnregisterAudioCallback();
   if (Initialized())
   {
     CAddonDll<DllVisualisation, Visualisation, VIS_PROPS>::Stop();
@@ -264,37 +262,30 @@ void CVisualisation::OnAudioData(const float* pAudioData, int iAudioDataLength)
     return;
 
   // Save our audio data in the buffers
-  auto_ptr<CAudioBuffer> pBuffer ( new CAudioBuffer(AUDIO_BUFFER_SIZE) );
+  std::unique_ptr<CAudioBuffer> pBuffer ( new CAudioBuffer(iAudioDataLength) );
   pBuffer->Set(pAudioData, iAudioDataLength);
   m_vecBuffers.push_back( pBuffer.release() );
 
   if ( (int)m_vecBuffers.size() < m_iNumBuffers) return ;
 
-  auto_ptr<CAudioBuffer> ptrAudioBuffer ( m_vecBuffers.front() );
+  std::unique_ptr<CAudioBuffer> ptrAudioBuffer ( m_vecBuffers.front() );
   m_vecBuffers.pop_front();
   // Fourier transform the data if the vis wants it...
   if (m_bWantsFreq)
   {
     const float *psAudioData = ptrAudioBuffer->Get();
-    memcpy(m_fFreq, psAudioData, AUDIO_BUFFER_SIZE * sizeof(float));
 
-    // FFT the data
-    twochanwithwindow(m_fFreq, AUDIO_BUFFER_SIZE);
+    if (!m_transform)
+      m_transform.reset(new RFFT(AUDIO_BUFFER_SIZE/2, false)); // half due to stereo
 
-    // Normalize the data
-    float fMinData = (float)AUDIO_BUFFER_SIZE * AUDIO_BUFFER_SIZE * 3 / 8 * 0.5 * 0.5; // 3/8 for the Hann window, 0.5 as minimum amplitude
-    float fInvMinData = 1.0f/fMinData;
-    for (int i = 0; i < AUDIO_BUFFER_SIZE + 2; i++)
-    {
-      m_fFreq[i] *= fInvMinData;
-    }
+    m_transform->calc(psAudioData, m_fFreq);
 
     // Transfer data to our visualisation
-    AudioData(psAudioData, AUDIO_BUFFER_SIZE, m_fFreq, AUDIO_BUFFER_SIZE);
+    AudioData(psAudioData, iAudioDataLength, m_fFreq, AUDIO_BUFFER_SIZE/2); // half due to complex-conjugate
   }
   else
   { // Transfer data to our visualisation
-    AudioData(ptrAudioBuffer->Get(), AUDIO_BUFFER_SIZE, NULL, 0);
+    AudioData(ptrAudioBuffer->Get(), iAudioDataLength, NULL, 0);
   }
   return ;
 }
@@ -319,13 +310,13 @@ void CVisualisation::ClearBuffers()
   m_bWantsFreq = false;
   m_iNumBuffers = 0;
 
-  while (m_vecBuffers.size() > 0)
+  while (!m_vecBuffers.empty())
   {
     CAudioBuffer* pAudioBuffer = m_vecBuffers.front();
     delete pAudioBuffer;
     m_vecBuffers.pop_front();
   }
-  for (int j = 0; j < AUDIO_BUFFER_SIZE*2; j++)
+  for (int j = 0; j < AUDIO_BUFFER_SIZE; j++)
   {
     m_fFreq[j] = 0.0f;
   }

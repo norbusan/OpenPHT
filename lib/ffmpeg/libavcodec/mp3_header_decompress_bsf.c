@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "libavutil/common.h"
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
 #include "mpegaudiodecheader.h"
@@ -70,8 +71,8 @@ static int mp3_header_decompress(AVBitStreamFilterContext *bsfc, AVCodecContext 
     header |= (frame_size == buf_size + 4)<<16; //FIXME actually set a correct crc instead of 0
 
     *poutbuf_size= frame_size;
-    *poutbuf= av_malloc(frame_size + FF_INPUT_BUFFER_PADDING_SIZE);
-    memcpy(*poutbuf + frame_size - buf_size, buf, buf_size + FF_INPUT_BUFFER_PADDING_SIZE);
+    *poutbuf= av_malloc(frame_size + AV_INPUT_BUFFER_PADDING_SIZE);
+    memcpy(*poutbuf + frame_size - buf_size, buf, buf_size + AV_INPUT_BUFFER_PADDING_SIZE);
 
     if(avctx->channels==2){
         uint8_t *p= *poutbuf + frame_size - buf_size;
@@ -91,7 +92,6 @@ static int mp3_header_decompress(AVBitStreamFilterContext *bsfc, AVCodecContext 
 }
 
 AVBitStreamFilter ff_mp3_header_decompress_bsf={
-    "mp3decomp",
-    0,
-    mp3_header_decompress,
+    .name   = "mp3decomp",
+    .filter = mp3_header_decompress,
 };

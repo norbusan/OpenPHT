@@ -18,6 +18,8 @@
  *
  */
 
+#include <string>
+#include <cstdlib>
 #include "threads/SystemClock.h"
 #include "DVDFileInfo.h"
 #include "FileItem.h"
@@ -26,10 +28,8 @@
 #include "video/VideoInfoTag.h"
 #include "filesystem/StackDirectory.h"
 #include "utils/log.h"
-#include "utils/TimeUtils.h"
 #include "utils/URIUtils.h"
 
-#include "DVDClock.h"
 #include "DVDStreamInfo.h"
 #include "DVDInputStreams/DVDInputStream.h"
 #ifdef HAVE_LIBBLURAY
@@ -44,20 +44,18 @@
 #include "DVDCodecs/DVDFactoryCodec.h"
 #include "DVDCodecs/Video/DVDVideoCodec.h"
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
+#include "DVDDemuxers/DVDDemuxVobsub.h"
 
-#include "DllAvCodec.h"
-#include "DllSwScale.h"
+#include "libavcodec/avcodec.h"
+#include "libswscale/swscale.h"
 #include "filesystem/File.h"
+#include "cores/FFmpeg.h"
 #include "TextureCache.h"
-
-/* PLEX */
-static DllAvFormat _dllAvFormat;
-/* END PLEX */
 
 bool CDVDFileInfo::GetFileDuration(const CStdString &path, int& duration)
 {
-  std::auto_ptr<CDVDInputStream> input;
-  std::auto_ptr<CDVDDemux> demux;
+  std::unique_ptr<CDVDInputStream> input;
+  std::unique_ptr<CDVDDemux> demux;
 
   input.reset(CDVDFactoryInputStream::CreateInputStream(NULL, path, ""));
   if (!input.get())
@@ -66,10 +64,7 @@ bool CDVDFileInfo::GetFileDuration(const CStdString &path, int& duration)
   if (!input->Open(path, ""))
     return false;
 
-  /* PLEX */
-  CStdString error;
-  demux.reset(CDVDFactoryDemuxer::CreateDemuxer(input.get(), error));
-  /* END PLEX */
+  demux.reset(CDVDFactoryDemuxer::CreateDemuxer(input.get(), true));
   if (!demux.get())
     return false;
 
@@ -95,7 +90,9 @@ int DegreeToOrientation(int degrees)
   }
 }
 
-bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &details, CStreamDetails *pStreamDetails)
+bool CDVDFileInfo::ExtractThumb(const CStdString &strPath,
+                                CTextureDetails &details,
+                                CStreamDetails *pStreamDetails, int pos)
 {
   unsigned int nTime = XbmcThreads::SystemClockMillis();
   CDVDInputStream *pInputStream = CDVDFactoryInputStream::CreateInputStream(NULL, strPath, "");
@@ -105,9 +102,16 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
     return false;
   }
 
-  if (pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD))
+  if (pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD)
+   || pInputStream->IsStreamType(DVDSTREAM_TYPE_BLURAY))
   {
-    CLog::Log(LOGERROR, "InputStream: dvd streams not supported for thumb extraction, file: %s", strPath.c_str());
+    CLog::Log(LOGDEBUG, "%s: disc streams not supported for thumb extraction, file: %s", __FUNCTION__, strPath.c_str());
+    delete pInputStream;
+    return false;
+  }
+
+  if (pInputStream->IsStreamType(DVDSTREAM_TYPE_PVRMANAGER))
+  {
     delete pInputStream;
     return false;
   }
@@ -124,10 +128,7 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
 
   try
   {
-    /* PLEX */
-    CStdString error;
-    pDemuxer = CDVDFactoryDemuxer::CreateDemuxer(pInputStream, error);
-    /* END PLEX */
+    pDemuxer = CDVDFactoryDemuxer::CreateDemuxer(pInputStream, true);
     if(!pDemuxer)
     {
       delete pInputStream;
@@ -147,14 +148,14 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
   if (pStreamDetails)
     DemuxerToStreamDetails(pInputStream, pDemuxer, *pStreamDetails, strPath);
 
-  CDemuxStream* pStream = NULL;
   int nVideoStream = -1;
   for (int i = 0; i < pDemuxer->GetNrOfStreams(); i++)
   {
-    pStream = pDemuxer->GetStream(i);
+    CDemuxStream* pStream = pDemuxer->GetStream(i);
     if (pStream)
     {
-      if(pStream->type == STREAM_VIDEO)
+      // ignore if it's a picture attachment (e.g. jpeg artwork)
+      if(pStream->type == STREAM_VIDEO && !(pStream->flags & AV_DISPOSITION_ATTACHED_PIC))
         nVideoStream = i;
       else
         pStream->SetDiscard(AVDISCARD_ALL);
@@ -171,7 +172,7 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
     CDVDStreamInfo hint(*pDemuxer->GetStream(nVideoStream), true);
     hint.software = true;
 
-    if (hint.codec == CODEC_ID_MPEG2VIDEO || hint.codec == CODEC_ID_MPEG1VIDEO)
+    if (hint.codec == AV_CODEC_ID_MPEG2VIDEO || hint.codec == AV_CODEC_ID_MPEG1VIDEO)
     {
       // libmpeg2 is not thread safe so use ffmepg for mpeg2/mpeg1 thumb extraction
       CDVDCodecOptions dvdOptions;
@@ -185,12 +186,11 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
     if (pVideoCodec)
     {
       int nTotalLen = pDemuxer->GetStreamLength();
-      int nSeekTo = nTotalLen / 3;
+      int nSeekTo = (pos==-1?nTotalLen / 3:pos);
 
       CLog::Log(LOGDEBUG,"%s - seeking to pos %dms (total: %dms) in %s", __FUNCTION__, nSeekTo, nTotalLen, strPath.c_str());
       if (pDemuxer->SeekTime(nSeekTo, true))
       {
-        DemuxPacket* pPacket = NULL;
         int iDecoderState = VC_ERROR;
         DVDVideoPicture picture;
 
@@ -200,7 +200,7 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
         int abort_index = pDemuxer->GetNrOfStreams() * 160;
         do
         {
-          pPacket = pDemuxer->Read();
+          DemuxPacket* pPacket = pDemuxer->Read();
           packetsTried++;
 
           if (!pPacket)
@@ -239,22 +239,19 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
               aspect = hint.aspect;
             unsigned int nHeight = (unsigned int)((double)g_advancedSettings.GetThumbSize() / aspect);
 
-            DllSwScale dllSwScale;
-            dllSwScale.Load();
-
-            BYTE *pOutBuf = new BYTE[nWidth * nHeight * 4];
-            struct SwsContext *context = dllSwScale.sws_getContext(picture.iWidth, picture.iHeight,
+            uint8_t *pOutBuf = new uint8_t[nWidth * nHeight * 4];
+            struct SwsContext *context = sws_getContext(picture.iWidth, picture.iHeight,
                   PIX_FMT_YUV420P, nWidth, nHeight, PIX_FMT_BGRA, SWS_FAST_BILINEAR | SwScaleCPUFlags(), NULL, NULL, NULL);
-            uint8_t *src[] = { picture.data[0], picture.data[1], picture.data[2], 0 };
-            int     srcStride[] = { picture.iLineSize[0], picture.iLineSize[1], picture.iLineSize[2], 0 };
-            uint8_t *dst[] = { pOutBuf, 0, 0, 0 };
-            int     dstStride[] = { nWidth*4, 0, 0, 0 };
 
             if (context)
             {
+              uint8_t *src[] = { picture.data[0], picture.data[1], picture.data[2], 0 };
+              int     srcStride[] = { picture.iLineSize[0], picture.iLineSize[1], picture.iLineSize[2], 0 };
+              uint8_t *dst[] = { pOutBuf, 0, 0, 0 };
+              int     dstStride[] = { (int)nWidth*4, 0, 0, 0 };
               int orientation = DegreeToOrientation(hint.orientation);
-              dllSwScale.sws_scale(context, src, srcStride, 0, picture.iHeight, dst, dstStride);
-              dllSwScale.sws_freeContext(context);
+              sws_scale(context, src, srcStride, 0, picture.iHeight, dst, dstStride);
+              sws_freeContext(context);
 
               details.width = nWidth;
               details.height = nHeight;
@@ -262,7 +259,6 @@ bool CDVDFileInfo::ExtractThumb(const CStdString &strPath, CTextureDetails &deta
               bOk = true;
             }
 
-            dllSwScale.Unload();
             delete [] pOutBuf;
           }
         }
@@ -316,16 +312,19 @@ bool CDVDFileInfo::GetFileStreamDetails(CFileItem *pItem)
   if (!pInputStream)
     return false;
 
+  if (pInputStream->IsStreamType(DVDSTREAM_TYPE_PVRMANAGER))
+  {
+    delete pInputStream;
+    return false;
+  }
+
   if (pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD) || !pInputStream->Open(playablePath.c_str(), ""))
   {
     delete pInputStream;
     return false;
   }
 
-  /* PLEX */
-  CStdString error;
-  CDVDDemux *pDemuxer = CDVDFactoryDemuxer::CreateDemuxer(pInputStream, error);
-  /* END PLEX */
+  CDVDDemux *pDemuxer = CDVDFactoryDemuxer::CreateDemuxer(pInputStream, true);
   if (pDemuxer)
   {
     bool retVal = DemuxerToStreamDetails(pInputStream, pDemuxer, pItem->GetVideoInfoTag()->m_streamDetails, strFileNameAndPath);
@@ -349,7 +348,7 @@ bool CDVDFileInfo::DemuxerToStreamDetails(CDVDInputStream *pInputStream, CDVDDem
   for (int iStream=0; iStream<pDemux->GetNrOfStreams(); iStream++)
   {
     CDemuxStream *stream = pDemux->GetStream(iStream);
-    if (stream->type == STREAM_VIDEO)
+    if (stream->type == STREAM_VIDEO && !(stream->flags & AV_DISPOSITION_ATTACHED_PIC))
     {
       CStreamDetailVideo *p = new CStreamDetailVideo();
       p->m_iWidth = ((CDemuxStreamVideo *)stream)->iWidth;
@@ -359,6 +358,7 @@ bool CDVDFileInfo::DemuxerToStreamDetails(CDVDInputStream *pInputStream, CDVDDem
         p->m_fAspect = (float)p->m_iWidth / p->m_iHeight;
       pDemux->GetStreamCodecName(iStream, p->m_strCodec);
       p->m_iDuration = pDemux->GetStreamLength();
+      p->m_strStereoMode = ((CDemuxStreamVideo *)stream)->stereo_mode;
 
       // stack handling
       if (URIUtils::IsStack(path))
@@ -410,7 +410,9 @@ bool CDVDFileInfo::DemuxerToStreamDetails(CDVDInputStream *pInputStream, CDVDDem
   {
     if(((CDVDInputStreamBluray*)pInputStream)->GetTotalTime() > 0)
     {
-      ((CStreamDetailVideo*)details.GetNthStream(CStreamDetail::VIDEO,0))->m_iDuration = ((CDVDInputStreamBluray*)pInputStream)->GetTotalTime() / 1000;
+      CStreamDetailVideo* detailVideo = (CStreamDetailVideo*)details.GetNthStream(CStreamDetail::VIDEO, 0);
+      if (detailVideo)
+        detailVideo->m_iDuration = ((CDVDInputStreamBluray*)pInputStream)->GetTotalTime() / 1000;
     }
   }
 #endif

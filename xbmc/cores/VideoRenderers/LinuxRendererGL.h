@@ -29,22 +29,19 @@
 #include "guilib/Shader.h"
 #include "settings/VideoSettings.h"
 #include "RenderFlags.h"
+#include "RenderFormats.h"
 #include "guilib/GraphicContext.h"
 #include "BaseRenderer.h"
-#include "RenderFormats.h"
 
 #include "threads/Event.h"
 
 class CRenderCapture;
 
-class CVDPAU;
 class CBaseTexture;
 namespace Shaders { class BaseYUV2RGBShader; }
 namespace Shaders { class BaseVideoFilterShader; }
-namespace VAAPI   { struct CHolder; }
-
-#define NUM_BUFFERS 3
-
+namespace VAAPI   { class CVaapiRenderPicture; }
+namespace VDPAU   { class CVdpauRenderPicture; }
 
 #undef ALIGN
 #define ALIGN(value, alignment) (((value)+((alignment)-1))&~((alignment)-1))
@@ -114,15 +111,13 @@ extern YUVCOEF yuv_coef_bt709;
 extern YUVCOEF yuv_coef_ebu;
 extern YUVCOEF yuv_coef_smtp240m;
 
-class DllSwScale;
-
 class CLinuxRendererGL : public CBaseRenderer
 {
 public:
   CLinuxRendererGL();
   virtual ~CLinuxRendererGL();
 
-  virtual void Update(bool bPauseDrawing);
+  virtual void Update();
   virtual void SetupScreenshot() {};
 
   bool RenderCapture(CRenderCapture* capture);
@@ -137,15 +132,17 @@ public:
   virtual void         UnInit();
   virtual void         Reset(); /* resets renderer after seek for example */
   virtual void         Flush();
+  virtual void         ReleaseBuffer(int idx);
+  virtual void         SetBufferSize(int numBuffers) { m_NumYV12Buffers = numBuffers; }
 
 #ifdef HAVE_LIBVDPAU
-  virtual void         AddProcessor(CVDPAU* vdpau);
+  virtual void         AddProcessor(VDPAU::CVdpauRenderPicture* vdpau, int index);
 #endif
 #ifdef HAVE_LIBVA
-  virtual void         AddProcessor(VAAPI::CHolder& holder);
+  virtual void         AddProcessor(VAAPI::CVaapiRenderPicture* vaapi, int index);
 #endif
 #ifdef TARGET_DARWIN
-  virtual void         AddProcessor(struct __CVBuffer *cvBufferRef);
+  virtual void         AddProcessor(struct __CVBuffer *cvBufferRef, int index);
 #endif
 
   virtual void RenderUpdate(bool clear, DWORD flags = 0, DWORD alpha = 255);
@@ -158,11 +155,8 @@ public:
   virtual bool Supports(ESCALINGMETHOD method);
 
   virtual EINTERLACEMETHOD AutoInterlaceMethod();
-  virtual std::vector<ERenderFormat> SupportedFormats() { return m_formats; }
 
-  /* PLEX */
-  virtual void SetRGB32Image(const char *image, int nHeight, int nWidth, int nPitch);
-  /* END PLEX */
+  virtual CRenderInfo GetRenderInfo();
 
 protected:
   virtual void Render(DWORD flags, int renderBuffer);
@@ -170,7 +164,6 @@ protected:
   void         DrawBlackBars();
 
   bool ValidateRenderer();
-  virtual void ManageTextures();
   int  NextYV12Texture();
   virtual bool ValidateRenderTarget();
   virtual void LoadShaders(int field=FIELD_FULL);
@@ -194,6 +187,10 @@ protected:
   void DeleteVDPAUTexture(int index);
   bool CreateVDPAUTexture(int index);
 
+  bool UploadVDPAUTexture420(int index);
+  void DeleteVDPAUTexture420(int index);
+  bool CreateVDPAUTexture420(int index);
+
   bool UploadVAAPITexture(int index);
   void DeleteVAAPITexture(int index);
   bool CreateVAAPITexture(int index);
@@ -214,12 +211,12 @@ protected:
   void CalculateTextureSourceRects(int source, int num_planes);
 
   // renderers
-  void RenderToFBO(int renderBuffer, int field);
+  void RenderToFBO(int renderBuffer, int field, bool weave = false);
   void RenderFromFBO();
   void RenderSinglePass(int renderBuffer, int field); // single pass glsl renderer
   void RenderSoftware(int renderBuffer, int field);   // single pass s/w yuv2rgb renderer
-  void RenderVDPAU(int renderBuffer, int field);      // render using vdpau hardware
-  void RenderVAAPI(int renderBuffer, int field);      // render using vdpau hardware
+  void RenderRGB(int renderBuffer, int field);      // render using vdpau/vaapi hardware
+  void RenderProgressiveWeave(int renderBuffer, int field); // render using vdpau hardware
 
   struct
   {
@@ -235,7 +232,6 @@ protected:
   bool m_bValidated;
   std::vector<ERenderFormat> m_formats;
   bool m_bImageReady;
-  ERenderFormat m_format;
   GLenum m_textureTarget;
   unsigned short m_renderMethod;
   RenderQuality m_renderQuality;
@@ -279,10 +275,10 @@ protected:
     GLuint    pbo[MAX_PLANES];
 
 #ifdef HAVE_LIBVDPAU
-    CVDPAU*   vdpau;
+    VDPAU::CVdpauRenderPicture *vdpau;
 #endif
 #ifdef HAVE_LIBVA
-    VAAPI::CHolder& vaapi;
+    VAAPI::CVaapiRenderPicture *vaapi;
 #endif
 #ifdef TARGET_DARWIN_OSX
     struct __CVBuffer *cvBufferRef;
@@ -299,6 +295,7 @@ protected:
                 , unsigned width,  unsigned height
                 , int stride, int bpp, void* data, GLuint* pbo = NULL );
 
+  void GetPlaneTextureSize(YUVPLANE& plane);
 
   Shaders::BaseYUV2RGBShader     *m_pYUVShader;
   Shaders::BaseVideoFilterShader *m_pVideoFilterShader;
@@ -309,13 +306,10 @@ protected:
   float m_clearColour;
 
   // software scale library (fallback if required gl version is not available)
-  DllSwScale        *m_dllSwScale;
   BYTE              *m_rgbBuffer;  // if software scale is used, this will hold the result image
   unsigned int       m_rgbBufferSize;
   GLuint             m_rgbPbo;
   struct SwsContext *m_context;
-
-  CEvent* m_eventTexturesDone[NUM_BUFFERS];
 
   void BindPbo(YUVBUFFER& buff);
   void UnBindPbo(YUVBUFFER& buff);
@@ -325,17 +319,13 @@ protected:
   bool  m_nonLinStretch;
   bool  m_nonLinStretchGui;
   float m_pixelRatio;
-
-  /* PLEX */
-  bool         m_bRGBImageSet;
-  /* END PLEX */
 };
 
 
 inline int NP2( unsigned x ) {
-#if defined(_LINUX) && !defined(__POWERPC__) && !defined(__PPC__) && !defined(__arm__)
+#if defined(TARGET_POSIX) && !defined(__POWERPC__) && !defined(__PPC__) && !defined(__arm__) && !defined(__mips__) && !defined(__aarch64__)
   // If there are any issues compiling this, just append a ' && 0'
-  // to the above to make it '#if defined(_LINUX) && 0'
+  // to the above to make it '#if defined(TARGET_POSIX) && 0'
 
   // Linux assembly is AT&T Unix style, not Intel style
   unsigned y;

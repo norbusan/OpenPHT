@@ -1,34 +1,35 @@
 include ../Makefile.include
+DEPS= Makefile size-max.patch
 
 # lib name, version
-BASE_URL=ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3
+BASE_URL=ftp://ftp.gnutls.org/gcrypt/gnutls/v3.4
 LIBNAME=gnutls
-VERSION=3.3.21
+VERSION=3.4.12
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.xz
 ARCHIVE_TOOL=/usr/local/bin/gtar
 
 # configuration settings
-CONFIGURE=./configure --prefix=$(PREFIX) --disable-shared --without-p11-kit --disable-nls --enable-local-libopts --disable-doc
+CONFIGURE=./configure --prefix=$(PREFIX) --disable-shared --without-p11-kit --with-included-libtasn1 --disable-nls --enable-local-libopts --disable-doc
 
-LIBDYLIB=$(SOURCE)/.libs/$(LIBNAME).dylib
+LIBDYLIB=$(SOURCE)/lib/.libs/lib$(LIBNAME).a
 
-all: $(LIBDYLIB) .installed
+all: .installed
 
 $(TARBALLS_LOCATION)/$(ARCHIVE):
 	$(RETRIEVE_TOOL) $(RETRIEVE_TOOL_FLAGS) $(BASE_URL)/$(ARCHIVE)
 
-$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE)
+$(SOURCE): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	rm -rf $(SOURCE)
-	$(ARCHIVE_TOOL) xJf $(TARBALLS_LOCATION)/$(ARCHIVE)
+	$(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	echo $(SOURCE) > .gitignore
 	cd $(SOURCE); patch -p0 < ../size-max.patch
 	cd $(SOURCE); $(CONFIGURE)
 
 $(LIBDYLIB): $(SOURCE)
-	make -j $(MAKE_JOBS) -C $(SOURCE)
+	make -C $(SOURCE)
 
-.installed:
+.installed: $(LIBDYLIB)
 	make -C $(SOURCE) install
 	touch $@
 

@@ -2,20 +2,20 @@
  * SMJPEG demuxer
  * Copyright (c) 2011 Paul B Mahol
  *
- * This file is part of Libav.
+ * This file is part of FFmpeg.
  *
- * Libav is free software; you can redistribute it and/or
+ * FFmpeg is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * Libav is distributed in the hope that it will be useful,
+ * FFmpeg is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
+ * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -23,6 +23,8 @@
  * @file
  * This is a demuxer for Loki SDL Motion JPEG files
  */
+
+#include <inttypes.h>
 
 #include "avformat.h"
 #include "internal.h"
@@ -41,7 +43,7 @@ static int smjpeg_probe(AVProbeData *p)
     return 0;
 }
 
-static int smjpeg_read_header(AVFormatContext *s, AVFormatParameters *ap)
+static int smjpeg_read_header(AVFormatContext *s)
 {
     SMJPEGContext *sc = s->priv_data;
     AVStream *ast = NULL, *vst = NULL;
@@ -52,11 +54,11 @@ static int smjpeg_read_header(AVFormatContext *s, AVFormatParameters *ap)
     avio_skip(pb, 8); // magic
     version = avio_rb32(pb);
     if (version)
-        av_log_ask_for_sample(s, "unknown version %d\n", version);
+        avpriv_request_sample(s, "Unknown version %"PRIu32, version);
 
     duration = avio_rb32(pb); // in msec
 
-    while (!pb->eof_reached) {
+    while (!avio_feof(pb)) {
         htype = avio_rl32(pb);
         switch (htype) {
         case SMJPEG_TXT:
@@ -77,8 +79,8 @@ static int smjpeg_read_header(AVFormatContext *s, AVFormatParameters *ap)
             break;
         case SMJPEG_SND:
             if (ast) {
-                av_log_ask_for_sample(s, "multiple audio streams not supported\n");
-                return AVERROR_INVALIDDATA;
+                avpriv_request_sample(s, "Multiple audio streams");
+                return AVERROR_PATCHWELCOME;
             }
             hlength = avio_rb32(pb);
             if (hlength < 8)
@@ -100,16 +102,16 @@ static int smjpeg_read_header(AVFormatContext *s, AVFormatParameters *ap)
             break;
         case SMJPEG_VID:
             if (vst) {
-                av_log_ask_for_sample(s, "multiple video streams not supported\n");
+                avpriv_request_sample(s, "Multiple video streams");
                 return AVERROR_INVALIDDATA;
             }
             hlength = avio_rb32(pb);
             if (hlength < 12)
                 return AVERROR_INVALIDDATA;
-            avio_skip(pb, 4); // number of frames
             vst = avformat_new_stream(s, 0);
             if (!vst)
                 return AVERROR(ENOMEM);
+            vst->nb_frames         = avio_rb32(pb);
             vst->codec->codec_type = AVMEDIA_TYPE_VIDEO;
             vst->codec->width      = avio_rb16(pb);
             vst->codec->height     = avio_rb16(pb);
@@ -124,7 +126,7 @@ static int smjpeg_read_header(AVFormatContext *s, AVFormatParameters *ap)
         case SMJPEG_HEND:
             return 0;
         default:
-            av_log(s, AV_LOG_ERROR, "unknown header %x\n", htype);
+            av_log(s, AV_LOG_ERROR, "unknown header %"PRIx32"\n", htype);
             return AVERROR_INVALIDDATA;
         }
     }
@@ -135,10 +137,13 @@ static int smjpeg_read_header(AVFormatContext *s, AVFormatParameters *ap)
 static int smjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     SMJPEGContext *sc = s->priv_data;
-    uint32_t dtype, ret, size, timestamp;
+    uint32_t dtype, size, timestamp;
+    int64_t pos;
+    int ret;
 
-    if (s->pb->eof_reached)
+    if (avio_feof(s->pb))
         return AVERROR_EOF;
+    pos   = avio_tell(s->pb);
     dtype = avio_rl32(s->pb);
     switch (dtype) {
     case SMJPEG_SNDD:
@@ -147,6 +152,7 @@ static int smjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
         ret = av_get_packet(s->pb, pkt, size);
         pkt->stream_index = sc->audio_stream_index;
         pkt->pts = timestamp;
+        pkt->pos = pos;
         break;
     case SMJPEG_VIDD:
         timestamp = avio_rb32(s->pb);
@@ -154,12 +160,13 @@ static int smjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
         ret = av_get_packet(s->pb, pkt, size);
         pkt->stream_index = sc->video_stream_index;
         pkt->pts = timestamp;
+        pkt->pos = pos;
         break;
     case SMJPEG_DONE:
         ret = AVERROR_EOF;
         break;
     default:
-        av_log(s, AV_LOG_ERROR, "unknown chunk %x\n", dtype);
+        av_log(s, AV_LOG_ERROR, "unknown chunk %"PRIx32"\n", dtype);
         ret = AVERROR_INVALIDDATA;
         break;
     }
@@ -174,4 +181,5 @@ AVInputFormat ff_smjpeg_demuxer = {
     .read_header    = smjpeg_read_header,
     .read_packet    = smjpeg_read_packet,
     .extensions     = "mjpg",
+    .flags          = AVFMT_GENERIC_INDEX,
 };

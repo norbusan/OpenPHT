@@ -24,14 +24,19 @@
 #include "XBApplicationEx.h"
 
 #include "guilib/IMsgTargetCallback.h"
-#include "guilib/Key.h"
-#include "threads/Condition.h"
+#include "guilib/Resolution.h"
 #include "utils/GlobalsHandling.h"
 
 #include <map>
+#include <memory>
+#include <string>
 
+class CAction;
 class CFileItem;
 class CFileItemList;
+class CKey;
+
+
 namespace ADDON
 {
   class CSkinInfo;
@@ -44,13 +49,13 @@ namespace MEDIA_DETECT
   class CAutorun;
 }
 
-#include "cores/IPlayer.h"
+#include "cores/IPlayerCallback.h"
 #include "cores/playercorefactory/PlayerCoreFactory.h"
 #include "PlayListPlayer.h"
-#if !defined(_WIN32) && defined(HAS_DVD_DRIVE)
+#if !defined(TARGET_WINDOWS) && defined(HAS_DVD_DRIVE)
 #include "storage/DetectDVDType.h"
 #endif
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
 #include "win32/WIN32Util.h"
 #endif
 #include "utils/Stopwatch.h"
@@ -60,6 +65,9 @@ namespace MEDIA_DETECT
 #endif
 #include "windowing/XBMC_events.h"
 #include "threads/Thread.h"
+
+#include "ApplicationPlayer.h"
+#include "interfaces/IActionListener.h"
 
 /* PLEX */
 #include "plex/Windows/LaunchHost.h"
@@ -102,6 +110,12 @@ namespace MUSIC_INFO
   class CMusicInfoScanner;
 }
 
+#define VOLUME_MINIMUM 0.0f        // -60dB
+#define VOLUME_MAXIMUM 1.0f        // 0dB
+#define VOLUME_DYNAMIC_RANGE 90.0f // 60dB
+#define VOLUME_CONTROL_STEPS 90    // 90 steps
+
+
 class CBackgroundPlayer : public CThread
 {
 public:
@@ -115,6 +129,7 @@ protected:
 
 class CApplication : public CXBApplicationEx, public IPlayerCallback, public IMsgTargetCallback
 {
+  friend class CApplicationPlayer;
 public:
 
   enum ESERVERS
@@ -171,7 +186,7 @@ public:
   void RestartApp();
   void UnloadSkin(bool forReload = false);
   bool LoadUserWindows();
-  void ReloadSkin();
+  void ReloadSkin(bool confirm = false);
   const CStdString& CurrentFile();
   CFileItem& CurrentFileItem();
   virtual bool OnMessage(CGUIMessage& message);
@@ -197,10 +212,6 @@ public:
   void Restart(bool bSamePosition = true);
   void DelayedPlayerRestart();
   void CheckDelayedPlayerRestart();
-  bool IsPlaying() const;
-  bool IsPaused() const;
-  bool IsPlayingAudio() const;
-  bool IsPlayingVideo() const;
   bool IsPlayingFullScreenVideo() const;
   bool IsStartingPlayback() const { return m_bPlaybackStarting; }
   bool IsFullScreen();
@@ -219,15 +230,14 @@ public:
   virtual void Process();
   void ProcessSlow();
   void ResetScreenSaver();
-  int GetVolume() const;
+  float GetVolume(bool percentage = true) const;
   void SetVolume(float iValue, bool isPercentage = true);
   bool IsMuted() const;
   void ToggleMute(void);
+  void SetMute(bool mute);
   void ShowVolumeBar(const CAction *action = NULL);
-  int GetPlaySpeed() const;
   int GetSubtitleDelay() const;
   int GetAudioDelay() const;
-  void SetPlaySpeed(int iSpeed);
   void ResetSystemIdleTimer();
   void ResetScreenSaverTimer();
   void StopScreenSaverTimer();
@@ -285,11 +295,11 @@ public:
   MEDIA_DETECT::CAutorun* m_Autorun;
 #endif
 
-#if !defined(_WIN32) && defined(HAS_DVD_DRIVE)
+#if !defined(TARGET_WINDOWS) && defined(HAS_DVD_DRIVE)
   MEDIA_DETECT::CDetectDVDMedia m_DetectDVDType;
 #endif
 
-  IPlayer* m_pPlayer;
+  CApplicationPlayer* m_pPlayer;
 
 #ifdef HAS_WEB_SERVER
   CWebServer& m_WebServer;
@@ -305,10 +315,21 @@ public:
 #endif
 
   inline bool IsInScreenSaver() { return m_bScreenSave; };
+  inline bool IsDPMSActive() { return m_dpmsIsActive; };
   int m_iScreenSaveLock; // spiff: are we checking for a lock? if so, ignore the screensaver state, if -1 we have failed to input locks
 
   bool m_bIsPaused;
   bool m_bPlaybackStarting;
+  typedef enum
+  {
+    PLAY_STATE_NONE = 0,
+    PLAY_STATE_STARTING,
+    PLAY_STATE_PLAYING,
+    PLAY_STATE_STOPPED,
+    PLAY_STATE_ENDED,
+  } PlayState;
+  PlayState m_ePlayState;
+  CCriticalSection m_playStateMutex;
 
   CKaraokeLyricsManager* m_pKaraokeMgr;
 
@@ -316,8 +337,6 @@ public:
   CStdString m_strPlayListFile;
 
   int GlobalIdleTime();
-  void NewFrame();
-  bool WaitFrame(unsigned int timeout);
 
   void EnablePlatformDirectories(bool enable=true)
   {
@@ -356,23 +375,27 @@ public:
     return m_bTestMode;
   }
 
-  bool IsPresentFrame();
-
   void Minimize();
   bool ToggleDPMS(bool manual);
 
   float GetDimScreenSaverLevel() const;
 
-  /*! \brief Retrieve the applications seek handler.
-   \return a constant pointer to the seek handler.
-   \sa CSeekHandler
-   */
-  const CSeekHandler *GetSeekHandler() const { return m_seekHandler; };
-
   bool SwitchToFullScreen();
 
   CSplash* GetSplash() { return m_splash; }
   void SetRenderGUI(bool renderGUI);
+  bool GetRenderGUI() const { return m_renderGUI; };
+
+  /*!
+   \brief Register an action listener.
+   \param listener The listener to register
+   */
+  void RegisterActionListener(IActionListener *listener);
+  /*!
+   \brief Unregister an action listener.
+   \param listener The listener to unregister
+   */
+  void UnregisterActionListener(IActionListener *listener);
 
   /* PLEX */
   bool m_bPlaybackInFullScreen;
@@ -401,9 +424,16 @@ public:
   /* END PLEX */
 protected:
   bool LoadSkin(const CStdString& skinID);
-  void LoadSkin(const boost::shared_ptr<ADDON::CSkinInfo>& skin);
+  bool LoadSkin(const boost::shared_ptr<ADDON::CSkinInfo>& skin);
+  
+  /*!
+   \brief Delegates the action to all registered action handlers.
+   \param action The action
+   \return true, if the action was taken by one of the action listener.
+   */
+  bool NotifyActionListeners(const CAction &action) const;
 
-  bool m_skinReloading; // if true we disallow LoadSkin until ReloadSkin is called
+  bool m_skinReverting;
 
 #if defined(TARGET_DARWIN_IOS)
   friend class CWinEventsIOS;
@@ -413,7 +443,7 @@ protected:
   ADDON::AddonPtr m_screenSaver;
 
   // timer information
-#ifdef _WIN32
+#ifdef TARGET_WINDOWS
   CWinIdleTimer m_idleTimer;
   CWinIdleTimer m_screenSaverTimer;
 #else
@@ -439,7 +469,6 @@ protected:
   CStdString m_prevMedia;
   CSplash* m_splash;
   ThreadIdentifier m_threadID;       // application thread ID.  Used in applicationMessanger to know where we are firing a thread with delay from.
-  PLAYERCOREID m_eCurrentPlayer;
   bool m_bInitializing;
   bool m_bPlatformDirectories;
 
@@ -447,22 +476,18 @@ protected:
   CFileItemPtr m_progressTrackingItem;
   bool m_progressTrackingPlayCountUpdate;
 
-  int m_iPlaySpeed;
   int m_currentStackPosition;
   int m_nextPlaylistItem;
 
   bool m_bPresentFrame;
   unsigned int m_lastFrameTime;
   unsigned int m_lastRenderTime;
+  bool m_skipGuiRender;
 
   bool m_bStandalone;
   bool m_bEnableLegacyRes;
   bool m_bTestMode;
   bool m_bSystemScreenSaverEnable;
-
-  int        m_frameCount;
-  CCriticalSection m_frameMutex;
-  XbmcThreads::ConditionVariable  m_frameCond;
 
   VIDEO::CVideoInfoScanner *m_videoInfoScanner;
   MUSIC_INFO::CMusicInfoScanner *m_musicInfoScanner;
@@ -495,7 +520,6 @@ protected:
   bool InitDirectoriesWin32();
   void CreateUserDirs();
 
-  CSeekHandler *m_seekHandler;
   CInertialScrollingHandler *m_pInertialScrollingHandler;
   CNetwork    *m_network;
 #ifdef HAS_PERFORMANCE_SAMPLE
@@ -506,6 +530,7 @@ protected:
   std::map<std::string, std::map<int, float> > m_lastAxisMap;
 #endif
 
+  std::vector<IActionListener *> m_actionListeners;
 
   /* PLEX */
 #ifdef HAVE_BREAKPAD
@@ -516,6 +541,9 @@ protected:
   LaunchHost *m_pLaunchHost;
   bool m_returnFromAutoUpdate;
   /* END PLEX */
+
+private:
+  CCriticalSection                m_critSection;                 /*!< critical section for all changes to this class, except for changes to triggers */
 };
 
 XBMC_GLOBAL_REF(CApplication,g_application);

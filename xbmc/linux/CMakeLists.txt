@@ -10,3 +10,7 @@ if(NOT TARGET_RPI)
   list(REMOVE_ITEM linux_SRCS ./OMXClock.cpp ./OMXCore.cpp ./RBP.cpp)
 endif()
 add_sources(${linux_SRCS})
+
+if(TARGET_LINUX)
+  add_subdirectory(sse4)
+endif()
